@@ -9,7 +9,7 @@ The C0.2 archive `Sealed_Heaven_C0_2_Source.zip` remains `2804d33a785acb7331a0d8
 
 ## 2. What the owner approved
 
-OD-01 through OD-16 and AM-01 through AM-08 remain approved. OC-EDGE remains rejected. NF-01 through NF-04 remain closed. NF-05 is closed by naming preinstalled-task packing fields. Normative copy: `docs/C0_3_IMPLEMENTATION_SPEC.md` version 1.3-approved and `docs/C0_3_ACCEPTANCE_TESTS.md` version 1.3-approved. Decision record: `C0_3_OWNER_DECISION_RECORD.md` version 2.0, plus `C0_3_G3_NF_RESOLUTION_MATRIX.md`.
+OD-01 through OD-16 and AM-01 through AM-08 remain approved. OC-EDGE remains rejected. NF-01 through NF-04 remain closed. NF-05 is closed by naming preinstalled-task packing fields. Normative copy: `docs/C0_3_IMPLEMENTATION_SPEC.md` version 1.3-approved and `docs/C0_3_ACCEPTANCE_TESTS.md` version 1.3-approved. Decision record: `C0_3_OWNER_DECISION_RECORD.md` version 2.0. The closed findings are incorporated in the 1.3-approved specification.
 
 ## 3. Architecture
 

@@ -36,7 +36,6 @@ C03-T01a’s post-boundary blob matches the independent oracle `11f9aae46d7f0f04
 | `src/tests/mod.rs` | Registers the S1 tests |
 | `C0_3_S1_IMPLEMENTATION_REPORT.md` | This file |
 | `C0_3_S1_VERIFICATION_LOG.txt` | Command results |
-| `Sealed_Heaven_C0_3_S1_Source.zip` | Source archive of `src`, manifests, and toolchain |
 
 Not modified: C0.1 and C0.2 golden literals, `Cargo.lock`, `Cargo.toml`, the toolchain, and the normative C0.3 documents.
 

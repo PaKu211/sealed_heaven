@@ -24,9 +24,7 @@ C03-T01a event digests match C0_3_G3_V1_3_VERIFICATION_LOG.txt
 H0 unchanged: ff18f9506b6c610af37f18d81f10090ec125fba0507f9cbf9c927dfa95cc6b3c
 
 ARCHIVE
-Sealed_Heaven_C0_3_S1_Source.zip
-contents: src, Cargo.toml, Cargo.lock, rust-toolchain.toml
-SHA-256: e2e99ff7fcfc6620624bfa423a97b42e346618da012d867177bce218138357d1
+The git tree on main is the source archive. The generated zip was removed as a duplicate.
 
 LOCKFILE
 Cargo.lock was not modified.
