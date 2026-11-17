@@ -70,7 +70,7 @@ Independently packed post-boundary blob SHA-256 (body‖trailer) from this contr
 
 ## 4. C03-T01b — expiry
 
-**Initial.** Reservation 3, acquired 1, expiry 3, task 1 Completing, `due_tick` 3, `created_tick` 0, packing fields from §1 (`goal` 0, `recipe_id` 0, `interruption` 0, target site 1, `progress_ticks` 2 after Reserved→Executing→Completing), enabled, unconsumed list empty. Cursor 1. Tick 2 so that staged tick becomes 3.
+**Initial.** Reservation 3, acquired 1, expiry 3, task 1 Completing, `due_tick` 3, `created_tick` 0, packing fields from §1 (`goal` 0, `recipe_id` 0, `interruption` 0, target site 1, preinstalled `progress_ticks` 2), enabled, unconsumed list empty. Cursor 1. Tick 2 so that staged tick becomes 3. This is an explicitly installed snapshot, not an assertion of an unrequested goal-0 Executing→Completing history; see the owner-authorized H10 clarification in specification §8.1. Its initial fields and expected events are unchanged.
 
 **Commands.** `drive(2, [])`.
 

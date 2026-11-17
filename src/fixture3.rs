@@ -11,6 +11,14 @@ use crate::{
 
 const TAG: &[u8] = b"SH:C03:STATE";
 
+mod validation;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum PathStep {
+    Edge(u64),
+    Grid(u8),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Actor {
     pub enabled: u8,
@@ -79,7 +87,7 @@ pub(crate) struct Task {
     pub due: u64,
     pub unconsumed: Vec<Completion>,
     pub path_index: u64,
-    pub steps: Vec<u8>,
+    pub steps: Vec<PathStep>,
     pub reservations: Vec<u64>,
     pub legs: Vec<Leg>,
 }
@@ -89,6 +97,7 @@ pub(crate) struct Transaction {
     pub task_id: u64,
     pub source: u8,
     pub key: CommandKey,
+    pub applied: u8,
     pub legs: Vec<Leg>,
 }
 
@@ -117,6 +126,9 @@ pub(crate) struct World {
     pub transactions: BTreeMap<u64, Transaction>,
     pub registry: BTreeMap<CommandKey, RegistryRecord>,
     pub pending: BTreeMap<CommandKey, Payload>,
+    // Codec-only trace records: actor ID is the map key, then the 320-byte tail.
+    // S1 does not produce decisions or evaluate needs.
+    pub traces: BTreeMap<u32, Vec<u8>>,
     pub cancels: BTreeSet<u64>,
 }
 
@@ -155,6 +167,7 @@ impl World {
             transactions: BTreeMap::new(),
             registry: BTreeMap::new(),
             pending: BTreeMap::new(),
+            traces: BTreeMap::new(),
             cancels: BTreeSet::new(),
         }
     }
@@ -278,18 +291,36 @@ pub(crate) fn drive(
     let mut staged = world.clone();
     let mut ordered = batch.to_vec();
     ordered.sort_by_key(|command| command.key());
-    for pair in ordered.windows(2) {
-        if pair[0].key() == pair[1].key() {
-            return Err(command_error(pair[0], InvalidCommand::ConflictingIdentity));
+    // §5 rows 2-4 are batch-wide and precede every per-command replay/late check.
+    if let Some(command) = ordered.iter().find(|c| c.key().producer_id != 1) {
+        return Err(command_error(*command, InvalidCommand::InvalidProducer));
+    }
+    if let Some(command) = ordered
+        .iter()
+        .find(|c| !world.actors.contains_key(&c.key().actor_id.get()))
+    {
+        return Err(command_error(*command, InvalidCommand::UnknownActor));
+    }
+    for (index, command) in ordered.iter().enumerate() {
+        if world.pending.contains_key(&command.key())
+            || ordered
+                .get(index + 1)
+                .is_some_and(|next| next.key() == command.key())
+        {
+            return Err(command_error(*command, InvalidCommand::ConflictingIdentity));
         }
     }
-    let mut created_this_phase = BTreeSet::new();
+    let mut scheduled_begins: BTreeSet<CommandKey> = world
+        .pending
+        .iter()
+        .filter_map(|(&key, payload)| matches!(payload, Payload::BeginTask { .. }).then_some(key))
+        .collect();
     for command in &ordered {
-        match classify(&staged, *command, &created_this_phase)? {
+        match classify(&staged, *command, &scheduled_begins)? {
             Admit::Noop => {}
             Admit::Store => {
                 if matches!(command.payload(), Payload::BeginTask { .. }) {
-                    created_this_phase.insert(command.key().actor_id.get());
+                    scheduled_begins.insert(command.key());
                 }
                 if staged
                     .pending
@@ -333,7 +364,7 @@ fn command_error(command: Command, reason: InvalidCommand) -> StepError {
 fn classify(
     world: &World,
     command: Command,
-    created_this_phase: &BTreeSet<u32>,
+    scheduled_begins: &BTreeSet<CommandKey>,
 ) -> Result<Admit, StepError> {
     let key = command.key();
     let payload = command.payload();
@@ -378,9 +409,9 @@ fn classify(
         return Err(command_error(command, InvalidCommand::InvalidPayload));
     }
     if let Payload::CompleteTask(0) = payload {
-        let actor = world.actors.get(&key.actor_id.get()).expect("checked");
-        let same_phase = created_this_phase.contains(&key.actor_id.get());
-        if actor.task_id == 0 && !same_phase {
+        if !scheduled_begins.iter().any(|begin| {
+            *begin < key && begin.target_tick == key.target_tick && begin.actor_id == key.actor_id
+        }) {
             return Err(command_error(command, InvalidCommand::InvalidPayload));
         }
     }
@@ -415,13 +446,20 @@ fn classify(
     if let Payload::ReserveStock { task_id, .. } | Payload::ReserveBundle { task_id, .. } = payload
     {
         let actor = world.actors.get(&key.actor_id.get()).expect("checked");
-        if actor.task_id != task_id {
+        if task_id == 0
+            || actor.task_id != task_id
+            || !world.tasks.get(&task_id).is_some_and(|t| t.stage < 6)
+        {
             return Err(command_error(command, InvalidCommand::InvalidPayload));
         }
     }
     if let Payload::BeginTask { .. } = payload {
         let actor = world.actors.get(&key.actor_id.get()).expect("checked");
-        if actor.task_id != 0 {
+        if actor.task_id != 0
+            || scheduled_begins
+                .iter()
+                .any(|begin| begin.target_tick == key.target_tick && begin.actor_id == key.actor_id)
+        {
             return Err(StepError::InvalidState);
         }
     }
@@ -456,8 +494,25 @@ fn payload_shape_ok(world: &World, command: Command) -> bool {
         Payload::CancelReservation(_) => true,
         Payload::CompleteTask(_) => true,
         Payload::BeginTask {
-            stage, leg_count, ..
-        } => matches!(stage, 1 | 5) && leg_count <= 4 && actor.locus != 3,
+            goal,
+            recipe_id,
+            stage,
+            leg_count,
+            legs,
+            target_locus,
+            target_site,
+            target_x,
+            target_y,
+            ..
+        } => {
+            goal <= 5
+                && matches!(recipe_id, 0 | 1)
+                && matches!(stage, 1 | 5)
+                && leg_count <= 4
+                && actor.locus != 3
+                && legs[..usize::from(leg_count)].iter().all(leg_shape_ok)
+                && validation::target_valid(world, target_locus, target_site, target_x, target_y)
+        }
         Payload::SetMode(_) => true,
         Payload::ClaimSlot | Payload::Probe { .. } | Payload::MintRecord => false,
     }
@@ -488,13 +543,40 @@ fn apply_due(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), S
         .copied()
         .filter(|key| key.target_tick == world.tick)
         .collect();
+    let mut created_this_phase = BTreeMap::new();
     for key in due {
         let Some(payload) = world.pending.remove(&key) else {
             continue;
         };
+        let old_task = world
+            .actors
+            .get(&key.actor_id.get())
+            .ok_or(StepError::InvalidState)?
+            .task_id;
+        if matches!(payload, Payload::CompleteTask(0))
+            && created_this_phase.get(&key.actor_id.get()) != Some(&old_task)
+        {
+            return Err(command_error(
+                Command::new(key, payload),
+                InvalidCommand::InvalidPayload,
+            ));
+        }
         apply_command(world, key, payload, events)?;
+        if matches!(payload, Payload::BeginTask { .. }) {
+            let task = world.actors[&key.actor_id.get()].task_id;
+            if task != 0 && task != old_task {
+                created_this_phase.insert(key.actor_id.get(), task);
+            }
+        }
     }
     Ok(())
+}
+
+fn leg_shape_ok(leg: &Leg) -> bool {
+    matches!(leg.op, 1..=4)
+        && matches!(leg.class, 1 | 2)
+        && leg.definition_id != 0
+        && leg.quantity != 0
 }
 
 fn apply_command(
@@ -503,9 +585,47 @@ fn apply_command(
     payload: Payload,
     events: &mut Vec<ResourceEvent>,
 ) -> Result<(), StepError> {
+    let command = Command::new(key, payload);
+    if !payload_shape_ok(world, command) {
+        return Err(command_error(command, InvalidCommand::InvalidPayload));
+    }
+    let actor = world
+        .actors
+        .get(&key.actor_id.get())
+        .ok_or(StepError::InvalidState)?;
+    match payload {
+        Payload::BeginTask { .. } if actor.task_id != 0 => return Err(StepError::InvalidState),
+        Payload::CompleteTask(id)
+            if actor.task_id == 0
+                || (id != 0 && id != actor.task_id)
+                || !world
+                    .tasks
+                    .get(&actor.task_id)
+                    .is_some_and(|t| t.stage < 6 && t.actor_id == key.actor_id.get()) =>
+        {
+            return Err(command_error(command, InvalidCommand::InvalidPayload));
+        }
+        Payload::ReserveStock { task_id, .. } | Payload::ReserveBundle { task_id, .. }
+            if task_id == 0
+                || task_id != actor.task_id
+                || !world
+                    .tasks
+                    .get(&task_id)
+                    .is_some_and(|t| t.stage < 6 && t.actor_id == key.actor_id.get()) =>
+        {
+            return Err(command_error(command, InvalidCommand::InvalidPayload));
+        }
+        _ => {}
+    }
     match payload {
         Payload::SetEnabled(bit) => {
             if let Some(actor) = world.actors.get_mut(&key.actor_id.get()) {
+                if actor.enabled == 0 && bit == 1 && actor.next_wake == world.tick {
+                    actor.next_wake = world
+                        .tick
+                        .checked_add(world.wake_interval)
+                        .ok_or(StepError::CapacityExceeded)?;
+                }
                 actor.enabled = bit;
             }
         }
@@ -648,6 +768,18 @@ fn reserve(
             .checked_add(quantity)
             .ok_or(StepError::CapacityExceeded)?;
     }
+    // Preflight every numeric aggregate before emitting even a rejection. A
+    // later overflow must roll back the entire boundary, not partly fill a bundle.
+    for (&stock_id, &quantity) in &requested {
+        if let Some(stock) = world.stocks.get(&stock_id) {
+            if quantity > stock.quantity {
+                return Err(StepError::InvalidState);
+            }
+            held(world, stock_id, None)?
+                .checked_add(quantity)
+                .ok_or(StepError::CapacityExceeded)?;
+        }
+    }
     for (&stock_id, &quantity) in &requested {
         let Some(stock) = world.stocks.get(&stock_id) else {
             emit(
@@ -662,8 +794,11 @@ fn reserve(
         if quantity > stock.quantity {
             return Err(StepError::InvalidState);
         }
-        let others = held_by_others(world, stock_id, task_id);
-        let available = stock.quantity.saturating_sub(others);
+        let total = held(world, stock_id, None)?;
+        let available = stock
+            .quantity
+            .checked_sub(total)
+            .ok_or(StepError::InvalidState)?;
         if quantity > available {
             emit(
                 world,
@@ -693,6 +828,24 @@ fn reserve(
         );
         ids.push((id, stock_id, quantity));
     }
+    let travel = world
+        .tasks
+        .get(&task_id)
+        .ok_or(StepError::InvalidState)?
+        .steps
+        .iter()
+        .try_fold(0u64, |sum, step| {
+            let cost = match step {
+                PathStep::Grid(_) => 1,
+                PathStep::Edge(id) => world
+                    .edges
+                    .iter()
+                    .find(|edge| edge.2 == *id)
+                    .map(|edge| edge.3)
+                    .ok_or(StepError::InvalidState)?,
+            };
+            sum.checked_add(cost).ok_or(StepError::CapacityExceeded)
+        })?;
     let task = world
         .tasks
         .get_mut(&task_id)
@@ -705,7 +858,6 @@ fn reserve(
         task.reservations.push(id);
     }
     task.reservations.sort_unstable();
-    let travel = 0;
     task.due = world
         .tick
         .checked_add(travel)
@@ -732,21 +884,24 @@ fn reserve(
     Ok(())
 }
 
-fn held_by_others(world: &World, stock_id: u64, task_id: u64) -> u64 {
+fn held(world: &World, stock_id: u64, exclude_task: Option<u64>) -> Result<u64, StepError> {
     world
         .reservations
         .values()
         .filter(|reservation| {
             reservation.state == 1
                 && reservation.stock_id == stock_id
-                && reservation.task_id != task_id
+                && Some(reservation.task_id) != exclude_task
         })
         .map(|reservation| reservation.quantity)
-        .fold(0, u64::saturating_add)
+        .try_fold(0u64, |sum, quantity| {
+            sum.checked_add(quantity).ok_or(StepError::CapacityExceeded)
+        })
 }
 
 fn invalidate(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), StepError> {
-    let task_ids: Vec<u64> = world.tasks.keys().copied().collect();
+    let mut task_ids: Vec<u64> = world.tasks.keys().copied().collect();
+    task_ids.sort_by_key(|id| (world.tasks[id].actor_id, *id));
     for task_id in task_ids {
         let Some(task) = world.tasks.get(&task_id) else {
             continue;
@@ -862,7 +1017,7 @@ fn step_task(
         2 if task.steps.is_empty() && at_target => advance(world, task_id, 4, events),
         2 if !task.steps.is_empty() => advance(world, task_id, 3, events),
         2 => Err(StepError::InvalidState),
-        4 if task.goal == 0 => Ok(()),
+        4 if task.goal == 0 && task.unconsumed.is_empty() => Ok(()),
         4 => advance(world, task_id, 5, events),
         5 if !task.unconsumed.is_empty() || task.due == world.tick => {
             complete(world, task_id, events)
@@ -941,6 +1096,7 @@ fn complete(
             task_id,
             source,
             key,
+            applied: 1,
             legs: applied,
         },
     );
@@ -1063,7 +1219,7 @@ fn apply_leg(
     stocks: &mut BTreeMap<u64, Stock>,
     next_stock: &mut u64,
 ) -> Result<(), StepError> {
-    if leg.quantity == 0 {
+    if leg.quantity == 0 || !matches!(leg.class, 1 | 2) || leg.definition_id == 0 {
         return Err(StepError::InvalidLeg);
     }
     match leg.op {
@@ -1078,8 +1234,11 @@ fn apply_leg(
             if stock.class == 2 {
                 return Err(StepError::InvalidLeg);
             }
-            let others = held_by_others(world, leg.stock_id, task_id);
-            let available = stock.quantity.saturating_sub(others);
+            let others = held(world, leg.stock_id, Some(task_id))?;
+            let available = stock
+                .quantity
+                .checked_sub(others)
+                .ok_or(StepError::InvalidLeg)?;
             if leg.quantity > available {
                 return Err(StepError::InvalidLeg);
             }
@@ -1090,7 +1249,7 @@ fn apply_leg(
         }
         2 | 4 => {
             if leg.stock_id == 0 {
-                validate_owner(world, task_actor_of(world, task_id), leg)?;
+                validate_owner(world, leg)?;
                 let id = *next_stock;
                 *next_stock = id.checked_add(1).ok_or(StepError::CapacityExceeded)?;
                 stocks.insert(
@@ -1126,28 +1285,12 @@ fn apply_leg(
     Ok(())
 }
 
-fn validate_owner(world: &World, task_actor: u32, leg: &Leg) -> Result<(), StepError> {
-    match leg.owner_kind_after {
-        1 if leg.owner_id_after == u64::from(task_actor) => Ok(()),
-        3 if world.sites.contains_key(&leg.owner_id_after) => Ok(()),
-        2 | 4 | 5
-            if world
-                .holders
-                .get(&leg.owner_id_after)
-                .is_some_and(|kind| *kind == leg.owner_kind_after) =>
-        {
-            Ok(())
-        }
-        _ => Err(StepError::InvalidLeg),
+fn validate_owner(world: &World, leg: &Leg) -> Result<(), StepError> {
+    if validation::owner_exists(world, leg.owner_kind_after, leg.owner_id_after) {
+        Ok(())
+    } else {
+        Err(StepError::InvalidLeg)
     }
-}
-
-fn task_actor_of(world: &World, task_id: u64) -> u32 {
-    world
-        .tasks
-        .get(&task_id)
-        .map(|task| task.actor_id)
-        .unwrap_or(0)
 }
 
 fn emit(
@@ -1272,7 +1415,7 @@ pub(crate) fn checkpoint_bytes(sim: &Simulation) -> Vec<u8> {
         body.extend(transaction.key.actor_id.get().to_le_bytes());
         body.extend(transaction.key.producer_id.to_le_bytes());
         push_u64(&mut body, transaction.key.sequence);
-        body.push(1);
+        body.push(transaction.applied);
         push_u64(&mut body, transaction.legs.len() as u64);
         for leg in &transaction.legs {
             encode_leg(&mut body, leg);
@@ -1290,7 +1433,11 @@ pub(crate) fn checkpoint_bytes(sim: &Simulation) -> Vec<u8> {
         encode_key(&mut body, key);
         encode_resource_payload(&mut body, payload);
     }
-    push_u64(&mut body, 0);
+    push_u64(&mut body, world.traces.len() as u64);
+    for (&actor, tail) in &world.traces {
+        body.extend(actor.to_le_bytes());
+        body.extend(tail);
+    }
     push_u64(&mut body, world.next_event_id);
     body.extend(world.digest);
     let trailer = encoding::sha256(&body);
@@ -1320,7 +1467,15 @@ fn encode_task(body: &mut Vec<u8>, id: u64, task: &Task) {
     }
     push_u64(body, task.path_index);
     push_u64(body, task.steps.len() as u64);
-    body.extend(&task.steps);
+    for step in &task.steps {
+        match step {
+            PathStep::Edge(id) => {
+                body.push(1);
+                push_u64(body, *id);
+            }
+            PathStep::Grid(direction) => body.extend([2, *direction]),
+        }
+    }
     push_u64(body, task.reservations.len() as u64);
     for id in &task.reservations {
         push_u64(body, *id);
@@ -1459,7 +1614,10 @@ fn push_u64(body: &mut Vec<u8>, value: u64) {
 }
 
 pub(crate) fn restore(bytes: &[u8]) -> Result<Simulation, RestoreError> {
-    if bytes.len() < 14 || &bytes[..12] != TAG {
+    if bytes.len() < 14 {
+        return Err(RestoreError::Truncated);
+    }
+    if &bytes[..12] != TAG {
         return Err(RestoreError::UnsupportedFormat);
     }
     let revision = u16::from_le_bytes([bytes[12], bytes[13]]);
@@ -1481,11 +1639,9 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
     let mut reader = Reader {
         data: bytes,
         at: 14,
+        semantic_valid: true,
     };
     let fixture_id = reader.u32()?;
-    if fixture_id != 3 {
-        return Err(RestoreError::UnknownFixture { found: fixture_id });
-    }
     let content = reader.array32()?;
     let tick = reader.u64()?;
     let seed = reader.u64()?;
@@ -1497,21 +1653,17 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
     let wake_interval = reader.u64()?;
     reader.skip(5 * 5 * 8)?;
     reader.skip(5 * 8)?;
-    let recipe_count = reader.u64()?;
-    if recipe_count != 1 {
-        return Err(RestoreError::Corrupt);
-    }
-    reader.skip(8 * 5 + 1 + 8)?;
+    let recipe_count = reader.count(49)?;
+    reader.skip(recipe_count.checked_mul(49).ok_or(RestoreError::Corrupt)?)?;
     let scenario = bytes
         .get(scenario_start..reader.at)
         .ok_or(RestoreError::Truncated)?;
-    if encoding::sha256(scenario) != content {
-        return Err(RestoreError::ContentMismatch);
-    }
-    let actor_count = reader.u64()?;
+    let actor_count = reader.count(131)?;
     let mut actors = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..actor_count {
         let id = reader.u32()?;
+        reader.check_order(&mut previous, id);
         let actor = Actor {
             enabled: reader.u8()?,
             mode: reader.u8()?,
@@ -1540,41 +1692,57 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
             edge: reader.u64()?,
             traversed: reader.u64()?,
         };
-        if actors.insert(id, actor).is_some() {
-            return Err(RestoreError::InvalidState);
-        }
+        actors.insert(id, actor);
     }
-    let site_count = reader.u64()?;
+    let site_count = reader.count(9)?;
     let mut sites = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..site_count {
-        sites.insert(reader.u64()?, reader.u8()?);
+        let id = reader.u64()?;
+        reader.check_order(&mut previous, id);
+        sites.insert(id, reader.u8()?);
     }
-    let holder_count = reader.u64()?;
+    let holder_count = reader.count(9)?;
     let mut holders = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..holder_count {
-        holders.insert(reader.u64()?, reader.u8()?);
+        let id = reader.u64()?;
+        reader.check_order(&mut previous, id);
+        holders.insert(id, reader.u8()?);
     }
-    let edge_count = reader.u64()?;
+    let edge_count = reader.count(32)?;
     let mut edges = Vec::new();
+    let mut previous = None;
     for _ in 0..edge_count {
-        edges.push((reader.u64()?, reader.u64()?, reader.u64()?, reader.u64()?));
+        let edge = (reader.u64()?, reader.u64()?, reader.u64()?, reader.u64()?);
+        reader.check_order(&mut previous, (edge.0, edge.1, edge.2));
+        edges.push(edge);
     }
     let grid_site = reader.u64()?;
     let grid_w = reader.u32()?;
     let grid_h = reader.u32()?;
-    let cells = usize::try_from(grid_w)
-        .ok()
-        .and_then(|width| {
-            usize::try_from(grid_h)
-                .ok()
-                .and_then(|height| width.checked_mul(height))
-        })
-        .ok_or(RestoreError::Corrupt)?;
+    if grid_w > 4096
+        || grid_h > 4096
+        || (grid_w == 0) != (grid_h == 0)
+        || (grid_site == 0) != (grid_w == 0 && grid_h == 0)
+    {
+        return Err(RestoreError::Corrupt);
+    }
+    let cells = usize::try_from(grid_w.checked_mul(grid_h).ok_or(RestoreError::Corrupt)?)
+        .map_err(|_| RestoreError::Corrupt)?;
+    if cells > reader.remaining() {
+        return Err(RestoreError::Corrupt);
+    }
     let grid = reader.bytes(cells)?.to_vec();
-    let stock_count = reader.u64()?;
+    if grid.iter().any(|byte| *byte > 1) {
+        return Err(RestoreError::Corrupt);
+    }
+    let stock_count = reader.count(34)?;
     let mut stocks = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..stock_count {
         let id = reader.u64()?;
+        reader.check_order(&mut previous, id);
         stocks.insert(
             id,
             Stock {
@@ -1586,10 +1754,12 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
             },
         );
     }
-    let reservation_count = reader.u64()?;
+    let reservation_count = reader.count(53)?;
     let mut reservations = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..reservation_count {
         let id = reader.u64()?;
+        reader.check_order(&mut previous, id);
         reservations.insert(
             id,
             Reservation {
@@ -1603,10 +1773,12 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
             },
         );
     }
-    let task_count = reader.u64()?;
+    let task_count = reader.count(104)?;
     let mut tasks = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..task_count {
         let id = reader.u64()?;
+        reader.check_order(&mut previous, id);
         let actor_id = reader.u32()?;
         let goal = reader.u8()?;
         let recipe_id = reader.u64()?;
@@ -1619,7 +1791,7 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
         let progress = reader.u64()?;
         let created = reader.u64()?;
         let due = reader.u64()?;
-        let unconsumed_count = reader.u64()?;
+        let unconsumed_count = reader.count(40)?;
         let mut unconsumed = Vec::new();
         for _ in 0..unconsumed_count {
             unconsumed.push(Completion {
@@ -1629,16 +1801,21 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
             });
         }
         let path_index = reader.u64()?;
-        let step_count = reader.u64()?;
-        let steps = reader
-            .bytes(usize::try_from(step_count).map_err(|_| RestoreError::Corrupt)?)?
-            .to_vec();
-        let reservation_count = reader.u64()?;
+        let step_count = reader.count(2)?;
+        let mut steps = Vec::new();
+        for _ in 0..step_count {
+            steps.push(match reader.u8()? {
+                1 => PathStep::Edge(reader.u64()?),
+                2 => PathStep::Grid(reader.u8()?),
+                _ => return Err(RestoreError::Corrupt),
+            });
+        }
+        let reservation_count = reader.count(8)?;
         let mut task_reservations = Vec::new();
         for _ in 0..reservation_count {
             task_reservations.push(reader.u64()?);
         }
-        let leg_count = reader.u64()?;
+        let leg_count = reader.count(35)?;
         let mut legs = Vec::new();
         for _ in 0..leg_count {
             legs.push(reader.leg()?);
@@ -1666,15 +1843,17 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
             },
         );
     }
-    let transaction_count = reader.u64()?;
+    let transaction_count = reader.count(50)?;
     let mut transactions = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..transaction_count {
         let id = reader.u64()?;
+        reader.check_order(&mut previous, id);
         let task_id = reader.u64()?;
         let source = reader.u8()?;
         let key = reader.key()?;
-        let _applied = reader.u8()?;
-        let leg_count = reader.u64()?;
+        let applied = reader.u8()?;
+        let leg_count = reader.count(35)?;
         let mut legs = Vec::new();
         for _ in 0..leg_count {
             legs.push(reader.leg()?);
@@ -1685,14 +1864,19 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
                 task_id,
                 source,
                 key,
+                applied,
                 legs,
             },
         );
     }
-    let registry_count = reader.u64()?;
+    let tables_sorted = reader.semantic_valid;
+    reader.semantic_valid = true;
+    let registry_count = reader.count(41)?;
     let mut registry = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..registry_count {
         let key = reader.key()?;
+        reader.check_order(&mut previous, key);
         registry.insert(
             key,
             RegistryRecord {
@@ -1702,23 +1886,40 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
             },
         );
     }
-    let pending_count = reader.u64()?;
+    let pending_count = reader.count(26)?;
     let mut pending = BTreeMap::new();
+    let mut previous = None;
     for _ in 0..pending_count {
         let key = reader.key()?;
+        reader.check_order(&mut previous, key);
         pending.insert(key, reader.payload()?);
     }
-    let trace_count = reader.u64()?;
-    if trace_count != 0 {
-        return Err(RestoreError::Corrupt);
+    let keys_sorted = reader.semantic_valid;
+    reader.semantic_valid = true;
+    let trace_count = reader.count(324)?;
+    let mut traces = BTreeMap::new();
+    let mut previous = None;
+    for _ in 0..trace_count {
+        let actor = reader.u32()?;
+        reader.check_order(&mut previous, actor);
+        traces.insert(actor, reader.bytes(320)?.to_vec());
     }
     let next_event_id = reader.u64()?;
     let digest = reader.array32()?;
     if reader.at != bytes.len() {
         return Err(RestoreError::Corrupt);
     }
-    let _ = (tick, seed);
-    Ok(World {
+    if fixture_id != 3 {
+        return Err(RestoreError::UnknownFixture { found: fixture_id });
+    }
+    if encoding::sha256(scenario) != content
+        || !matches!(wake_interval, 4 | 100)
+        || scenario != scenario_block(wake_interval)
+    {
+        return Err(RestoreError::ContentMismatch);
+    }
+    let traces_sorted = reader.semantic_valid;
+    let world = World {
         tick,
         seed,
         wake_interval,
@@ -1742,16 +1943,37 @@ fn decode_body(bytes: &[u8]) -> Result<World, RestoreError> {
         transactions,
         registry,
         pending,
+        traces,
         cancels: BTreeSet::new(),
-    })
+    };
+    validation::validate(&world, tables_sorted, keys_sorted, traces_sorted)?;
+    Ok(world)
 }
 
 struct Reader<'a> {
     data: &'a [u8],
     at: usize,
+    semantic_valid: bool,
 }
 
 impl<'a> Reader<'a> {
+    fn remaining(&self) -> usize {
+        self.data.len() - self.at
+    }
+
+    fn count(&mut self, minimum: u64) -> Result<usize, RestoreError> {
+        let count = self.u64()?;
+        let size = count.checked_mul(minimum).ok_or(RestoreError::Corrupt)?;
+        if count == u64::MAX || size > self.remaining() as u64 {
+            return Err(RestoreError::Corrupt);
+        }
+        usize::try_from(count).map_err(|_| RestoreError::Corrupt)
+    }
+
+    fn check_order<T: Copy + Ord>(&mut self, previous: &mut Option<T>, value: T) {
+        self.semantic_valid &= previous.is_none_or(|old| old < value);
+        *previous = Some(value);
+    }
     fn take(&mut self, len: usize) -> Result<&'a [u8], RestoreError> {
         let end = self.at.checked_add(len).ok_or(RestoreError::Truncated)?;
         let bytes = self.data.get(self.at..end).ok_or(RestoreError::Truncated)?;
@@ -1829,13 +2051,13 @@ impl<'a> Reader<'a> {
             5 => {
                 let task_id = self.u64()?;
                 let expiry_tick = self.u64()?;
-                let pair_count = self.u64()?;
+                let pair_count = self.count(16)?;
                 if pair_count > 4 {
                     return Err(RestoreError::Corrupt);
                 }
                 let mut stocks = [0; 4];
                 let mut quantities = [0; 4];
-                for index in 0..usize::try_from(pair_count).unwrap() {
+                for index in 0..pair_count {
                     stocks[index] = self.u64()?;
                     quantities[index] = self.u64()?;
                 }
@@ -1857,7 +2079,7 @@ impl<'a> Reader<'a> {
                 let target_x = self.u32()?;
                 let target_y = self.u32()?;
                 let due_tick = self.u64()?;
-                let leg_count = self.u64()?;
+                let leg_count = self.count(35)?;
                 if leg_count > 4 {
                     return Err(RestoreError::Corrupt);
                 }
@@ -1870,7 +2092,7 @@ impl<'a> Reader<'a> {
                     owner_kind_after: 0,
                     owner_id_after: 0,
                 }; 4];
-                for leg in legs.iter_mut().take(usize::try_from(leg_count).unwrap()) {
+                for leg in legs.iter_mut().take(leg_count) {
                     *leg = self.leg()?;
                 }
                 Ok(Payload::BeginTask {

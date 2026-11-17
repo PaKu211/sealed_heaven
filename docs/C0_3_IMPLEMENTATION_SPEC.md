@@ -3,6 +3,10 @@
 Version 1.3-approved · 17 November 2026  
 Status: owner-authorized documentation after NF-05 packing-field remediation. Implementation is not authorized.
 
+S1 H10 clarification: the project owner's targeted-remediation authorization
+permits the goal-0 clarification in §8 below. Other slice authorization and the
+frozen compatibility boundaries are unchanged. This is not an S1 acceptance verdict.
+
 This specification incorporates OD-01 through OD-16 as approved in `C0_3_OWNER_DECISION_RECORD.md` from `C0_3_OWNER_DECISIONS_PENDING.md` version 1.2, as amended by AM-01 through AM-08 from the R2.1-final remediation packet, the NF-01 through NF-04 documentation remediation, and the NF-05 preinstalled-task packing-field remediation. OC-EDGE is rejected. Fixture numbers in §12 are C0.3 fixture configuration. They are not the final gameplay balance of Sealed Heaven.
 
 ## 1. Authority and exit
@@ -261,13 +265,47 @@ Work orders current tasks by `(actor id, task id)`. First match:
 | 6 | `Reserved`, empty path, not at the target | `InvalidState` for the boundary |
 | 7 | `Travelling`, locus 3, path empty | Spend one cost on the current edge. Do not search |
 | 8 | `Travelling`, stored path | One progress step, or arrive and enter `Executing` |
-| 9 | `Executing` | `Completing`, one kind 7, no legs |
+| 9a | `Executing`, goal 0, unconsumed completion list empty | No change and no event |
+| 9b | `Executing`, goal 1–5, or goal 0 with a non-empty unconsumed completion list | `Completing`, one kind 7, no legs |
 | 10 | `Completing`, unconsumed list non-empty or `due_tick` equals the tick | Legs, one release per own reservation, `Done` |
 | 11 | `Completing`, neither requested nor due | No event |
 
 `progress_ticks` increases by 1 on each advancing work-phase transition in the table above. Reservation promotion in §6.1 does not increment `progress_ticks`. Rest and return home have no reservations and no legs. Their successful completion is kind 4 with an empty leg list, then kind 7 `Done`. Disablement or a zero-id cancel on that path is kind 7 `Failed` or `Cancelled`, then kind 5, and no kind 4. Work releases one tool and one workstation without debiting them. A scripted haul completes one hop per task. Actor → store, store → cargo, and cargo → site are three successive current tasks. Autonomous haul is one debit and one credit in a single task.
 
 After task-owned work, residual edge travel runs for every actor with `locus` 3 and `task_id` 0, in ascending actor id. Each spends one edge cost with no event. Arrival places the actor on the destination site, clears `edge_id`, sets `traversed_cost` to 0, and emits no event. Residual travel runs for enabled and disabled actors.
+
+### 8.1 Owner-authorized S1 H10 clarification
+
+Goal 0 is scripted, not an autonomous decision goal. A completion command only
+appends provenance in the command phase. For goal 0 in Executing, a non-empty
+unconsumed list enables the single work transition to Completing (one kind 7 and
+one progress tick); legs never run in that same transition. Requests received in
+Queued or Reserved remain on the task until its ordinary stage transitions reach
+Completing. Reservation promotion and Reserved-to-Executing behavior are unchanged.
+
+The creation-tick skip and overdue rule precede these rules for every goal. There
+is no implicit extension of due_tick. A request reaching Executing at its due tick
+can advance it to Completing but cannot complete it that tick. If it survives
+invalidation, the following overdue boundary returns InvalidState with full
+rollback. A request with an old target still follows §5 admission; a future-target
+request cannot override an overdue task. With no request, goal-0 Executing remains
+unchanged through its due tick and an overdue attempt fails the same way.
+
+Completing retains rule 10 for every goal: it applies only on a later-than-creation
+tick, with a request or at its due tick, after invalidation. An explicitly installed
+or BeginTask-created Completing task may therefore use the existing source-2
+due-tick path without a request; no new autonomous goal selection is introduced.
+If creation and due coincide, creation skip still wins and the next surviving
+boundary is overdue. Goals 1–5 keep their unconditional Executing-to-Completing
+transition. No transition performs two work steps in one tick.
+
+Disablement, cancellation and expiry still run before work, in that priority.
+They release once, move every unconsumed key to role 2, set the terminal stage and
+clear actor.task_id, even when work would otherwise be overdue. Successful work
+uses the existing kind-4 / ascending reason-8 releases / kind-7 Done order and the
+lowest unconsumed key as role 1. Requests and progress persist in existing fields;
+restore does not emit prefix events or add a readiness flag. An error restores
+every pre-call byte, including any completion admitted during the failed boundary.
 
 ## 9. Navigation
 

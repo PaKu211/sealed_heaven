@@ -61,6 +61,20 @@ fn legs(items: &[Leg]) -> [Leg; 4] {
     stored
 }
 
+fn install_reservation_stock(world: &mut World) {
+    world.stocks.insert(
+        1,
+        Stock {
+            definition_id: 1,
+            class: 1,
+            quantity: 1,
+            owner_kind: 3,
+            owner_id: 1,
+        },
+    );
+    world.next_stock_id = 2;
+}
+
 #[test]
 fn c03_t01a_two_claimants_match_independent_blob() {
     let mut sim = Simulation::two_claimants();
@@ -161,6 +175,7 @@ fn c03_t01d_disable_after_acquire() {
 #[test]
 fn c03_t01b_expiry_and_t01c_cancel() {
     let mut world = World::standard(100);
+    install_reservation_stock(&mut world);
     world.insert_actor(1, 1);
     world.insert_actor(2, 0);
     world.tick = 2;
@@ -196,6 +211,7 @@ fn c03_t01b_expiry_and_t01c_cancel() {
     assert!(sim.drive(3, &[]).unwrap().resource_events().is_empty());
 
     let mut world = World::standard(100);
+    install_reservation_stock(&mut world);
     world.insert_actor(1, 1);
     world.insert_actor(2, 0);
     world.tick = 2;
