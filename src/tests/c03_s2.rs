@@ -384,3 +384,78 @@ fn save_before_decision_matches_a_continuous_eat() {
     assert_eq!(resumed.domain_checkpoint_bytes(), expected);
     assert_eq!(resumed.world3.as_ref().unwrap().stocks[&1].quantity, 0);
 }
+
+#[test]
+fn eat_event_contract_and_every_resume_split_match() {
+    // Pack the seven specified events directly; do not use the production encoder
+    // to produce the expected stream or digest.
+    let payloads = [
+        [2u64.to_le_bytes(), 1u64.to_le_bytes(), 1u64.to_le_bytes()].concat(),
+        [1u64.to_le_bytes().as_slice(), &[4]].concat(),
+        [
+            &[1],
+            1u64.to_le_bytes().as_slice(),
+            5u64.to_le_bytes().as_slice(),
+            1_000_000i64.to_le_bytes().as_slice(),
+            &[0; 32],
+        ]
+        .concat(),
+        [1u64.to_le_bytes().as_slice(), &[5]].concat(),
+        [1u64.to_le_bytes(), 1u64.to_le_bytes()].concat(),
+        [2u64.to_le_bytes().as_slice(), &[8]].concat(),
+        [1u64.to_le_bytes().as_slice(), &[6]].concat(),
+    ];
+    let kinds = [1, 7, 6, 7, 4, 3, 7];
+    let ticks = [1u64, 1, 1, 2, 3, 3, 3];
+    let expected: Vec<Vec<u8>> = payloads
+        .iter()
+        .enumerate()
+        .map(|(index, payload)| {
+            [
+                (index as u64 + 1).to_le_bytes().as_slice(),
+                ticks[index].to_le_bytes().as_slice(),
+                1u32.to_le_bytes().as_slice(),
+                &[kinds[index]],
+                payload,
+            ]
+            .concat()
+        })
+        .collect();
+    let mut baseline = start(hungry(1, 1));
+    let mut actual = Vec::new();
+    let mut checkpoints = vec![baseline.domain_checkpoint_bytes()];
+    for tick in 0..3 {
+        actual.extend(
+            baseline
+                .drive(tick, &[])
+                .unwrap()
+                .resource_events()
+                .iter()
+                .map(|e| e.canonical_bytes()),
+        );
+        checkpoints.push(baseline.domain_checkpoint_bytes());
+    }
+    assert_eq!(actual, expected);
+    let mut digest = crate::encoding::sha256(b"SH:C03:EVENT-INIT:v1");
+    for event in &expected {
+        digest = crate::encoding::sha256(&[b"SH:C03:EVENT:v1".as_slice(), &digest, event].concat());
+    }
+    assert_eq!(baseline.event_digest(), digest);
+    for split in 0..=3 {
+        let mut resumed = Simulation::restore_domain_checkpoint(&checkpoints[split]).unwrap();
+        let mut suffix = Vec::new();
+        for tick in split..3 {
+            suffix.extend(
+                resumed
+                    .drive(tick as u64, &[])
+                    .unwrap()
+                    .resource_events()
+                    .iter()
+                    .map(|e| e.canonical_bytes()),
+            );
+            assert_eq!(resumed.domain_checkpoint_bytes(), checkpoints[tick + 1]);
+        }
+        let prefix_len = [0, 3, 4, 7][split];
+        assert_eq!(suffix, expected[prefix_len..]);
+    }
+}
