@@ -1,32 +1,19 @@
-# C0.3 autonomous progress
+# C0.3 Autonomous Progress — accepted
 
-2026-11-18 recovery: S2 branch found at `cf31ef1`, synchronized with its remote.
-No original handoff/progress/execution files found. No uncommitted source changes.
+Date: 18 November 2026
+
+**Independent Sealed Heaven C0.3 Milestone: PASS**
+
+Accepted commit: `f90b94d8866330141962cd915f6cc8eee402e757` on `feat/c03-s4-integration`.
+
+RT-01 targeted independent re-review passed. Acceptance evidence and complete required verification are archived in `C0_3_RT01_INDEPENDENT_REVIEW.md`. Exact target verification: fmt, locked/offline check, strict Clippy, debug tests (82 + 2 doctests), release tests (82 + 2 doctests), and standalone canonical-vector packer all passed. Frozen C0.1/C0.2 tests were included. No golden vectors or frozen contracts changed.
 
 | Slice | State |
 | --- | --- |
-| S1 | Existing remediated baseline `bf91789`; audits not repeated |
-| S2 | Implementation verified: 67 unit + 2 doctests debug/release, strict clippy |
-| S3 | Implemented/verified: 75 unit + 2 doctests debug/release, fmt/check/clippy |
-| S4 | Implementation/test matrix verified: 80 unit + 2 doctests both profiles; independent acceptance pending |
+| S1 | Implemented and remediated |
+| S2 | Implemented and verified |
+| S3 | Implemented and verified; RT-01 passed |
+| S4 | Implemented and verified |
+| C0.3 | Independent milestone PASS |
 
-Initial verification: 66 unit tests debug/release, 2 release doctests, formatting,
-locked/offline check and strict clippy pass. Not a C0.3 acceptance declaration.
-
-Git: branch `feat/c03-s2-needs-goals`; recovered local/remote SHA
-`cf31ef19e45e257d3a3b9e5c22d35039df7e5f90`.
-
-S2 push succeeded: branch `feat/c03-s2-needs-goals`, local and remote SHA
-`509d9c014b6d2aa294e79310dfcee1f840d070a2`, verified via ls-remote.
-S3 push succeeded: branch `feat/c03-s3-navigation`, local and remote SHA
-`ca85bfdadf6b451bd4d41d2347cc7e450ceab495`, verified via ls-remote.
-S4 is based on that verified implementation. Current branch:
-`feat/c03-s4-integration`. Full regression, standalone contract packer, formatting,
-check and strict clippy pass. See S4 report and verification
-log. Residual timing interpretation remains explicitly flagged for independent
-review and owner confirmation; the milestone is not independently accepted.
-
-S4 push succeeded: local and remote SHA
-`cdeb82c6f14d9072e55991d1352896ffdabc8b9e`, verified via ls-remote. Working tree
-was clean after push. Final follow-up checkpoint records this synchronization and
-handoff only; no implementation changes after the full verification.
+No merge to `main` was performed. The next milestone has no approved normative scope or implementation authorization in the checked-in roadmap; see `C0_4_DECISION_PACKET.md`. Do not invent or begin that contract until the owner records a decision.

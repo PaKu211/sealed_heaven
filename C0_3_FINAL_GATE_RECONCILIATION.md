@@ -6,7 +6,7 @@ Audited baseline: `1dbe07e632efa55596cb33e17d6470afa0e0824c`
 
 ## Status
 
-**Owner reconciliation implemented; targeted independent re-review required.** This is implementation/contract verification, not an independent C0.3 PASS. The historical independent verdict remains INCONCLUSIVE until an independent reviewer issues a new verdict on the amended target.
+**Owner reconciliation and targeted independent re-review complete: RT-01 PASS.** This document records the request and pre-review status; the completed review and milestone evidence are archived in `C0_3_RT01_INDEPENDENT_REVIEW.md`.
 
 ## F01 disposition
 
@@ -48,7 +48,7 @@ Prior independently packed residual reference values asserted by the new regress
 
 Frozen H0, C03-T01a, M0-T06 and M0-T07 initial values are not replaced. The required debug/release regression suites and the contract-reference packer check retain their original assertions. Exact results and preservation comparisons are in `C0_3_RESIDUAL_TRAVEL_VERIFICATION_LOG.txt`.
 
-## Targeted independent re-review requested
+## Targeted independent re-review — completed
 
 Please review the resulting feature-branch commit against audited baseline `1dbe07e632efa55596cb33e17d6470afa0e0824c`:
 
@@ -59,3 +59,8 @@ Please review the resulting feature-branch commit against audited baseline `1dbe
 5. Confirm production Rust, dependencies, toolchain and existing golden values are unchanged, then independently decide whether F01 is closed and whether the retained milestone gate can receive a new verdict.
 
 Commit/push are authorized only to `feat/c03-s4-integration`; the published commit is identified by Git and the final delivery response rather than a circular self-hash inside this file. No merge into main or independent milestone PASS is declared here.
+
+
+## Review result
+
+RT-01 PASS at 90b94d8866330141962cd915f6cc8eee402e757. The independent targeted reviewer found no concrete defect; the required Cargo fmt, check, Clippy, debug test, and release test commands were independently run at that exact commit and passed (82 tests plus 2 doctests in each test profile). The standalone canonical-vector check passed. See C0_3_RT01_INDEPENDENT_REVIEW.md for scope and limitations.
