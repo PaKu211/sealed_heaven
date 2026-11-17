@@ -1,0 +1,11 @@
+C0.4 2026-11-18
+Accepted baseline and remote verified at 14d229bedc308d7e50225122caaec0ce5732a201.
+Clean isolated branch/worktree feat/c04-first-playable created from that baseline.
+Inspected root manifest, frozen public API, fixture codec, S4 mixed twenty-NPC test.
+No public full fixture-3 actor view or twenty-NPC constructor exists.
+Contract uses frozen public restore/drive/checkpoint APIs and read-only projection;
+no frozen source edits or additive API requirements.
+Normative contract and executable acceptance criteria drafted. Review pending.
+Independent contract reviewer PASS (C0_4_CONTRACT_INDEPENDENT_REVIEW.md).
+Reviewer independently ran five root Cargo checks: 82+2 tests debug and release;
+all passed, standalone C03 packer passed. Conditional implementation now effective.
