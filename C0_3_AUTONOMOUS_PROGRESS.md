@@ -22,6 +22,11 @@ S3 push succeeded: branch `feat/c03-s3-navigation`, local and remote SHA
 `ca85bfdadf6b451bd4d41d2347cc7e450ceab495`, verified via ls-remote.
 S4 is based on that verified implementation. Current branch:
 `feat/c03-s4-integration`. Full regression, standalone contract packer, formatting,
-check and strict clippy pass; commit/push pending. See S4 report and verification
+check and strict clippy pass. See S4 report and verification
 log. Residual timing interpretation remains explicitly flagged for independent
 review and owner confirmation; the milestone is not independently accepted.
+
+S4 push succeeded: local and remote SHA
+`cdeb82c6f14d9072e55991d1352896ffdabc8b9e`, verified via ls-remote. Working tree
+was clean after push. Final follow-up checkpoint records this synchronization and
+handoff only; no implementation changes after the full verification.
