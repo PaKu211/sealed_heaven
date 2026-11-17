@@ -1,0 +1,49 @@
+H0_compute=ff18f9506b6c610af37f18d81f10090ec125fba0507f9cbf9c927dfa95cc6b3c
+H0_match=True
+sizes actor=131 site=9 holder=9 edge=32 stock=34 res=53 leg=35 registry=41 unconsumed=40 trace=324
+event_sizes={1: 45, 2: 38, 3: 30, 4: 37, 5: 30, 6: 78, 7: 30}
+C03T01a_E1_digest=33dafb9c588fd7299c5742a873e8356e1cbda54998c3d9b2b55a4f89a2311e91
+C03T01a_E2_digest=40076c534936ba6eaf9fa061d5b6e3e2f00a79123e92987e036b82ab18735d62
+C03T01a_E3_digest=8b04d4b8805008055104ddfde0bfa51810a5f1adcdfed010e9208dfa8b97cf37
+C03T01a_E4_digest=5fdbc5707211fbfc309f5ed75e21eaa83ebf3d7307da60cc442a3cd7f8340908
+C03T01a_stream_sha=6dddae6663e2d9107bfa9aa096c65ce9228c3b80da60864292ad1ca90c587bfe
+C03T01a_stream_len=143 next_cursor=5
+scenario_len=305 scenario_sha=1d42d342fdde3ba9f05adce78b1e938799e07a0713dccd5b77ed83a9e6d4b1b6
+empty_probe_body_len=547 body_sha=9fc21a068ef3b59a894d9ce4e7c5b202affb8c4eb2ec74a8bc8a81af795448f4
+empty_probe_blob_len=579 blob_sha=7341dd932a32b9c37a51472edbdd09f487725cb9e138c4d67062907b34ce387b
+NOTE empty_probe is structural only; not an acceptance fixture (no sites/edges required by §12)
+M0T07_init_body_len=830 body_sha=787a40d5eabadfeb9294851ee967dd0a81122fac44f91b04b961f1ced59f6f78
+M0T07_init_blob_len=862 blob_sha=bd803a2c4ae4320ce2a1a5ceb49a2941aec48921c4cbc0a60b15c607b62148c3
+M0T07_content_hash=d5d93ec2e652315b521cf74020114b49d2c923db042dc9fcd9167fa2ba5d8015
+FILE C0_3_OWNER_DECISION_RECORD.md bytes=8058 sha256=55db85c55dd1044309e77314547e8e1f0e113a20b1ad12eac8dde9fe76d018b2
+FILE docs/C0_3_IMPLEMENTATION_SPEC.md bytes=29761 sha256=da69aebcecbd9d82ebda79d890db747b6e55106d323eb61d2d345366627f5f0c
+FILE docs/C0_3_ACCEPTANCE_TESTS.md bytes=14284 sha256=89f7d96d3a330bacf128512fc112748d48e127c2c6559baecc0dcf9125ffbe3a
+FILE docs/C0_3_ARCHITECTURE_REVIEW.md bytes=3513 sha256=0bbb9c1c286bbc37ef78d5ba1ee9177043acbdd04be2b58b1e38751396d1572e
+FILE C0_3_G3_REMEDIATION_REPORT.md bytes=5047 sha256=d453aeb970d3cb38485db97e9da4ed08412f58375969f4e61700b2d32391bfb0
+FILE C0_3_G3_FINDING_RESOLUTION_MATRIX.md bytes=1665 sha256=8759212f3381b20ab35a148fcb05d3ffa90221cf8027cf8df6815e9b6a5adee0
+FILE C0_3_G3_INDEPENDENT_AUDIT.md bytes=40041 sha256=ffa3f7500cc4f38c59754993e0bcbedd5a5cd1fb234c26edad6a083c9f6a60f0
+FILE C0_3_BALANCED_DEVELOPMENT_PLAN.md bytes=4436 sha256=b4760b9a65732075dbe52173ff0ff92ff83fb49ef41d190657d984cf8d9f67fc
+FILE C0_3_VERTICAL_SLICE_TEST_PLAN.md bytes=6879 sha256=55da3ec8997a981ed439d74db9eb72fd34177f8647610cec036df64d17e1130e
+FILE C0_3_IMPLEMENTATION_GATE_CHECKLIST.md bytes=2598 sha256=12ecc0ae29c3696daad2e4aef4bc93480db2de3814fc6898ee2e49a645943508
+ZIP D:\projek\sealed\Sealed_Heaven_C0_2_Source.zip sha256=2804d33a785acb7331a0d82fd1c080bec82d0add348578abb4b1a6807db60a40
+ANALYSIS C03-T01a: initial due_tick=0 Queued; after ReserveStock stage=Reserved; work rule3: non-Queued and due_tick(0)<staged(1) => InvalidState; acceptance expects Executing. CONTRADICTION.
+ANALYSIS M0-T06: same due_tick=0 after Reserved=>Executing expectation. CONTRADICTION. Remediaton "promotion sets due_tick" not present in normative §§6-8.
+ANALYSIS M0-T06 stocks 101-104: class given, definition_id not stated; Eat requires definition-1. MISSING.
+ANALYSIS Work goal: tool vs workstation identification by definition not specified for fixture stocks.
+ANALYSIS Haul credit to existing home stockpile stock_id nonzero: only stock_id 0 allocation specified. GAP.
+
+==== FINAL AUDIT SUMMARY ====
+Verdict: FAIL
+Blocker NF-01: due_tick=0 after Reserve* makes Reserved tasks InvalidState under spec §8 rule 3, but acceptance §§3,6,11 require Executing.
+High NF-02: M0-T06 stock definition_id unspecified.
+High NF-03: Work tool/workstation discriminator unspecified.
+High NF-04: credit to existing non-zero stock_id unspecified for haul.
+H0: PASS ff18f9506b6c610af37f18d81f10090ec125fba0507f9cbf9c927dfa95cc6b3c
+C0.2 archive: PASS 2804d33a785acb7331a0d82fd1c080bec82d0add348578abb4b1a6807db60a40
+M0-T07 init blob: bd803a2c4ae4320ce2a1a5ceb49a2941aec48921c4cbc0a60b15c607b62148c3
+OC-EDGE: REJECTED and absent
+Implementation authorized: NO
+S1 started: NO
+G3 PASS declared: NO
+Report: C0_3_G3_FINAL_INDEPENDENT_AUDIT.md
+Packer: independent Python reference (not sealed_sim)

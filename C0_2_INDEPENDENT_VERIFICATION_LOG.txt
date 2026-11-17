@@ -1,0 +1,72 @@
+Sealed Heaven C0.2 independent verification log (G2)
+17 November 2026
+
+Auditor host
+  OS: Windows 10.0.26200
+  rustc: 1.100.0 (0ef1bc386059596dada8fb65b50425aab2ea637a)
+  cargo: 1.100.0 (3acc79c0c 2026-11-05)
+  host triple: x86_64-pc-windows-msvc
+  Linux comparison: not executed. The submitted log is also Windows. R2 is not certified.
+
+Archive
+  Path: D:\projek\sealed\Sealed_Heaven_C0_2_Source.zip
+  SHA-256: 2804d33a785acb7331a0d82fd1c080bec82d0add348578abb4b1a6807db60a40
+  Submitted hash: 2804d33a785acb7331a0d82fd1c080bec82d0add348578abb4b1a6807db60a40
+  Result: MATCH
+  Members: 29
+  Archive was not modified.
+
+C0.1 baseline
+  Archive: D:\projek\sealed\Sealed_Heaven_C0_1_Source (1).zip
+  SHA-256: 9c3b7907845c8cf0ff2e757c9a5d4125a4264ab6977b7513b1300f16aaa51250
+  MATCH: Cargo.lock, rust-toolchain.toml, src/tests/golden.rs, C0.1 report, C0.1 log
+  DIFF: Cargo.toml description only; src/lib.rs; src/encoding.rs; src/tests/mod.rs
+  NEW: src/domain.rs, src/tests/c02.rs, src/tests/c02_golden.rs
+  C0.1 independent audit report: NOT FOUND
+  G0_REVIEW_REPORT.md is a G0 document review and was not used as the C0.1 code baseline.
+
+Dependencies
+  sealed_sim 0.1.0
+  rand_chacha =0.10.0, default-features = false
+  sha2 =0.11.1
+  Cargo.lock SHA-256: 176e4bb5d145739c101c10296ce9f97d4a24917381be057e74134e0ba1779d75
+  No Bevy. No serde. No new direct crate.
+
+Oracle, computed from docs/C0_2_ACCEPTANCE_TESTS.md inside the archive
+  15 labeled blobs: SHA-256 labels matched hashlib output, 0 mismatches
+  src/tests/c02_golden.rs hex matched those 15 document blocks
+  Event 3 digest from published H2 and event bytes:
+    1a1cc22bf1041c19845bceb790e6761dad0edaf41cb3eca1f90b0ce06f1875b1
+  Fixture 2 H0: 413408f703da057f8b39023e580c8c65649376824d1a77be0a4d24aaf048dd0b
+  Fixture 2 content: 043d3507909cf4718d94488279deb1943dfa69530f9e86b109e381c3cbd2dd92
+
+Commands, extracted archive, --offline because the lockfile is authoritative
+  cargo fmt --all --check
+    exit 0
+  cargo check --locked --offline
+    exit 0
+  cargo clippy --all-targets --locked --offline -- -D warnings
+    exit 0
+  cargo test --locked --offline
+    25 unit tests passed, 0 failed, 0 ignored
+    2 doctests passed, 0 failed, 0 ignored
+  cargo test --release --locked --offline
+    25 unit tests passed, 0 failed, 0 ignored
+    2 doctests passed, 0 failed, 0 ignored
+
+Submitted suite covers C01-T01 through C01-T06 and C02-T01 through C02-T04.
+No submitted test was ignored. None failed.
+
+Auditor tests, temporary copy only, not inserted into the archive
+  cargo test --locked --offline --lib g2_
+    6 passed, 0 failed, 0 ignored
+    g2_corrupt_unknown_payload_and_short_revision
+    g2_illegal_actor_cursor_and_extreme_reservation_count
+    g2_conflict_then_valid_and_reordered_batches
+    g2_overflow_then_valid_drive_and_restore_cycles
+    g2_disabled_actor_still_completes_installed_task
+    g2_step_misuse_does_not_mutate_fixture_two
+
+Verdict: PASS
+No blocking defect.
+Findings recorded: G2-I01, G2-I02, G2-I03, all informational.
