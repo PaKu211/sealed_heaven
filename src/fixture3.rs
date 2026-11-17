@@ -11,6 +11,7 @@ use crate::{
 
 const TAG: &[u8] = b"SH:C03:STATE";
 
+mod navigation;
 mod validation;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -340,7 +341,14 @@ pub(crate) fn drive(
     apply_due(&mut staged, &mut events, &mut suppressed)?;
     invalidate(&mut staged, &mut events)?;
     decide(&mut staged, &suppressed, &mut events)?;
-    work(&mut staged, &mut events)?;
+    // The residual fixture saves the just-cancelled edge position unchanged.
+    // Actors already taskless at boundary start resume travel in this work phase.
+    let residual: Vec<u32> = world
+        .actors
+        .iter()
+        .filter_map(|(&id, a)| (a.locus == 3 && a.task_id == 0).then_some(id))
+        .collect();
+    work(&mut staged, &residual, &mut events)?;
     sim.tick = staged.tick;
     sim.next_event_id = staged.next_event_id;
     sim.event_digest = staged.digest;
@@ -1062,7 +1070,8 @@ fn goal_plan(
             if !home_known {
                 return Ok((None, 10));
             }
-            if !at_home {
+            if !at_site || (!at_home && navigation::route(world, actor.site, actor.home)?.is_none())
+            {
                 return Ok((None, 5));
             }
             Ok((
@@ -1091,7 +1100,8 @@ fn goal_plan(
             if !home_known {
                 return Ok((None, 10));
             }
-            if !at_home {
+            if !at_site || (!at_home && navigation::route(world, actor.site, actor.home)?.is_none())
+            {
                 return Ok((None, 5));
             }
             match lowest_haul(world, actor_id)? {
@@ -1208,6 +1218,13 @@ fn commit_goal(
     } else {
         actor.site
     };
+    if actor.site != task.target_site {
+        task.steps = navigation::route(world, actor.site, task.target_site)?
+            .ok_or(StepError::InvalidState)?;
+        task.stage = 3;
+    }
+    let stage = task.stage;
+    let travel = navigation::path_cost(world, &task.steps)?;
     match plan {
         GoalPlan::Eat { stock } => {
             let definition = world
@@ -1259,11 +1276,12 @@ fn commit_goal(
         .task_id = task_id;
     let due = world
         .tick
-        .checked_add(2)
+        .checked_add(travel)
+        .and_then(|sum| sum.checked_add(2))
         .ok_or(StepError::CapacityExceeded)?;
     let expiry = due.checked_add(1).ok_or(StepError::CapacityExceeded)?;
     match plan {
-        GoalPlan::Eat { stock } => {
+        GoalPlan::Eat { stock } | GoalPlan::Haul { stock, .. } => {
             reserve(world, actor_id, task_id, expiry, &[(stock, 1)], events)?;
         }
         GoalPlan::Work { tool, station } => {
@@ -1271,7 +1289,7 @@ fn commit_goal(
             pairs.sort_by_key(|pair| pair.0);
             reserve(world, actor_id, task_id, expiry, &pairs, events)?;
         }
-        GoalPlan::Rest | GoalPlan::Haul { .. } | GoalPlan::ReturnHome => {
+        GoalPlan::Rest | GoalPlan::ReturnHome => {
             world
                 .tasks
                 .get_mut(&task_id)
@@ -1283,7 +1301,7 @@ fn commit_goal(
         world,
         actor_id,
         7,
-        pack(&[u64_bytes(task_id), vec![4]]),
+        pack(&[u64_bytes(task_id), vec![stage]]),
         events,
     )?;
     Ok(task_id)
@@ -1349,64 +1367,79 @@ fn invalidate(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), 
         let Some(reason) = reason else {
             continue;
         };
-        let actor_id = task.actor_id;
-        let reservation_ids = task.reservations.clone();
-        let unconsumed = task.unconsumed.clone();
-        for id in reservation_ids {
-            if let Some(reservation) = world.reservations.get_mut(&id) {
-                if reservation.state == 1 {
-                    reservation.state = 2;
-                    emit(
-                        world,
-                        actor_id,
-                        3,
-                        pack(&[u64_bytes(id), vec![reason]]),
-                        events,
-                    )?;
-                }
-            }
-        }
-        let stage = if reason == 2 { 7 } else { 8 };
-        if let Some(task) = world.tasks.get_mut(&task_id) {
-            task.stage = stage;
-            task.interruption = reason;
-            task.unconsumed.clear();
-        }
-        for record in unconsumed {
-            world.registry.insert(
-                record.key,
-                RegistryRecord {
-                    submitted: record.submitted,
-                    resolved: record.resolved,
-                    role: 2,
-                },
-            );
-        }
-        emit(
-            world,
-            actor_id,
-            7,
-            pack(&[u64_bytes(task_id), vec![stage]]),
-            events,
-        )?;
-        emit(
-            world,
-            actor_id,
-            5,
-            pack(&[u64_bytes(task_id), vec![reason]]),
-            events,
-        )?;
-        if let Some(actor) = world.actors.get_mut(&actor_id) {
-            if actor.task_id == task_id {
-                actor.task_id = 0;
-            }
-        }
+        fail_task(world, task_id, reason, events)?;
     }
     world.cancels.clear();
     Ok(())
 }
 
-fn work(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), StepError> {
+fn fail_task(
+    world: &mut World,
+    task_id: u64,
+    reason: u8,
+    events: &mut Vec<ResourceEvent>,
+) -> Result<(), StepError> {
+    let task = world.tasks.get(&task_id).ok_or(StepError::InvalidState)?;
+    let actor_id = task.actor_id;
+    let reservation_ids = task.reservations.clone();
+    let unconsumed = task.unconsumed.clone();
+    for id in reservation_ids {
+        if let Some(reservation) = world.reservations.get_mut(&id) {
+            if reservation.state == 1 {
+                reservation.state = 2;
+                emit(
+                    world,
+                    actor_id,
+                    3,
+                    pack(&[u64_bytes(id), vec![reason]]),
+                    events,
+                )?;
+            }
+        }
+    }
+    let stage = if reason == 2 { 7 } else { 8 };
+    if let Some(task) = world.tasks.get_mut(&task_id) {
+        task.stage = stage;
+        task.interruption = reason;
+        task.unconsumed.clear();
+    }
+    for record in unconsumed {
+        world.registry.insert(
+            record.key,
+            RegistryRecord {
+                submitted: record.submitted,
+                resolved: record.resolved,
+                role: 2,
+            },
+        );
+    }
+    emit(
+        world,
+        actor_id,
+        7,
+        pack(&[u64_bytes(task_id), vec![stage]]),
+        events,
+    )?;
+    emit(
+        world,
+        actor_id,
+        5,
+        pack(&[u64_bytes(task_id), vec![reason]]),
+        events,
+    )?;
+    if let Some(actor) = world.actors.get_mut(&actor_id) {
+        if actor.task_id == task_id {
+            actor.task_id = 0;
+        }
+    }
+    Ok(())
+}
+
+fn work(
+    world: &mut World,
+    residual: &[u32],
+    events: &mut Vec<ResourceEvent>,
+) -> Result<(), StepError> {
     let ids: Vec<u64> = world
         .actors
         .values()
@@ -1415,6 +1448,12 @@ fn work(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), StepEr
         .collect();
     for task_id in ids {
         step_task(world, task_id, events)?;
+    }
+    for id in residual {
+        let actor = world.actors.get(id).ok_or(StepError::InvalidState)?;
+        if actor.locus == 3 && actor.task_id == 0 {
+            navigation::spend_edge(world, *id)?;
+        }
     }
     Ok(())
 }
@@ -1446,8 +1485,40 @@ fn step_task(
             complete(world, task_id, events)
         }
         5 => Ok(()),
-        3 => Err(StepError::InvalidState),
+        3 => travel_task(world, task_id, events),
         _ => Err(StepError::InvalidState),
+    }
+}
+
+fn travel_task(
+    world: &mut World,
+    task_id: u64,
+    events: &mut Vec<ResourceEvent>,
+) -> Result<(), StepError> {
+    let task = world.tasks[&task_id].clone();
+    let actor = world.actors[&task.actor_id].clone();
+    if task.steps.is_empty() && actor.locus != 3 {
+        let path = navigation::search(world, &actor, &task)?;
+        let Some(path) = path.filter(|p| !p.is_empty()) else {
+            return fail_task(world, task_id, 5, events);
+        };
+        world.tasks.get_mut(&task_id).unwrap().steps = path;
+    }
+    navigation::step(world, task_id)?;
+    let actor = &world.actors[&task.actor_id];
+    if actor.locus == task.target_locus
+        && actor.site == task.target_site
+        && actor.x == task.target_x
+        && actor.y == task.target_y
+    {
+        advance(world, task_id, 4, events)
+    } else {
+        let task = world.tasks.get_mut(&task_id).unwrap();
+        task.progress = task
+            .progress
+            .checked_add(1)
+            .ok_or(StepError::CapacityExceeded)?;
+        Ok(())
     }
 }
 

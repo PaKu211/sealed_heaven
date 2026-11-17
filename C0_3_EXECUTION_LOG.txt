@@ -15,3 +15,14 @@ Added explicit independent Eat event packing and all-boundary restore comparison
 S2 increment: cargo test --locked --offline and --release: 67 unit + 2 doctests
 passed in each profile. Strict clippy passed. Formatting applied and reviewed.
 Reviewed intended diff; only S2 tests, reports, resume files, and /target/ ignore.
+S2 push succeeded: feat/c03-s2-needs-goals.
+Local SHA: 509d9c014b6d2aa294e79310dfcee1f840d070a2.
+Remote SHA: 509d9c014b6d2aa294e79310dfcee1f840d070a2 (git ls-remote).
+Created feat/c03-s3-navigation from verified S2, same worktree directory.
+Implemented route/grid search, task travel, residual movement, production goals.
+Initial new suite: 74 passed, 1 failed (M0-T07 initial fixture interval mismatch).
+Corrected M0-T07 to interval 100 per existing v1.3 independent audit; oracle unchanged.
+S3 full regression: 75 unit + 2 doctests passed debug and release.
+cargo fmt --all --check, check --locked --offline, strict clippy: all passed.
+Reviewed fixture3 changes and new navigation/tests. Frozen files/dependencies untouched.
+Residual travel interpretation follows acceptance section 14; see S3 report.

@@ -11,7 +11,7 @@ No merge, force push, branch deletion, protection bypass, or secrets/build outpu
 ## Current checkpoint
 
 - Worktree: `D:/projek/sealed/Sealed_Heaven_C0_1_Source (1)/sealed-heaven-s2`.
-- Branch: `feat/c03-s2-needs-goals`.
+- Branch: `feat/c03-s3-navigation` (same worktree directory).
 - Recovered HEAD and remote: `cf31ef19e45e257d3a3b9e5c22d35039df7e5f90`.
 - S1 remediation is inherited at `bf91789`; do not redo its completed audits.
 - S2 implemented; adding explicit event-oracle and all-split restore coverage.
@@ -21,12 +21,14 @@ No merge, force push, branch deletion, protection bypass, or secrets/build outpu
 
 ## Next
 
-S2 verification increment: 67 unit + 2 doctests debug/release and strict clippy pass.
-Commit/push S2 report/tests. Create `feat/c03-s3-navigation` from verified S2.
-Implement route/grid search, travel and remaining production tests, M0-T07.
-Then create `feat/c03-s4-integration` from verified S3; implement full M0-T06,
+S2 `509d9c014b6d2aa294e79310dfcee1f840d070a2` pushed successfully; ls-remote
+confirmed the identical SHA. S3 implemented and full regression is 75 unit + 2
+doctests in both profiles, plus fmt/check/strict clippy. Commit/push S3 report and
+code, then create `feat/c03-s4-integration` from verified S3; implement full M0-T06,
 mixed five-goal integration and full acceptance coverage with independent vectors.
 Independent review and owner acceptance remain outstanding; never call WIP PASS.
+Residual timing ambiguity is documented in `C0_3_S3_IMPLEMENTATION_REPORT.md`:
+implementation follows acceptance §14's post-cancel save, then next-tick arrival.
 
 ## Frozen contracts
 
