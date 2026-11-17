@@ -139,6 +139,35 @@ Stock 20, definition 7, class 1, quantity 1, owner kind 3, owner id 1. Planned l
 
 Save while the unconsumed completion list is non-empty and the stage is not `Done`. The blob contains submitted and resolved task ids. Restore. Prefix events are not emitted again. Resume consumes the lowest key and retains every key in the registry. One-boundary `drive` and grouped `drive` match after every boundary.
 
+## 9A. H09 — applied non-completion replay
+
+**Initial.** Shared two-claimant state from §3: tick 0, seed 100, cursor 1, digest H0. Actor 1 is already enabled and task 1 is non-terminal.
+
+**Applied no-op.** Boundary 0 admits actor 1, producer 1, sequence 1, target 1, `SetEnabled(1)`. It emits nothing. Tick is 1, cursor 1, digest H0. The checkpoint body contains no applied-command history for this key.
+
+**Positive old-target replay.**
+
+| Step | Input | Expected |
+| --- | --- | --- |
+| 1 | Same key, `CancelReservation(0)`, at boundary 1 | `LateTarget`. Tick, cursor, digest, and full checkpoint bytes unchanged |
+| 2 | Save after step 0, restore, repeat step 1 | Identical `LateTarget` and unchanged bytes |
+| 3 | Empty boundary at tick 0 instead of step 0 | Byte-identical tick-1 checkpoint; step 1 produces the same `LateTarget` and unchanged bytes |
+
+Step 3 is the no-hidden-cache assertion. A no-op applied command and an empty boundary are indistinguishable in canonical state, and they must remain indistinguishable after restore.
+
+**Negative structural cases.** From the same tick-1 image, every case fails with no mutation:
+
+| Case | Expected |
+| --- | --- |
+| Old-target replay key with producer 0 | `InvalidProducer` (row 2) |
+| Old-target replay key with an unknown actor id | `UnknownActor` (row 3) |
+| The same key twice in one admission | `ConflictingIdentity` (row 4) |
+| A pending future key submitted again before its due tick | `ConflictingIdentity` (row 4) |
+
+**Future target.** At boundary 1, the same key with target 2 and `SetMode(Scheduled)` is an ordinary new command, not a historical replay. It is admitted, emits nothing, and applies at tick 2 with mode Scheduled. Re-submitting that key at tick 2 returns `LateTarget` and leaves the bytes unchanged. Save/restore before any case reproduces the same result and the same bytes.
+
+**Durable completion identities.** Consumed `CompleteTask` identities are unaffected: §7 still governs the 41-byte registry, including no-op replay for the same submitted id and `ConflictingIdentity` for a different payload or type.
+
 ## 10. C03-T01h — rollback and hostile saves
 
 Over-reserve, quantity 0, an empty interval, and a reservation sum that would overflow `u64` fail before publication. An `i64` score overflow and a `u64` route-cost overflow return `CapacityExceeded` and emit nothing. Cursor overflow returns `CapacityExceeded`. An unbounded count, an illegal grid, or a registry count that does not fit returns `Corrupt`. A task id equal to a reservation id, a dangling task id, or `resolved_task_id` 0 is `InvalidState`. Truncation, wrong tag, wrong revision, bad checksum, unknown fixture, and content mismatch are distinct. A C0.2 blob is `UnsupportedFormat`. The following valid boundary matches a run that never attempted the failed call.
@@ -268,6 +297,7 @@ Actor 1 on edge 1, `traversed_cost` 0, travelling task 50, empty path.
 | Exit item | Section |
 | --- | --- |
 | C03-T01 | §§3–10 |
+| H09 applied non-completion replay | §9A |
 | M0-T06, including the one-unit case | §§11 and 3 |
 | M0-T07 Actor → Store → Cargo → Site, recipe, later-leg rollback | §12 |
 | M0-T08 cancel, disable, expiry, unreachable, exactly once | §13 |

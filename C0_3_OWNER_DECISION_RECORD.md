@@ -1,7 +1,7 @@
 # C0.3 Owner Decision Record
 
-Version 2.0 · 17 November 2026  
-Status: recorded. This record does not authorize implementation.
+Version 2.1 · 17 November 2026  
+Status: recorded. The H09 amendment in §2A authorizes only the minimum fixture-3 documentation, acceptance-test, and Rust changes needed to apply it. It does not authorize S2, S3, S4, Bevy, merge, push, or an independent S1 PASS.
 
 ## 1. Verification
 
@@ -28,7 +28,7 @@ The owner attached these conditions. They bind the specification.
 1. C0.1 and C0.2 canonical behavior and golden vectors remain frozen.
 2. The creation-tick work restriction remains in force.
 3. Completion replay is a no-op only for an identical `CompleteTask` command identity, including the original submitted task id.
-4. Reusing an applied `CommandKey` with a different command type or payload returns `ConflictingIdentity`.
+4. Reuse of a durable command identity with a different command type or payload returns `ConflictingIdentity`. For fixture 3, durable identities are the 41-byte consumed completion registry and pending commands. The H09 amendment in §2A supersedes the former requirement to durably recognize every historically applied non-completion key.
 5. Reservation accounting, transaction rollback, and completion provenance follow the approved R2.1-final contracts.
 6. Residual edge movement preserves travel cost and remains deterministic across save and restore.
 7. OC-EDGE is rejected. The approved graph remains unchanged.
@@ -37,6 +37,27 @@ The owner attached these conditions. They bind the specification.
 10. The Balanced Development Strategy remains approved: S1 Resource Core, S2 First Living NPC, S3 Movement and Production, S4 Multi-NPC Integration. An internal slice is not the C0.3 milestone exit.
 
 Implementation requires a later, separate authorization. An independent G3 review of the revised documents is mandatory before that authorization. This record does not start S1, does not declare G3 PASS, and does not begin Bevy integration.
+
+### H09 amendment — fixture 3 (17 November 2026)
+
+The project owner approved **H09 Option B**. This amendment is normative for C0.3 fixture 3 and supersedes the conflicting portion of §2 condition 4. The superseded text required durable recognition of every historically applied non-completion command key. The deterministic replay contract below replaces that requirement.
+
+1. Consumed `CompleteTask` identities remain durable through the existing 41-byte completion registry.
+2. Pending command identities retain their existing conflict rules.
+3. Duplicate or conflicting commands within one admission are validated according to the normative first-match precedence table.
+4. Ordinary non-completion commands that have already been applied do not require a separate persistent historical registry.
+5. After such a command has been applied and is no longer present in canonical state, a later submission with an old target follows the deterministic `LateTarget` rule, subject to earlier applicable structural validation.
+6. Save and restore must produce identical future behavior from identical canonical checkpoint bytes.
+7. No hidden noncanonical replay cache is permitted.
+8. `SH:C03:STATE` revision 1, the 41-byte completion registry, and every published canonical vector are preserved.
+
+Consequences for fixture 3:
+
+- A durable identity is either a consumed completion registry record or a pending command. Those identities keep their conflict rules.
+- An applied non-completion key that has left canonical state has no persistent identity. A later submission with an old target is `LateTarget` after the earlier structural rows. A later submission with a future target is an ordinary new command, not a historical replay.
+- Identical canonical checkpoint bytes produce identical future behavior; no historical distinction is reconstructed outside the body.
+
+This amendment authorizes only the minimum necessary normative documentation, acceptance-test, and Rust changes to implement H09. It does not authorize S2, S3, S4, or Bevy, does not permit a push or merge, and does not declare an independent S1 PASS.
 
 ## 3. Approved OD contracts
 

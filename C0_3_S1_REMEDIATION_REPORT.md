@@ -8,6 +8,8 @@
 
 **Result:** B01 and H01–H08, H10 are corrected and covered by regressions. **H09 remains BLOCKED** by a direct conflict between binding condition 4 and the H09 owner direction; it is documented, not silently resolved. The mandatory verification suite passes in debug and release.
 
+> **H09 status update (17 November 2026):** H09 was subsequently resolved by the owner's Option B amendment. See `C0_3_S1_H09_RESOLUTION.md` and `C0_3_S1_FINAL_REMEDIATION_REPORT.md`. Statements below that describe H09 as BLOCKED are historical.
+
 ---
 
 ## 1. Authorization and correction strategy

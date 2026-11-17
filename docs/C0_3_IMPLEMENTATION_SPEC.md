@@ -1,11 +1,16 @@
 # C0.3 Implementation Specification
 
 Version 1.3-approved · 17 November 2026  
-Status: owner-authorized documentation after NF-05 packing-field remediation. Implementation is not authorized.
+Status: owner-authorized documentation after NF-05 and the targeted S1 H10/H09 clarifications. Implementation authorization is limited to those targeted corrections; this is not an S1 acceptance verdict.
 
 S1 H10 clarification: the project owner's targeted-remediation authorization
 permits the goal-0 clarification in §8 below. Other slice authorization and the
 frozen compatibility boundaries are unchanged. This is not an S1 acceptance verdict.
+
+S1 H09 clarification: the project owner's H09 Option B amendment narrows §5
+row 7 to durable identities. Applied non-completion keys have no persistent
+history. Checkpoint revision 1, the 41-byte registry, and published vectors are
+unchanged.
 
 This specification incorporates OD-01 through OD-16 as approved in `C0_3_OWNER_DECISION_RECORD.md` from `C0_3_OWNER_DECISIONS_PENDING.md` version 1.2, as amended by AM-01 through AM-08 from the R2.1-final remediation packet, the NF-01 through NF-04 documentation remediation, and the NF-05 preinstalled-task packing-field remediation. OC-EDGE is rejected. Fixture numbers in §12 are C0.3 fixture configuration. They are not the final gameplay balance of Sealed Heaven.
 
@@ -164,7 +169,7 @@ Rules are tested in order. The first match is the result. An error rolls the who
 | 4 | The same key appears twice in the batch, or the key is already pending | `ConflictingIdentity` |
 | 5 | The key is in the consumed registry and the submitted `CompleteTask` id equals the stored `submitted_task_id` | No-op, including when the target tick is old. Role 1 and role 2 both match this way |
 | 6 | The key is in the consumed registry and the submitted `CompleteTask` id differs from the stored `submitted_task_id` | `ConflictingIdentity`, even if both ids would resolve to the same task |
-| 7 | The key is in the consumed registry and the payload is not `CompleteTask`, or any applied command key is reused with a different command type or payload | `ConflictingIdentity` |
+| 7 | The key is in the consumed registry and the payload is not `CompleteTask` | `ConflictingIdentity` |
 | 8 | The payload is a cancel, the reservation exists, and the command actor is not the stored claimant | `InvalidPayload` |
 | 9 | The payload is a cancel, the reservation exists, the actor is the claimant, and that task is already terminal | No-op, including when the target tick is old |
 | 10 | `target_tick` is less than or equal to the current tick, and no earlier rule matched | `LateTarget` |
@@ -173,6 +178,8 @@ Rules are tested in order. The first match is the result. An error rolls the who
 | 13 | Non-zero cancel whose reservation task is non-terminal and is not `actor.task_id` | `InvalidPayload` |
 | 14 | Unknown cancel id, or cancel 0 when the actor has no current task | No-op |
 | 15 | Otherwise | Admit |
+
+Rows 4 and 7 are the durable-identity rules. For fixture 3, a durable identity is a pending command or a consumed completion registry record. An ordinary non-completion command that has been applied and is no longer present in canonical state has no persistent identity: a later submission with a target tick at or before the current tick reaches row 10 and returns `LateTarget`, while a later submission with a future target is an ordinary new command. Rows 2–4 still run before row 10. Restore does not reconstruct hidden history, and identical canonical checkpoint bytes produce identical later behavior. This is the approved H09 amendment; it does not change revision 1, the 41-byte registry, or any published vector.
 
 Due commands sort by `(target tick, actor ID, producer ID, sequence)`, ascending. That order is the C03 fixture order. It is not global gameplay fairness.
 

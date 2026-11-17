@@ -1,0 +1,265 @@
+========================================================================
+C0.3 S1 FINAL REMEDIATION — VERIFICATION LOG
+========================================================================
+Baseline commit : 552ed25 "Implement the C0.3 S1 resource core."
+Prior commit    : 54d7dfc "Correct the C0.3 S1 independent-audit findings"
+Branch          : fix/c03-s1-independent-audit
+Date            : 17 November 2026
+Host            : Windows, PowerShell
+Workspace       : C:\Users\PC_4\AppData\Local\Temp\opencode\sealed-heaven-s1-remediation-552ed25
+Toolchain       : rustc 1.100.0 (0ef1bc386 2026-11-09)
+                  cargo 1.100.0 (3acc79c0c 2026-11-05)
+Pinned file     : rust-toolchain.toml channel = "1.100.0"
+Evidence dir    : C:\Users\PC_4\AppData\Local\Temp\opencode\sealed-heaven-s1-remediation-evidence
+Audit dir       : C:\Users\PC_4\AppData\Local\Temp\opencode\sealed-heaven-s1-audit-552ed25
+
+Scope: H09 Option B amendment plus final S1 verification. No S2/S3/S4,
+no Bevy, no push, no merge, no independent S1 PASS declaration.
+
+========================================================================
+1. MANDATORY COMMANDS
+========================================================================
+Working directory: repository root.
+CARGO_TARGET_DIR: <evidence>\build
+All commands use --locked --offline.
+
+$ cargo fmt --all --check
+EXIT(fmt): 0
+
+$ cargo check --locked --offline
+EXIT(check): 0
+
+$ cargo clippy --all-targets --locked --offline -- -D warnings
+EXIT(clippy): 0
+
+$ cargo test --locked --offline
+running 59 tests
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+running 2 doctests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+EXIT(test-debug): 0
+
+$ cargo test --release --locked --offline
+running 59 tests
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+running 2 doctests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+EXIT(test-release): 0
+
+Raw transcript: final-verification-h09.txt
+
+------------------------------------------------------------------------
+1.1 Test composition (59 unit tests + 2 doctests)
+------------------------------------------------------------------------
+C0.1: 14 tests
+C0.2: 11 tests
+C03 S1: 6 tests
+Remediation: 28 tests (26 prior + 2 H09)
+
+H09 regressions:
+  h09_applied_noncompletion_replay_is_late_and_identity_free
+  h09_pending_duplicate_and_future_target_follow_first_match
+
+Both pass in debug and release.
+
+Doctests: 2 (src/lib.rs line 3; Simulation::drive line 765)
+
+========================================================================
+2. H09 CASE VERIFICATION
+========================================================================
+Owner amendment: C0_3_OWNER_DECISION_RECORD.md §2A (Option B).
+
+Contract under test:
+  - consumed CompleteTask identities remain durable in the 41-byte registry;
+  - pending identities keep their conflict rules;
+  - within-admission duplicates follow first-match precedence;
+  - applied non-completion keys have no persistent identity;
+  - old-target reuse is LateTarget after earlier structural validation;
+  - save/restore is byte-deterministic with no hidden cache.
+
+Verified cases (unit tests, debug and release):
+
+  applied no-op SetEnabled(1)
+    -> no event, tick 1, cursor 1, digest H0
+  same key CancelReservation(0) at boundary 1
+    -> LateTarget, checkpoint bytes unchanged
+  save after apply, restore, repeat
+    -> same LateTarget, same bytes
+  empty boundary vs applied no-op
+    -> byte-identical tick-1 checkpoints; same replay result
+  old-target replay with producer 0
+    -> InvalidProducer, no mutation
+  old-target replay with unknown actor
+    -> UnknownActor, no mutation
+  same key twice in one admission
+    -> ConflictingIdentity, no mutation
+  pending future key re-submitted before due
+    -> ConflictingIdentity, no mutation
+  same key, future target 2, SetMode(Scheduled)
+    -> ordinary new command, admitted, applies at tick 2, no event
+  that target-2 key re-submitted at tick 2
+    -> LateTarget, bytes unchanged
+
+External audit case (amended expectation):
+
+  applied_noncompletion_key_reuse
+    RESTORE  OK   roundtrip_equal=true
+    DRIVE-0  OK   tick=1 cursor=1 digest=ff18f950...
+    STATE-0  sha=a6acf5cc52dce5bc23c38c137dcc449cba87493ae80d9047c2ac2bf095de78b8 len=1201
+    DRIVE-1  Command { key: (1,1,1,1), reason: LateTarget } unchanged=true
+    STATE-1  same sha and length
+
+The original audit expected ConflictingIdentity. The owner's Option B
+amendment supersedes that expectation for fixture 3.
+
+========================================================================
+3. ORACLE REPRODUCTION
+========================================================================
+3.1 H0
+
+$ python -c "import hashlib;print(hashlib.sha256(b'SH:C03:EVENT-INIT:v1').hexdigest())"
+ff18f9506b6c610af37f18d81f10090ec125fba0507f9cbf9c927dfa95cc6b3c
+
+Expected from docs/C0_3_ACCEPTANCE_TESTS.md line 12: MATCH.
+
+3.2 T01a
+
+Oracle file SHA-256:
+11f9aae46d7f0f04b6c3efead0a25c3086bc56904877d237c0a79ae032a293d9
+
+t01a_forward  RESTORE   OK   roundtrip_equal=true
+t01a_forward  DRIVE-0   OK   tick=1 cursor=5
+                           digest=5fdbc5707211fbfc309f5ed75e21eaa83ebf3d7307da60cc442a3cd7f8340908
+                           events=
+                             1:1:1:1:030000000000000001000000000000000100000000000000,
+                             2:1:1:7:010000000000000002,
+                             3:1:2:2:0100000000000000010000000000000004,
+                             4:1:1:7:010000000000000004
+t01a_forward  STATE-0   sha=11f9aae46d7f0f04b6c3efead0a25c3086bc56904877d237c0a79ae032a293d9 len=1262
+t01a_forward  RELOAD-1  OK   equal=true
+
+t01a_reverse  RESTORE   OK   roundtrip_equal=true
+t01a_reverse  DRIVE-0   OK   tick=1 cursor=5
+                           digest=5fdbc5707211fbfc309f5ed75e21eaa83ebf3d7307da60cc442a3cd7f8340908
+t01a_reverse  STATE-0   sha=11f9aae46d7f0f04b6c3efead0a25c3086bc56904877d237c0a79ae032a293d9 len=1262
+t01a_reverse  RELOAD-1  OK   equal=true
+
+Forward and reverse are byte-identical to the independent oracle.
+
+3.3 Frozen C0.1/C0.2
+
+  c01_t04_checkpoint_and_event_chain_golden_vectors ........ ok
+  c01_t04_named_rng_golden_vectors_and_stream_isolation .... ok
+  c02::c02_t01a..c02_t02d (11 tests) ...................... ok
+
+No diff in src/domain.rs, src/tests/c01.rs, src/tests/c02.rs,
+docs/C0_1_ACCEPTANCE_TESTS.md, or docs/C0_2_ACCEPTANCE_TESTS.md.
+
+========================================================================
+4. INDEPENDENT AUDIT CORPUS
+========================================================================
+Harness: external probe against this working tree, debug and release.
+
+$ cargo run --offline --manifest-path <evidence>\probe\Cargo.toml -- <evidence>
+$ cargo run --release --offline --manifest-path <evidence>\probe\Cargo.toml -- <evidence>
+
+Results (debug and release identical):
+
+  cases_old=99 cases_new=99
+  unchanged=31 changed=68 not_in_baseline=0
+  restore_expectations_pass=57 fail=0
+  PANIC occurrences = 0
+
+Baseline restore table: 6 PASS / 51 FAIL.
+Corrected restore table: 57 PASS / 0 FAIL.
+
+Note: the 68 changed observations are the intended B01/H01–H10 and
+H09-amendment corrections. The H09 case is among them and now matches
+the amended contract.
+
+========================================================================
+5. PRESERVATION AND DIFF CHECKS
+========================================================================
+$ git diff --stat -- Cargo.toml Cargo.lock rust-toolchain.toml
+(empty)
+
+$ git status --porcelain -- src/domain.rs src/tests/c01.rs src/tests/c02.rs
+(empty)
+
+$ git status --porcelain -- docs/C0_1_ACCEPTANCE_TESTS.md docs/C0_2_ACCEPTANCE_TESTS.md
+(empty)
+
+Checkpoint invariants:
+  tag             SH:C03:STATE (12 bytes)
+  revision        1
+  fixture         3
+  scenario block  305 bytes
+  actor width     131 bytes
+  registry row    41 bytes
+  T01a blob       11f9aae46d7f0f04b6c3efead0a25c3086bc56904877d237c0a79ae032a293d9
+  T01a length     1262
+  T01a digest     5fdbc5707211fbfc309f5ed75e21eaa83ebf3d7307da60cc442a3cd7f8340908
+  H0              ff18f9506b6c610af37f18d81f10090ec125fba0507f9cbf9c927dfa95cc6b3c
+
+========================================================================
+6. FILE HASHES (SHA-256, at verification time)
+========================================================================
+Contracts:
+  2f2badcce958c2c2d0c1d19c4c106f79bfd8b57b9b9cca6059543f853696f4de  C0_3_OWNER_DECISION_RECORD.md
+  93b91ef942c8f2a115243d105b8e08dde9b9c282396838399ca8adfc79d0d05b  docs/C0_3_IMPLEMENTATION_SPEC.md
+  2ffc51fe3374effa941434f4bed58d5a08aa97a95a49ceab62d74e12cf9531b9  docs/C0_3_ACCEPTANCE_TESTS.md
+
+Code:
+  73d58220fc1f6095f4c899311908120c9d5771193a1b6906b3217566e4f576f5  src/fixture3.rs
+  9fee05b6b248094ba5f46a798e36d470f834fb1dd731925a6fc61dfef4d08396  src/fixture3/validation.rs
+  058252fd96012a64cfad6f05293f332b54aee56c40987eb32bca37109e5f6bc4  src/tests/c03_remediation.rs
+
+Evidence:
+  af266a64a9f3f730fae39df295a3cef8b2a1d4055ae10da73035b3ad0b59bb59  final-verification-h09.txt
+  38b62fc410e76b89675fb7bec7600f14deae25d410ec3c3d4658c922d72661ac  final-probe-debug.txt
+  76ef968c59798844f9eae77267fd0b782eb3266a580410d620cd472de1b808dc  final-probe-release.txt
+  5f4bd6b9606b48e45fd057fbbcf7efdd4c5478bd896afce477722812c07c0ec6  final-adversarial-comparison-debug.txt
+  5f4bd6b9606b48e45fd057fbbcf7efdd4c5478bd896afce477722812c07c0ec6  final-adversarial-comparison-release.txt
+  bc9991e9b9d01796e1372a238041cbac870088b89c08edebddd944481baefd12  final-test-list.txt
+
+Oracle:
+  11f9aae46d7f0f04b6c3efead0a25c3086bc56904877d237c0a79ae032a293d9  <audit>\oracle-t01a.bin
+
+========================================================================
+7. FILES CHANGED IN THIS FINAL CORRECTION
+========================================================================
+Modified:
+  C0_3_OWNER_DECISION_RECORD.md
+  docs/C0_3_IMPLEMENTATION_SPEC.md
+  docs/C0_3_ACCEPTANCE_TESTS.md
+  src/tests/c03_remediation.rs
+  C0_3_S1_REMEDIATION_REPORT.md        (H09 historical banner)
+  C0_3_S1_FINDING_CLOSURE_MATRIX.md    (H09 historical banner)
+
+Added:
+  C0_3_S1_H09_RESOLUTION.md
+  C0_3_S1_FINAL_REMEDIATION_REPORT.md
+  C0_3_S1_FINAL_VERIFICATION_LOG.txt
+
+No production Rust change was needed for H09. The existing implementation
+already conforms; only two regression tests were added.
+
+========================================================================
+8. GIT STATE
+========================================================================
+Branch: fix/c03-s1-independent-audit
+Baseline: 552ed25
+Prior remediation commit: 54d7dfc
+/main: 2758489 (untouched)
+Merge: none
+Push: none
+
+The final H09 commit is created after this log is written. No S1 PASS,
+milestone exit, merge readiness, or S2/S3/S4 start is claimed.
+
+========================================================================
+9. NEXT ACTION
+========================================================================
+Stop and request an independent S1 re-audit of the H09 amendment and the
+final remediation.
+========================================================================

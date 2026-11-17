@@ -6,6 +6,8 @@
 **Reference audit:** `sealed-heaven-s1-audit-552ed25/C0_3_S1_INDEPENDENT_AUDIT.md`
 **Scope:** B01 and H01–H10 only. No S2/S3/S4, no merge, no push, no S1 PASS declaration.
 
+> **H09 status update (17 November 2026):** H09 was subsequently resolved by the owner's Option B amendment. See `C0_3_S1_H09_RESOLUTION.md` and `C0_3_S1_FINAL_REMEDIATION_REPORT.md`. The H09 row below is historical.
+
 ---
 
 ## 1. Disposition summary

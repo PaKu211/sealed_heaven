@@ -1,8 +1,8 @@
 //! Focused regressions for the owner-authorized independent S1 findings.
 use crate::fixture3::{self, Completion, PathStep, RegistryRecord, Reservation, Stock, World};
 use crate::{
-    ActorId, Command, CommandKey, InvalidCommand, Leg, Payload, RestoreError, Simulation,
-    StepError, encoding,
+    ActorId, Command, CommandKey, InvalidCommand, Leg, Payload, ProcessingMode, RestoreError,
+    Simulation, StepError, encoding,
 };
 
 fn key(tick: u64, actor: u32, sequence: u64) -> CommandKey {
@@ -412,6 +412,143 @@ fn h08_supported_scenarios_roundtrip_unsupported_consistent_content_is_rejected(
         Simulation::restore_domain_checkpoint(&body),
         Err(RestoreError::ContentMismatch)
     );
+}
+
+#[test]
+fn h09_applied_noncompletion_replay_is_late_and_identity_free() {
+    let mut sim = Simulation::two_claimants();
+    let applied = cmd(1, 1, 1, Payload::SetEnabled(1));
+    let out = sim.drive(0, &[applied]).unwrap();
+    assert!(out.resource_events().is_empty());
+    let applied_bytes = sim.domain_checkpoint_bytes();
+
+    let replay = cmd(1, 1, 1, Payload::CancelReservation(0));
+    let late = StepError::Command {
+        key: replay.key(),
+        reason: InvalidCommand::LateTarget,
+    };
+    assert_rollback(&mut sim, &[replay], late);
+    assert_eq!(sim.domain_checkpoint_bytes(), applied_bytes);
+
+    let mut restored = Simulation::restore_domain_checkpoint(&applied_bytes).unwrap();
+    assert_rollback(&mut restored, &[replay], late);
+    assert_eq!(restored.domain_checkpoint_bytes(), applied_bytes);
+
+    // A no-op applied command leaves no identity behind: its canonical bytes
+    // equal an empty boundary, and both histories produce the same replay.
+    let mut empty = Simulation::two_claimants();
+    assert!(empty.drive(0, &[]).unwrap().resource_events().is_empty());
+    assert_eq!(empty.domain_checkpoint_bytes(), applied_bytes);
+    assert_rollback(&mut empty, &[replay], late);
+    assert_eq!(empty.domain_checkpoint_bytes(), applied_bytes);
+}
+
+#[test]
+fn h09_pending_duplicate_and_future_target_follow_first_match() {
+    let mut sim = Simulation::two_claimants();
+    let applied = cmd(1, 1, 1, Payload::SetEnabled(1));
+    sim.drive(0, &[applied]).unwrap();
+    let applied_bytes = sim.domain_checkpoint_bytes();
+    let replay = cmd(1, 1, 1, Payload::CancelReservation(0));
+
+    let mut producer = Simulation::restore_domain_checkpoint(&applied_bytes).unwrap();
+    let bad_producer = Command::new(
+        CommandKey {
+            producer_id: 0,
+            ..replay.key()
+        },
+        replay.payload(),
+    );
+    assert_rollback(
+        &mut producer,
+        &[bad_producer],
+        StepError::Command {
+            key: bad_producer.key(),
+            reason: InvalidCommand::InvalidProducer,
+        },
+    );
+
+    let mut unknown = Simulation::restore_domain_checkpoint(&applied_bytes).unwrap();
+    let bad_actor = Command::new(
+        CommandKey {
+            actor_id: ActorId::new(99),
+            ..replay.key()
+        },
+        replay.payload(),
+    );
+    assert_rollback(
+        &mut unknown,
+        &[bad_actor],
+        StepError::Command {
+            key: bad_actor.key(),
+            reason: InvalidCommand::UnknownActor,
+        },
+    );
+
+    let mut duplicate = Simulation::restore_domain_checkpoint(&applied_bytes).unwrap();
+    assert_eq!(
+        duplicate.drive(1, &[replay, replay]),
+        Err(StepError::Command {
+            key: replay.key(),
+            reason: InvalidCommand::ConflictingIdentity,
+        })
+    );
+    assert_eq!(duplicate.domain_checkpoint_bytes(), applied_bytes);
+
+    let pending_future = cmd(3, 1, 1, Payload::SetMode(ProcessingMode::Scheduled));
+    let mut pending = Simulation::restore_domain_checkpoint(&applied_bytes).unwrap();
+    assert!(
+        pending
+            .drive(1, &[pending_future])
+            .unwrap()
+            .resource_events()
+            .is_empty()
+    );
+    let pending_bytes = pending.domain_checkpoint_bytes();
+    let conflict = StepError::Command {
+        key: pending_future.key(),
+        reason: InvalidCommand::ConflictingIdentity,
+    };
+    assert_rollback(&mut pending, &[pending_future], conflict);
+    let mut pending_restored = Simulation::restore_domain_checkpoint(&pending_bytes).unwrap();
+    assert_rollback(&mut pending_restored, &[pending_future], conflict);
+
+    // With no durable non-completion identity, a future target is an ordinary
+    // new command, not a historical replay.
+    let future = cmd(2, 1, 1, Payload::SetMode(ProcessingMode::Scheduled));
+    let mut future_sim = Simulation::restore_domain_checkpoint(&applied_bytes).unwrap();
+    assert!(
+        future_sim
+            .drive(1, &[future])
+            .unwrap()
+            .resource_events()
+            .is_empty()
+    );
+    assert_eq!(
+        future_sim.world3.as_ref().unwrap().actors[&1].mode,
+        ProcessingMode::Scheduled as u8
+    );
+    let future_bytes = future_sim.domain_checkpoint_bytes();
+
+    let mut future_restored = Simulation::restore_domain_checkpoint(&applied_bytes).unwrap();
+    assert!(
+        future_restored
+            .drive(1, &[future])
+            .unwrap()
+            .resource_events()
+            .is_empty()
+    );
+    assert_eq!(future_restored.domain_checkpoint_bytes(), future_bytes);
+
+    assert_rollback(
+        &mut future_sim,
+        &[future],
+        StepError::Command {
+            key: future.key(),
+            reason: InvalidCommand::LateTarget,
+        },
+    );
+    assert_eq!(future_sim.domain_checkpoint_bytes(), future_bytes);
 }
 
 #[test]
