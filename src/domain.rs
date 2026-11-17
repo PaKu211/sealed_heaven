@@ -236,6 +236,7 @@ impl Raw {
                 .into_iter()
                 .map(|(id, mode)| (id, mode_from_byte(mode).expect("validated marker mode")))
                 .collect(),
+            world3: None,
         }
     }
 }
@@ -638,6 +639,14 @@ fn encode_command(bytes: &mut Vec<u8>, key: CommandKey, payload: Payload) {
         } => bytes.extend([2, stream_id, draw_count]),
         Payload::SetMode(mode) => bytes.extend([3, mode_byte(mode)]),
         Payload::MintRecord => bytes.push(4),
+        Payload::SetEnabled(_)
+        | Payload::ReserveStock { .. }
+        | Payload::ReserveBundle { .. }
+        | Payload::CancelReservation(_)
+        | Payload::CompleteTask(_)
+        | Payload::BeginTask { .. } => {
+            unreachable!("fixture 3 payloads are not C0.2 commands")
+        }
     }
 }
 

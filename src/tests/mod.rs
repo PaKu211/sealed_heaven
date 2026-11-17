@@ -1,5 +1,6 @@
 mod c02;
 mod c02_golden;
+mod c03_s1;
 mod golden;
 
 use super::*;

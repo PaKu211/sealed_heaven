@@ -34,6 +34,14 @@ pub(super) fn checkpoint_bytes(sim: &Simulation) -> Vec<u8> {
             Payload::SetMode(_) | Payload::MintRecord => {
                 panic!("checkpoint_bytes is the C0.1 observation")
             }
+            Payload::SetEnabled(_)
+            | Payload::ReserveStock { .. }
+            | Payload::ReserveBundle { .. }
+            | Payload::CancelReservation(_)
+            | Payload::CompleteTask(_)
+            | Payload::BeginTask { .. } => {
+                panic!("checkpoint_bytes is the C0.1 observation")
+            }
         }
     }
 

@@ -17,6 +17,7 @@
 
 mod domain;
 mod encoding;
+mod fixture3;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -74,6 +75,17 @@ pub enum ProcessingMode {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Leg {
+    pub op: u8,
+    pub stock_id: u64,
+    pub definition_id: u64,
+    pub class: u8,
+    pub quantity: u64,
+    pub owner_kind_after: u8,
+    pub owner_id_after: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Payload {
     ClaimSlot,
     /// The fixture accepts streams 1 and 2 and one or two raw words.
@@ -83,6 +95,34 @@ pub enum Payload {
     },
     SetMode(ProcessingMode),
     MintRecord,
+    SetEnabled(u8),
+    ReserveStock {
+        stock_id: u64,
+        quantity: u64,
+        expiry_tick: u64,
+        task_id: u64,
+    },
+    ReserveBundle {
+        task_id: u64,
+        expiry_tick: u64,
+        pair_count: u8,
+        stocks: [u64; 4],
+        quantities: [u64; 4],
+    },
+    CancelReservation(u64),
+    CompleteTask(u64),
+    BeginTask {
+        goal: u8,
+        stage: u8,
+        recipe_id: u64,
+        target_locus: u8,
+        target_site: u64,
+        target_x: u32,
+        target_y: u32,
+        due_tick: u64,
+        leg_count: u8,
+        legs: [Leg; 4],
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -131,8 +171,9 @@ pub enum StepError {
     },
     CapacityExceeded,
     InvalidState,
-    /// `step` was called on fixture 2. The simulation is unchanged.
+    /// `step` was called on fixture 2 or fixture 3. The simulation is unchanged.
     UseDrive,
+    InvalidLeg,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -315,6 +356,27 @@ pub enum GeneratedOutcome {
     },
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResourceEvent {
+    pub id: u64,
+    pub tick: u64,
+    pub actor_id: u32,
+    pub kind: u8,
+    pub payload: Vec<u8>,
+}
+
+impl ResourceEvent {
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend(self.id.to_le_bytes());
+        bytes.extend(self.tick.to_le_bytes());
+        bytes.extend(self.actor_id.to_le_bytes());
+        bytes.push(self.kind);
+        bytes.extend(&self.payload);
+        bytes
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DomainEvent {
     Command(Event),
@@ -343,11 +405,16 @@ impl DomainEvent {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DriveOutput {
     events: Vec<DomainEvent>,
+    resource_events: Vec<ResourceEvent>,
 }
 
 impl DriveOutput {
     pub fn events(&self) -> &[DomainEvent] {
         &self.events
+    }
+
+    pub fn resource_events(&self) -> &[ResourceEvent] {
+        &self.resource_events
     }
 }
 
@@ -406,6 +473,7 @@ pub struct Simulation {
     pub(crate) reservations: BTreeMap<u64, Reservation>,
     pub(crate) tasks: BTreeMap<u64, Task>,
     markers: BTreeMap<u64, ProcessingMode>,
+    world3: Option<fixture3::World>,
 }
 
 impl Simulation {
@@ -502,7 +570,20 @@ impl Simulation {
             reservations: BTreeMap::new(),
             tasks: BTreeMap::new(),
             markers: BTreeMap::new(),
+            world3: None,
         }
+    }
+
+    pub fn two_claimants() -> Self {
+        fixture3::into_simulation(fixture3::two_claimants())
+    }
+
+    pub fn resource_stock_quantity(&self, id: u64) -> Option<u64> {
+        self.world3
+            .as_ref()?
+            .stocks
+            .get(&id)
+            .map(|stock| stock.quantity)
     }
 
     pub fn fixture_content_hash() -> [u8; 32] {
@@ -565,6 +646,9 @@ impl Simulation {
     }
 
     pub fn domain_checkpoint_bytes(&self) -> Vec<u8> {
+        if self.fixture_id == 3 {
+            return fixture3::checkpoint_bytes(self);
+        }
         domain::domain_checkpoint_bytes(self)
     }
 
@@ -573,6 +657,9 @@ impl Simulation {
     }
 
     pub fn restore_domain_checkpoint(bytes: &[u8]) -> Result<Self, RestoreError> {
+        if bytes.len() >= 12 && &bytes[..12] == b"SH:C03:STATE" {
+            return fixture3::restore(bytes);
+        }
         domain::restore(bytes)
     }
 
@@ -720,6 +807,13 @@ impl Simulation {
         submission_tick: u64,
         batch: &[Command],
     ) -> Result<DriveOutput, StepError> {
+        if self.fixture_id == 3 {
+            let resource_events = fixture3::drive(self, submission_tick, batch)?;
+            return Ok(DriveOutput {
+                events: Vec::new(),
+                resource_events,
+            });
+        }
         if submission_tick != self.tick {
             return Err(StepError::WrongBoundary {
                 expected: self.tick,
@@ -750,7 +844,10 @@ impl Simulation {
         staged.apply_commands(&mut events)?;
         staged.apply_work(&mut events)?;
         *self = staged;
-        Ok(DriveOutput { events })
+        Ok(DriveOutput {
+            events,
+            resource_events: Vec::new(),
+        })
     }
 
     fn preflight(&self, command: Command) -> Result<(), StepError> {
@@ -815,6 +912,14 @@ impl Simulation {
                 }
                 Payload::MintRecord => DomainEvent::SchedulerCommand(self.commit_mint(key)?),
                 Payload::SetMode(_) => unreachable!("the mode phase removes due mode commands"),
+                Payload::SetEnabled(_)
+                | Payload::ReserveStock { .. }
+                | Payload::ReserveBundle { .. }
+                | Payload::CancelReservation(_)
+                | Payload::CompleteTask(_)
+                | Payload::BeginTask { .. } => {
+                    unreachable!("fixture 3 commands stay in the resource world")
+                }
             };
             events.push(event);
         }
@@ -879,6 +984,14 @@ impl Simulation {
                 }
                 Payload::SetMode(_) | Payload::MintRecord => {
                     unreachable!("fixture 1 rejects scheduler payloads")
+                }
+                Payload::SetEnabled(_)
+                | Payload::ReserveStock { .. }
+                | Payload::ReserveBundle { .. }
+                | Payload::CancelReservation(_)
+                | Payload::CompleteTask(_)
+                | Payload::BeginTask { .. } => {
+                    unreachable!("fixture 3 commands stay in the resource world")
                 }
             }
         };
