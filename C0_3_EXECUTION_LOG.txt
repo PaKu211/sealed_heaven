@@ -26,3 +26,15 @@ S3 full regression: 75 unit + 2 doctests passed debug and release.
 cargo fmt --all --check, check --locked --offline, strict clippy: all passed.
 Reviewed fixture3 changes and new navigation/tests. Frozen files/dependencies untouched.
 Residual travel interpretation follows acceptance section 14; see S3 report.
+S3 push succeeded: feat/c03-s3-navigation.
+Local SHA: ca85bfdadf6b451bd4d41d2347cc7e450ceab495.
+Remote SHA: ca85bfdadf6b451bd4d41d2347cc7e450ceab495 (git ls-remote).
+Created feat/c03-s4-integration from that verified S3 implementation.
+Added twenty-actor contention, late over-reserve rollback, lifecycle/future-command
+restore/grouping, mixed five-goal/mode integration, and M0-T08 tests.
+Added contract-only Python packer/reference (published checkpoint hashes reproduced).
+S4 initial debug: 80 passed; clippy failed useless_vec test schedule; fixed to array.
+S4 final regression: 80 unit + 2 doctests passed debug and release, 0 failed/ignored.
+Formatting, locked/offline check, strict clippy, contract packer --check: all passed.
+Frozen-file comparison against bf91789: unchanged (see S4 verification log).
+Reviewed intended S4 diff and acceptance matrix. Independent acceptance still pending.

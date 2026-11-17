@@ -1,0 +1,26 @@
+2026-11-18 S4 implementation verification (not independent acceptance)
+Branch: feat/c03-s4-integration
+Base: ca85bfdadf6b451bd4d41d2347cc7e450ceab495 (S3, pushed and verified).
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+cargo 1.100.0 (3acc79c0c 2026-11-05)
+
+python docs/tools/c03_vectors.py --check: passed.
+  Standalone contract packer; no simulator invocation or output read.
+  M0-T06 published body/blob reproduced, M0-T07 initial body/blob reproduced.
+cargo fmt --all --check: passed.
+cargo check --locked --offline: passed.
+cargo clippy --all-targets --locked --offline -- -D warnings: passed.
+cargo test --locked --offline: 80 unit + 2 doctests passed, 0 failed/ignored.
+cargo test --release --locked --offline: 80 unit + 2 doctests passed, 0 failed/ignored.
+git diff --check: passed (only Windows LF/CRLF conversion notices).
+
+Initial S4 debug tests: 80 passed; strict clippy found useless_vec in test schedule.
+Changed the fixed schedule to an array. Full suite and strict clippy rerun passed.
+
+Frozen-file comparison against bf91789: no differences in Cargo.toml, Cargo.lock,
+rust-toolchain.toml, src/lib.rs, src/domain.rs, src/encoding.rs,
+src/tests/golden.rs, src/tests/c02_golden.rs, src/tests/c02.rs.
+
+Current executable acceptance matrix is in C0_3_S4_IMPLEMENTATION_REPORT.md.
+Unresolved gate: independent review/owner acceptance and residual timing confirmation.
+No push/merge to main; no forced push or protection bypass.

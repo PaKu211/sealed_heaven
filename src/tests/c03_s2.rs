@@ -436,6 +436,13 @@ fn eat_event_contract_and_every_resume_split_match() {
         checkpoints.push(baseline.domain_checkpoint_bytes());
     }
     assert_eq!(actual, expected);
+    assert_eq!(
+        crate::encoding::sha256(&actual.concat())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>(),
+        "36a7ff5be4036b5eb39236d26a5bf2a21f7fe8c8aa118431ed460dd018d72bf8"
+    );
     let mut digest = crate::encoding::sha256(b"SH:C03:EVENT-INIT:v1");
     for event in &expected {
         digest = crate::encoding::sha256(&[b"SH:C03:EVENT:v1".as_slice(), &digest, event].concat());

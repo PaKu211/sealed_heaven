@@ -283,6 +283,7 @@ fn m0_t07_four_locations_recipe_and_later_leg_rollback_at_tick_ten() {
         "bd803a2c4ae4320ce2a1a5ceb49a2941aec48921c4cbc0a60b15c607b62148c3"
     );
     let mut expected_event_id = 1;
+    let mut stream = Vec::new();
     for hop in 0..5u64 {
         let (definition, owner_kind, owner, recipe) = match hop {
             0 => (1, 2, 20, 0),
@@ -333,6 +334,7 @@ fn m0_t07_four_locations_recipe_and_later_leg_rollback_at_tick_ten() {
         assert_eq!(result.resource_events().len(), 1);
         let e = &result.resource_events()[0];
         assert_eq!((e.id, e.kind), (expected_event_id, 7));
+        stream.extend(e.canonical_bytes());
         expected_event_id += 1;
         let mut resumed = reload(&sim);
         if hop == 4 {
@@ -360,6 +362,9 @@ fn m0_t07_four_locations_recipe_and_later_leg_rollback_at_tick_ten() {
             );
             assert_eq!(output.resource_events()[0].id, expected_event_id);
             expected_event_id += 2;
+            for event in output.resource_events() {
+                stream.extend(event.canonical_bytes());
+            }
             let w = sim.world3.as_ref().unwrap();
             assert_eq!(w.stocks[&(10 + hop)].quantity, 0);
             assert_eq!(
@@ -369,4 +374,18 @@ fn m0_t07_four_locations_recipe_and_later_leg_rollback_at_tick_ten() {
             assert_eq!(w.transactions.len(), hop as usize + 1);
         }
     }
+    assert_eq!(
+        encoding::sha256(&stream)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>(),
+        "ba129bbc9e420be0ae4afcaef0d18abd6a2557c9a6b1902c0f0c5449b56a1327"
+    );
+    assert_eq!(
+        sim.event_digest()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>(),
+        "3496e28f3771c4ac6bbf1e394ff8246384f1bd0c1f9a56bfa618cc0076f37852"
+    );
 }

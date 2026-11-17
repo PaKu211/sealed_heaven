@@ -4,6 +4,7 @@ mod c03_remediation;
 mod c03_s1;
 mod c03_s2;
 mod c03_s3;
+mod c03_s4;
 mod golden;
 
 use super::*;
