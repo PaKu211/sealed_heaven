@@ -2,6 +2,7 @@ mod c02;
 mod c02_golden;
 mod c03_remediation;
 mod c03_s1;
+mod c03_s2;
 mod golden;
 
 use super::*;

@@ -126,8 +126,7 @@ pub(crate) struct World {
     pub transactions: BTreeMap<u64, Transaction>,
     pub registry: BTreeMap<CommandKey, RegistryRecord>,
     pub pending: BTreeMap<CommandKey, Payload>,
-    // Codec-only trace records: actor ID is the map key, then the 320-byte tail.
-    // S1 does not produce decisions or evaluate needs.
+    // One 320-byte decision trace per actor. The actor id is the map key.
     pub traces: BTreeMap<u32, Vec<u8>>,
     pub cancels: BTreeSet<u64>,
 }
@@ -337,8 +336,10 @@ pub(crate) fn drive(
         .checked_add(1)
         .ok_or(StepError::CapacityExceeded)?;
     let mut events = Vec::new();
-    apply_due(&mut staged, &mut events)?;
+    let mut suppressed = BTreeSet::new();
+    apply_due(&mut staged, &mut events, &mut suppressed)?;
     invalidate(&mut staged, &mut events)?;
+    decide(&mut staged, &suppressed, &mut events)?;
     work(&mut staged, &mut events)?;
     sim.tick = staged.tick;
     sim.next_event_id = staged.next_event_id;
@@ -518,7 +519,11 @@ fn payload_shape_ok(world: &World, command: Command) -> bool {
     }
 }
 
-fn apply_due(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), StepError> {
+fn apply_due(
+    world: &mut World,
+    events: &mut Vec<ResourceEvent>,
+    suppressed: &mut BTreeSet<u32>,
+) -> Result<(), StepError> {
     let mode_keys: Vec<CommandKey> = world
         .pending
         .iter()
@@ -561,7 +566,7 @@ fn apply_due(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), S
                 InvalidCommand::InvalidPayload,
             ));
         }
-        apply_command(world, key, payload, events)?;
+        apply_command(world, key, payload, events, suppressed)?;
         if matches!(payload, Payload::BeginTask { .. }) {
             let task = world.actors[&key.actor_id.get()].task_id;
             if task != 0 && task != old_task {
@@ -584,6 +589,7 @@ fn apply_command(
     key: CommandKey,
     payload: Payload,
     events: &mut Vec<ResourceEvent>,
+    suppressed: &mut BTreeSet<u32>,
 ) -> Result<(), StepError> {
     let command = Command::new(key, payload);
     if !payload_shape_ok(world, command) {
@@ -620,13 +626,17 @@ fn apply_command(
     match payload {
         Payload::SetEnabled(bit) => {
             if let Some(actor) = world.actors.get_mut(&key.actor_id.get()) {
-                if actor.enabled == 0 && bit == 1 && actor.next_wake == world.tick {
+                let was_disabled = actor.enabled == 0;
+                if was_disabled && bit == 1 && actor.next_wake == world.tick {
                     actor.next_wake = world
                         .tick
                         .checked_add(world.wake_interval)
                         .ok_or(StepError::CapacityExceeded)?;
                 }
                 actor.enabled = bit;
+                if was_disabled && bit == 1 {
+                    suppressed.insert(key.actor_id.get());
+                }
             }
         }
         Payload::BeginTask {
@@ -897,6 +907,419 @@ fn held(world: &World, stock_id: u64, exclude_task: Option<u64>) -> Result<u64, 
         .try_fold(0u64, |sum, quantity| {
             sum.checked_add(quantity).ok_or(StepError::CapacityExceeded)
         })
+}
+
+const GOAL_WEIGHTS: [[i64; 5]; 5] = [
+    [1000, 0, 0, 0, 0],
+    [0, 1000, 0, 0, 0],
+    [0, 0, 1000, 0, 0],
+    [0, 0, 0, 1000, 0],
+    [0, 0, 0, 0, 1000],
+];
+
+#[derive(Clone, Copy)]
+enum GoalPlan {
+    Eat {
+        stock: u64,
+    },
+    Rest,
+    Work {
+        tool: u64,
+        station: u64,
+    },
+    Haul {
+        stock: u64,
+        credit: u64,
+        definition: u64,
+    },
+    ReturnHome,
+}
+
+fn decide(
+    world: &mut World,
+    suppressed: &BTreeSet<u32>,
+    events: &mut Vec<ResourceEvent>,
+) -> Result<(), StepError> {
+    let actors: Vec<u32> = world.actors.keys().copied().collect();
+    for actor_id in actors {
+        if suppressed.contains(&actor_id) {
+            continue;
+        }
+        let actor = world
+            .actors
+            .get(&actor_id)
+            .cloned()
+            .ok_or(StepError::InvalidState)?;
+        if actor.next_wake != world.tick || actor.task_id != 0 {
+            continue;
+        }
+        let mut scores = [0i64; 5];
+        let mut eligible = [0u8; 5];
+        let mut reasons = [0u8; 5];
+        let mut plans = [None; 5];
+        for goal in 1..=5 {
+            let index = goal - 1;
+            scores[index] = goal_score(&actor, goal)?;
+            let (plan, reason) = goal_plan(world, actor_id, &actor, goal)?;
+            if plan.is_some() {
+                eligible[index] = 1;
+            }
+            reasons[index] = reason;
+            plans[index] = plan;
+        }
+        let winner = (0..5)
+            .filter(|index| eligible[*index] == 1)
+            .max_by_key(|index| (scores[*index], -(*index as i64)))
+            .map(|index| index + 1)
+            .unwrap_or(0);
+        let next_wake = world
+            .tick
+            .checked_add(world.wake_interval)
+            .ok_or(StepError::CapacityExceeded)?;
+        let task_id = if winner == 0 {
+            0
+        } else {
+            commit_goal(
+                world,
+                actor_id,
+                winner as u8,
+                plans[winner - 1].ok_or(StepError::InvalidState)?,
+                events,
+            )?
+        };
+        let actor = world
+            .actors
+            .get_mut(&actor_id)
+            .ok_or(StepError::InvalidState)?;
+        actor.next_wake = next_wake;
+        let channels = actor.channels;
+        let relationship = actor.relationship;
+        world.traces.insert(
+            actor_id,
+            trace_bytes(DecisionTrace {
+                evaluated: world.tick,
+                next_wake,
+                winner: winner as u8,
+                task_id,
+                scores,
+                eligible,
+                reasons,
+                channels,
+                relationship,
+            }),
+        );
+        let mut payload = vec![winner as u8];
+        payload.extend(task_id.to_le_bytes());
+        payload.extend(next_wake.to_le_bytes());
+        for score in scores {
+            payload.extend(score.to_le_bytes());
+        }
+        emit(world, actor_id, 6, payload, events)?;
+    }
+    Ok(())
+}
+
+fn goal_score(actor: &Actor, goal: usize) -> Result<i64, StepError> {
+    let mut score = 0i64;
+    for (channel, weight) in actor.channels.into_iter().zip(GOAL_WEIGHTS[goal - 1]) {
+        let term = i64::from(channel)
+            .checked_mul(weight)
+            .ok_or(StepError::CapacityExceeded)?;
+        score = score.checked_add(term).ok_or(StepError::CapacityExceeded)?;
+    }
+    score
+        .checked_add(actor.roles[goal - 1])
+        .ok_or(StepError::CapacityExceeded)
+}
+
+fn goal_plan(
+    world: &World,
+    actor_id: u32,
+    actor: &Actor,
+    goal: usize,
+) -> Result<(Option<GoalPlan>, u8), StepError> {
+    if actor.enabled == 0 {
+        return Ok((None, 1));
+    }
+    // The approved fixture minimum is i64::MIN, so no representable term is below it.
+    if actor.task_id != 0 {
+        return Ok((None, 9));
+    }
+    let at_site = actor.locus == 1 && world.sites.contains_key(&actor.site);
+    let home_known = world.sites.contains_key(&actor.home);
+    let at_home = at_site && actor.site == actor.home;
+    match goal {
+        1 => {
+            if !at_site {
+                return Ok((None, 5));
+            }
+            match lowest_food(world, actor_id)? {
+                Some(stock) => Ok((Some(GoalPlan::Eat { stock }), 0)),
+                None => Ok((None, 6)),
+            }
+        }
+        2 | 5 => {
+            if !home_known {
+                return Ok((None, 10));
+            }
+            if !at_home {
+                return Ok((None, 5));
+            }
+            Ok((
+                Some(if goal == 2 {
+                    GoalPlan::Rest
+                } else {
+                    GoalPlan::ReturnHome
+                }),
+                0,
+            ))
+        }
+        3 => {
+            if !at_site {
+                return Ok((None, 5));
+            }
+            let tool = lowest_site_stock(world, actor.site, 4, 2)?;
+            let station = lowest_site_stock(world, actor.site, 5, 2)?;
+            match (tool, station) {
+                (Some(tool), Some(station)) if tool != station => {
+                    Ok((Some(GoalPlan::Work { tool, station }), 0))
+                }
+                _ => Ok((None, 6)),
+            }
+        }
+        4 => {
+            if !home_known {
+                return Ok((None, 10));
+            }
+            if !at_home {
+                return Ok((None, 5));
+            }
+            match lowest_haul(world, actor_id)? {
+                Some((stock, definition)) => {
+                    let credit = lowest_home_credit(world, actor.home, definition).unwrap_or(0);
+                    Ok((
+                        Some(GoalPlan::Haul {
+                            stock,
+                            credit,
+                            definition,
+                        }),
+                        0,
+                    ))
+                }
+                None => Ok((None, 6)),
+            }
+        }
+        _ => Err(StepError::InvalidState),
+    }
+}
+
+fn lowest_food(world: &World, actor_id: u32) -> Result<Option<u64>, StepError> {
+    for (&id, stock) in &world.stocks {
+        if stock.owner_kind == 1
+            && stock.owner_id == u64::from(actor_id)
+            && stock.class == 1
+            && stock.definition_id == 1
+            && available(world, id)? >= 1
+        {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
+}
+
+fn lowest_site_stock(
+    world: &World,
+    site: u64,
+    definition: u64,
+    class: u8,
+) -> Result<Option<u64>, StepError> {
+    for (&id, stock) in &world.stocks {
+        if stock.owner_kind == 3
+            && stock.owner_id == site
+            && stock.definition_id == definition
+            && stock.class == class
+            && available(world, id)? >= 1
+        {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
+}
+
+fn lowest_haul(world: &World, actor_id: u32) -> Result<Option<(u64, u64)>, StepError> {
+    for (&id, stock) in &world.stocks {
+        if stock.owner_kind == 1
+            && stock.owner_id == u64::from(actor_id)
+            && stock.class == 1
+            && stock.definition_id != 1
+            && available(world, id)? >= 1
+        {
+            return Ok(Some((id, stock.definition_id)));
+        }
+    }
+    Ok(None)
+}
+
+fn lowest_home_credit(world: &World, home: u64, definition: u64) -> Option<u64> {
+    world.stocks.iter().find_map(|(&id, stock)| {
+        (stock.owner_kind == 3
+            && stock.owner_id == home
+            && stock.class == 1
+            && stock.definition_id == definition)
+            .then_some(id)
+    })
+}
+
+fn available(world: &World, stock_id: u64) -> Result<u64, StepError> {
+    let on_hand = world
+        .stocks
+        .get(&stock_id)
+        .ok_or(StepError::InvalidState)?
+        .quantity;
+    on_hand
+        .checked_sub(held(world, stock_id, None)?)
+        .ok_or(StepError::InvalidState)
+}
+
+fn commit_goal(
+    world: &mut World,
+    actor_id: u32,
+    goal: u8,
+    plan: GoalPlan,
+    events: &mut Vec<ResourceEvent>,
+) -> Result<u64, StepError> {
+    let task_id = world.next_record_id;
+    world.next_record_id = task_id.checked_add(1).ok_or(StepError::CapacityExceeded)?;
+    let actor = world
+        .actors
+        .get(&actor_id)
+        .ok_or(StepError::InvalidState)?
+        .clone();
+    let mut task = scripted_task(actor_id);
+    task.goal = goal;
+    task.stage = 4;
+    task.created = world.tick;
+    task.target_locus = 1;
+    task.target_site = if matches!(
+        plan,
+        GoalPlan::Rest | GoalPlan::ReturnHome | GoalPlan::Haul { .. }
+    ) {
+        actor.home
+    } else {
+        actor.site
+    };
+    match plan {
+        GoalPlan::Eat { stock } => {
+            let definition = world
+                .stocks
+                .get(&stock)
+                .ok_or(StepError::InvalidState)?
+                .definition_id;
+            task.legs.push(Leg {
+                op: 1,
+                stock_id: stock,
+                definition_id: definition,
+                class: 1,
+                quantity: 1,
+                owner_kind_after: 0,
+                owner_id_after: 0,
+            });
+        }
+        GoalPlan::Haul {
+            stock,
+            credit,
+            definition,
+        } => {
+            task.legs.push(Leg {
+                op: 1,
+                stock_id: stock,
+                definition_id: definition,
+                class: 1,
+                quantity: 1,
+                owner_kind_after: 0,
+                owner_id_after: 0,
+            });
+            task.legs.push(Leg {
+                op: 2,
+                stock_id: credit,
+                definition_id: definition,
+                class: 1,
+                quantity: 1,
+                owner_kind_after: 3,
+                owner_id_after: actor.home,
+            });
+        }
+        GoalPlan::Rest | GoalPlan::Work { .. } | GoalPlan::ReturnHome => {}
+    }
+    world.tasks.insert(task_id, task);
+    world
+        .actors
+        .get_mut(&actor_id)
+        .ok_or(StepError::InvalidState)?
+        .task_id = task_id;
+    let due = world
+        .tick
+        .checked_add(2)
+        .ok_or(StepError::CapacityExceeded)?;
+    let expiry = due.checked_add(1).ok_or(StepError::CapacityExceeded)?;
+    match plan {
+        GoalPlan::Eat { stock } => {
+            reserve(world, actor_id, task_id, expiry, &[(stock, 1)], events)?;
+        }
+        GoalPlan::Work { tool, station } => {
+            let mut pairs = [(tool, 1u64), (station, 1)];
+            pairs.sort_by_key(|pair| pair.0);
+            reserve(world, actor_id, task_id, expiry, &pairs, events)?;
+        }
+        GoalPlan::Rest | GoalPlan::Haul { .. } | GoalPlan::ReturnHome => {
+            world
+                .tasks
+                .get_mut(&task_id)
+                .ok_or(StepError::InvalidState)?
+                .due = due;
+        }
+    }
+    emit(
+        world,
+        actor_id,
+        7,
+        pack(&[u64_bytes(task_id), vec![4]]),
+        events,
+    )?;
+    Ok(task_id)
+}
+
+struct DecisionTrace {
+    evaluated: u64,
+    next_wake: u64,
+    winner: u8,
+    task_id: u64,
+    scores: [i64; 5],
+    eligible: [u8; 5],
+    reasons: [u8; 5],
+    channels: [u32; 5],
+    relationship: i64,
+}
+
+fn trace_bytes(trace: DecisionTrace) -> Vec<u8> {
+    let mut bytes = vec![0u8; 320];
+    bytes[..8].copy_from_slice(&trace.evaluated.to_le_bytes());
+    bytes[8..16].copy_from_slice(&trace.next_wake.to_le_bytes());
+    bytes[16] = trace.winner;
+    bytes[17..25].copy_from_slice(&trace.task_id.to_le_bytes());
+    for index in 0..5 {
+        let at = 25 + index * 59;
+        bytes[at] = index as u8 + 1;
+        bytes[at + 1] = trace.eligible[index];
+        bytes[at + 2] = trace.reasons[index];
+        bytes[at + 3..at + 11].copy_from_slice(&trace.scores[index].to_le_bytes());
+        for (channel_index, channel) in trace.channels.into_iter().enumerate() {
+            let start = at + 11 + channel_index * 8;
+            bytes[start..start + 8].copy_from_slice(&i64::from(channel).to_le_bytes());
+        }
+        bytes[at + 51..at + 59].copy_from_slice(&trace.relationship.to_le_bytes());
+    }
+    bytes
 }
 
 fn invalidate(world: &mut World, events: &mut Vec<ResourceEvent>) -> Result<(), StepError> {
@@ -1584,13 +2007,7 @@ fn encode_resource_payload(body: &mut Vec<u8>, payload: Payload) {
 fn scenario_block(wake: u64) -> Vec<u8> {
     let mut body = Vec::new();
     push_u64(&mut body, wake);
-    for row in [
-        [1000i64, 0, 0, 0, 0],
-        [0, 1000, 0, 0, 0],
-        [0, 0, 1000, 0, 0],
-        [0, 0, 0, 1000, 0],
-        [0, 0, 0, 0, 1000],
-    ] {
+    for row in GOAL_WEIGHTS {
         for weight in row {
             body.extend(weight.to_le_bytes());
         }
