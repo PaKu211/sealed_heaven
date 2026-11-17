@@ -1,7 +1,7 @@
 # C0.3 Acceptance Tests
 
-Version 1.3-approved · 17 November 2026  
-Status: owner-authorized documentation after NF-05 packing-field remediation. Implementation is not authorized.
+Version 1.3-approved + RT-01 · 18 November 2026
+Status: owner-authorized documentation after NF-05 packing-field remediation and cancellation-only RT-01. RT-01 authorizes its targeted documentation/tests and branch commit/push, not independent C0.3 acceptance or unrelated implementation.
 
 The procedures below are the exit evidence for the [implementation specification](C0_3_IMPLEMENTATION_SPEC.md) version 1.3-approved. They keep C03-T01 and the written M0-T06, M0-T07, and M0-T08 sentences. C0.1 and C0.2 golden literals are not replaced. H0, the M0-T07 initial blob, and the C03-T01a and M0-T06 post-boundary checkpoint blobs are stated where independently derived from this contract alone.
 
@@ -291,6 +291,8 @@ Actor 1 on edge 1, `traversed_cost` 0, travelling task 50, empty path.
 2. Save and restore. Locus 3 and `traversed_cost` 0 remain.
 3. Empty `drive`. Actor arrives at site 2. No event.
 4. Repeat from the post-cancel save, disable the actor, then empty `drive`. Arrival still occurs. No task is created.
+
+**RT-01 timing clarification (owner approved, cancellation only).** Use initial tick 0, task 50 due 4, cursor 1 and H0. Submit `CancelReservation(0)` with key `(target 1, actor 1, producer 1, sequence 1)` through `drive(0, ...)`. The committed tick is `T = 1`: task 50 is Cancelled with reason 2, `task_id` is 0, and locus 3 / edge 1 / traversed 0 are preserved. The only events are id 1 kind 7 `(50, Cancelled)` and id 2 kind 5 `(50, reason 2)`; cursor is 3. Save/restore before and after cancellation must reproduce complete bytes. The next successful `drive(1, [])` commits tick 2 and spends the remaining cost 1, arriving at site 2 with edge 0 and traversed 0, silently. In step 4, submit `SetEnabled(0)` with key `(2,1,1,2)` at boundary 1: that same tick-2 `drive` also performs residual arrival despite disablement; a subsequent empty `drive` is silent and does not repeat arrival or create a task. Both branches preserve the post-cancel event cursor/digest across residual movement. An invalid `SetEnabled(2)` at boundary 1 must return `InvalidPayload` without advancing the tick or changing checkpoint bytes; a subsequent valid tick-2 retry still arrives. This qualification preserves steps 1–4 and does not alter other interruption/residual cases or any published golden value.
 
 ## 15. Coverage
 

@@ -223,6 +223,160 @@ fn edge_start_and_post_cancel_residual_save_preserve_cost_even_when_disabled() {
 }
 
 #[test]
+fn rt01_cancelled_edge_waits_one_boundary_then_resumes_after_restore_even_if_disabled() {
+    let mut world = edge_world(true);
+    world.tasks.get_mut(&50).unwrap().due = 4;
+    let initial = fixture3::into_simulation(world);
+    assert_eq!(
+        reload(&initial).domain_checkpoint_bytes(),
+        initial.domain_checkpoint_bytes()
+    );
+    for disabled in [false, true] {
+        let mut sim = reload(&initial);
+        let output = sim
+            .drive(0, &[command(1, 1, Payload::CancelReservation(0))])
+            .unwrap();
+        let expected: Vec<Vec<u8>> = [(1u64, 7u8, 7u8), (2, 5, 2)]
+            .into_iter()
+            .map(|(id, kind, value)| {
+                [
+                    id.to_le_bytes().as_slice(),
+                    1u64.to_le_bytes().as_slice(),
+                    1u32.to_le_bytes().as_slice(),
+                    &[kind],
+                    50u64.to_le_bytes().as_slice(),
+                    &[value],
+                ]
+                .concat()
+            })
+            .collect();
+        assert_eq!(
+            output
+                .resource_events()
+                .iter()
+                .map(|e| e.canonical_bytes())
+                .collect::<Vec<_>>(),
+            expected
+        );
+        let w = sim.world3.as_ref().unwrap();
+        let a = &w.actors[&1];
+        assert_eq!(
+            (sim.tick(), a.task_id, a.locus, a.site, a.edge, a.traversed),
+            (1, 0, 3, 0, 1, 0)
+        );
+        assert_eq!(
+            (
+                w.tasks[&50].stage,
+                w.tasks[&50].interruption,
+                w.tasks[&50].progress
+            ),
+            (7, 2, 0)
+        );
+        assert_eq!(sim.next_event_id(), 3);
+        // Independently packed bytes/digest from the final audit's exact due-4
+        // residual fixture, not a replacement for any approved project vector.
+        let hex = |bytes: &[u8]| bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+        assert_eq!(
+            hex(&sim.event_digest()),
+            "bdc5acacb73293eaea7d3e63d8062b8c6a639e4f6d22071e2a6aee10c3682d68"
+        );
+        assert_eq!(
+            hex(&encoding::sha256(&sim.domain_checkpoint_bytes())),
+            "5a632f69783424998b68fab64cd9101fc0e8747a46ef0c598be09e7497d130b6"
+        );
+        let mut restored = reload(&sim);
+        assert_eq!(
+            restored.domain_checkpoint_bytes(),
+            sim.domain_checkpoint_bytes()
+        );
+        let digest = sim.event_digest();
+        let batch = if disabled {
+            vec![command(2, 2, Payload::SetEnabled(0))]
+        } else {
+            vec![]
+        };
+        let output = sim.drive(1, &batch).unwrap();
+        assert!(output.resource_events().is_empty());
+        assert_eq!(restored.drive(1, &batch).unwrap(), output);
+        assert_eq!(
+            restored.domain_checkpoint_bytes(),
+            sim.domain_checkpoint_bytes()
+        );
+        let a = &sim.world3.as_ref().unwrap().actors[&1];
+        assert_eq!(
+            (
+                sim.tick(),
+                a.task_id,
+                a.locus,
+                a.site,
+                a.edge,
+                a.traversed,
+                a.enabled
+            ),
+            (2, 0, 1, 2, 0, 0, if disabled { 0 } else { 1 })
+        );
+        assert_eq!((sim.next_event_id(), sim.event_digest()), (3, digest));
+        assert_eq!(
+            hex(&encoding::sha256(&sim.domain_checkpoint_bytes())),
+            if disabled {
+                "c8b2c75819bd12c6f8e38a16c404933bbc8491a96aad7bff587a059e5033d101"
+            } else {
+                "3692e9b96d2cf046f1e251ac2663a81dc6fe15e18506bc0c43868be87bb4ee32"
+            }
+        );
+        sim = reload(&sim);
+        assert!(sim.drive(2, &[]).unwrap().resource_events().is_empty());
+        assert_eq!(
+            (sim.tick(), sim.next_event_id(), sim.event_digest()),
+            (3, 3, digest)
+        );
+        assert!(sim.world3.as_ref().unwrap().transactions.is_empty());
+        assert_eq!(sim.world3.as_ref().unwrap().actors[&1].task_id, 0);
+    }
+}
+
+#[test]
+fn rt01_failed_next_boundary_does_not_spend_cost_or_add_a_restore_wait() {
+    let mut sim = fixture3::into_simulation(edge_world(true));
+    sim.drive(0, &[command(1, 1, Payload::CancelReservation(0))])
+        .unwrap();
+    sim = reload(&sim);
+    let before = sim.domain_checkpoint_bytes();
+    let digest = sim.event_digest();
+    assert_eq!(
+        sim.drive(1, &[command(2, 2, Payload::SetEnabled(2))]),
+        Err(StepError::Command {
+            key: command(2, 2, Payload::SetEnabled(2)).key(),
+            reason: crate::InvalidCommand::InvalidPayload,
+        })
+    );
+    assert_eq!(sim.domain_checkpoint_bytes(), before);
+    let mut restored = reload(&sim);
+    let batch = [command(2, 2, Payload::SetEnabled(0))];
+    let output = sim.drive(1, &batch).unwrap();
+    assert!(output.resource_events().is_empty());
+    assert_eq!(restored.drive(1, &batch).unwrap(), output);
+    assert_eq!(
+        restored.domain_checkpoint_bytes(),
+        sim.domain_checkpoint_bytes()
+    );
+    let a = &sim.world3.as_ref().unwrap().actors[&1];
+    assert_eq!(
+        (
+            sim.tick(),
+            a.locus,
+            a.site,
+            a.edge,
+            a.traversed,
+            a.task_id,
+            a.enabled
+        ),
+        (2, 1, 2, 0, 0, 0, 0)
+    );
+    assert_eq!((sim.next_event_id(), sim.event_digest()), (3, digest));
+}
+
+#[test]
 fn unreachable_home_rejects_before_creation_and_unreachable_task_releases() {
     let mut sim = fixture3::into_simulation(start(5, 9));
     assert_eq!(kinds(&mut sim, 0, &[]), [6]);
