@@ -1,0 +1,27 @@
+[package]
+name = "sealed_playable"
+version = "0.4.0"
+edition = "2024"
+publish = false
+default-run = "sealed_playable"
+
+[dependencies]
+sealed_sim = { path = "../.." }
+bevy = { version = "=0.17.3", default-features = false, features = ["std", "async_executor", "multi_threaded"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+
+[features]
+default = ["desktop"]
+desktop = ["bevy/bevy_asset", "bevy/bevy_color", "bevy/bevy_core_pipeline", "bevy/bevy_render", "bevy/bevy_sprite", "bevy/bevy_sprite_render", "bevy/bevy_text", "bevy/bevy_ui", "bevy/bevy_ui_render", "bevy/bevy_window", "bevy/bevy_winit", "bevy/default_font", "bevy/png", "bevy/x11"]
+
+[[bin]]
+name = "sealed_playable"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[[bin]]
+name = "sealed_agency"
+path = "src/agency_main.rs"
+required-features = ["desktop"]

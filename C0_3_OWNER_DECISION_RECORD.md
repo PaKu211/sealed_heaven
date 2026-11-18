@@ -1,7 +1,7 @@
 # C0.3 Owner Decision Record
 
-Version 2.0 · 17 November 2026  
-Status: recorded. This record does not authorize implementation.
+Version 2.2 · 18 November 2026
+Status: recorded. H09 retains its original limited authorization. RT-01 below authorizes the targeted cancellation-timing documentation and required regression tests, their verification, and commit/push to `feat/c03-s4-integration` only. It does not authorize a merge, C0.4, Bevy, dependency/toolchain changes, or an independent C0.3 PASS.
 
 ## 1. Verification
 
@@ -28,7 +28,7 @@ The owner attached these conditions. They bind the specification.
 1. C0.1 and C0.2 canonical behavior and golden vectors remain frozen.
 2. The creation-tick work restriction remains in force.
 3. Completion replay is a no-op only for an identical `CompleteTask` command identity, including the original submitted task id.
-4. Reusing an applied `CommandKey` with a different command type or payload returns `ConflictingIdentity`.
+4. Reuse of a durable command identity with a different command type or payload returns `ConflictingIdentity`. For fixture 3, durable identities are the 41-byte consumed completion registry and pending commands. The H09 amendment in §2A supersedes the former requirement to durably recognize every historically applied non-completion key.
 5. Reservation accounting, transaction rollback, and completion provenance follow the approved R2.1-final contracts.
 6. Residual edge movement preserves travel cost and remains deterministic across save and restore.
 7. OC-EDGE is rejected. The approved graph remains unchanged.
@@ -37,6 +37,42 @@ The owner attached these conditions. They bind the specification.
 10. The Balanced Development Strategy remains approved: S1 Resource Core, S2 First Living NPC, S3 Movement and Production, S4 Multi-NPC Integration. An internal slice is not the C0.3 milestone exit.
 
 Implementation requires a later, separate authorization. An independent G3 review of the revised documents is mandatory before that authorization. This record does not start S1, does not declare G3 PASS, and does not begin Bevy integration.
+
+### H09 amendment — fixture 3 (17 November 2026)
+
+The project owner approved **H09 Option B**. This amendment is normative for C0.3 fixture 3 and supersedes the conflicting portion of §2 condition 4. The superseded text required durable recognition of every historically applied non-completion command key. The deterministic replay contract below replaces that requirement.
+
+1. Consumed `CompleteTask` identities remain durable through the existing 41-byte completion registry.
+2. Pending command identities retain their existing conflict rules.
+3. Duplicate or conflicting commands within one admission are validated according to the normative first-match precedence table.
+4. Ordinary non-completion commands that have already been applied do not require a separate persistent historical registry.
+5. After such a command has been applied and is no longer present in canonical state, a later submission with an old target follows the deterministic `LateTarget` rule, subject to earlier applicable structural validation.
+6. Save and restore must produce identical future behavior from identical canonical checkpoint bytes.
+7. No hidden noncanonical replay cache is permitted.
+8. `SH:C03:STATE` revision 1, the 41-byte completion registry, and every published canonical vector are preserved.
+
+Consequences for fixture 3:
+
+- A durable identity is either a consumed completion registry record or a pending command. Those identities keep their conflict rules.
+- An applied non-completion key that has left canonical state has no persistent identity. A later submission with an old target is `LateTarget` after the earlier structural rows. A later submission with a future target is an ordinary new command, not a historical replay.
+- Identical canonical checkpoint bytes produce identical future behavior; no historical distinction is reconstructed outside the body.
+
+This amendment authorizes only the minimum necessary normative documentation, acceptance-test, and Rust changes to implement H09. It does not authorize S2, S3, S4, or Bevy, does not permit a push or merge, and does not declare an independent S1 PASS.
+
+### RT-01 owner amendment — next-boundary residual movement after cancellation (18 November 2026)
+
+The owner explicitly approved **Option B — next-boundary residual movement** against audited commit `1dbe07e632efa55596cb33e17d6470afa0e0824c`. This supersedes only the conflicting same-boundary cancellation reading of implementation specification §8. Acceptance §14's post-cancel save and next-boundary continuation remain approved.
+
+1. Let `T` be the staged tick of a successful `drive` whose invalidation phase actually cancels the current task (interruption reason 2 under the existing reason precedence). Clear `task_id` and perform the existing cancellation transitions/releases/provenance handling without changing them.
+2. Preserve the actor's mid-edge locus, edge id and `traversed_cost`. Clearing the task through that cancellation does not make the actor perform residual movement in tick `T`.
+3. Starting with the next successful boundary, staged tick `T+1`, the existing residual work rule may spend one edge-cost unit per tick, after task-owned work, in the existing actor-id order. Remaining edge cost is never discarded. Disabled actors still perform residual travel.
+4. Arrival places the actor at the correct destination site, clears `edge_id` and resets `traversed_cost` to 0. Residual progress/arrival emit no event; other approved events remain unchanged.
+5. Save/restore at tick `T` preserves the exact on-edge/taskless state and produces identical continuation at `T+1`, without an extra wait, repeated prefix events or hidden readiness state. A failed boundary does not advance the tick or spend cost; a successful boundary advances exactly one tick under the existing `drive` rules.
+6. This is a cancellation-only exception. It does not change reason precedence, unrelated task transitions, completion, navigation/path ordering, or other residual-work cases, including other causes of task-id clearing. It does not alter AM-08's cost preservation, the approved graph, checkpoint revision 1, event schema, or any frozen C0.1/C0.2/C0.3 vector.
+
+No conflicting binding condition was found: OD-14 still decides the interruption reason before this exception applies; OD-10 and AM-01 retain creation-tick/one-transition rules; OD-11 and AM-08 retain exact travel cost and position; the save/replay and frozen-vector conditions remain in force. This amendment resolves the authority question identified as F01 in the final independent audit; independent confirmation of closure remains required.
+
+Authorization: record this decision, reconcile §8 and the affected acceptance wording, add focused tests, verify the five required Cargo commands, and commit/push the targeted change to `feat/c03-s4-integration`. Do not modify production Rust unnecessarily. Request a targeted independent re-review; do not declare independent milestone PASS.
 
 ## 3. Approved OD contracts
 
@@ -70,7 +106,7 @@ Implementation requires a later, separate authorization. An independent G3 revie
 | AM-05 | Fixture-3 first-match ingress. A consumed completion key replays as a no-op only when the submitted payload id matches. A different submitted id is `ConflictingIdentity`. Terminal cancel uses the stored claimant. Producer 0 is not a command |
 | AM-06 | The five goal plans, the reason order, and same-tick enable rescheduling are fixture rules. Weights and the wake interval stay the approved fixture configuration |
 | AM-07 | `Queued` may be overdue without failing the boundary. Other non-terminal stages may not. Creation-tick skip is first. Same-boundary work events are kept. M0-T07 tick 10 is a later-leg `InvalidLeg` |
-| AM-08 | Mid-edge progress is preserved. After `task_id` is cleared, residual work-phase travel spends the remaining edge cost one tick at a time until the destination site. The approved graph is unchanged. OC-EDGE is rejected |
+| AM-08 | Mid-edge progress is preserved. After `task_id` is cleared, residual work-phase travel spends the remaining edge cost one tick at a time until the destination site. Cancellation timing is qualified by RT-01 above. The approved graph is unchanged. OC-EDGE is rejected |
 
 ## 5. Fixture configuration
 

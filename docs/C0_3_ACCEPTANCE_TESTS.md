@@ -1,7 +1,7 @@
 # C0.3 Acceptance Tests
 
-Version 1.3-approved · 17 November 2026  
-Status: owner-authorized documentation after NF-05 packing-field remediation. Implementation is not authorized.
+Version 1.3-approved + RT-01 · 18 November 2026
+Status: owner-authorized documentation after NF-05 packing-field remediation and cancellation-only RT-01. RT-01 authorizes its targeted documentation/tests and branch commit/push, not independent C0.3 acceptance or unrelated implementation.
 
 The procedures below are the exit evidence for the [implementation specification](C0_3_IMPLEMENTATION_SPEC.md) version 1.3-approved. They keep C03-T01 and the written M0-T06, M0-T07, and M0-T08 sentences. C0.1 and C0.2 golden literals are not replaced. H0, the M0-T07 initial blob, and the C03-T01a and M0-T06 post-boundary checkpoint blobs are stated where independently derived from this contract alone.
 
@@ -70,7 +70,7 @@ Independently packed post-boundary blob SHA-256 (body‖trailer) from this contr
 
 ## 4. C03-T01b — expiry
 
-**Initial.** Reservation 3, acquired 1, expiry 3, task 1 Completing, `due_tick` 3, `created_tick` 0, packing fields from §1 (`goal` 0, `recipe_id` 0, `interruption` 0, target site 1, `progress_ticks` 2 after Reserved→Executing→Completing), enabled, unconsumed list empty. Cursor 1. Tick 2 so that staged tick becomes 3.
+**Initial.** Reservation 3, acquired 1, expiry 3, task 1 Completing, `due_tick` 3, `created_tick` 0, packing fields from §1 (`goal` 0, `recipe_id` 0, `interruption` 0, target site 1, preinstalled `progress_ticks` 2), enabled, unconsumed list empty. Cursor 1. Tick 2 so that staged tick becomes 3. This is an explicitly installed snapshot, not an assertion of an unrequested goal-0 Executing→Completing history; see the owner-authorized H10 clarification in specification §8.1. Its initial fields and expected events are unchanged.
 
 **Commands.** `drive(2, [])`.
 
@@ -138,6 +138,35 @@ Stock 20, definition 7, class 1, quantity 1, owner kind 3, owner id 1. Planned l
 ## 9. C03-T01g and C03-T01i
 
 Save while the unconsumed completion list is non-empty and the stage is not `Done`. The blob contains submitted and resolved task ids. Restore. Prefix events are not emitted again. Resume consumes the lowest key and retains every key in the registry. One-boundary `drive` and grouped `drive` match after every boundary.
+
+## 9A. H09 — applied non-completion replay
+
+**Initial.** Shared two-claimant state from §3: tick 0, seed 100, cursor 1, digest H0. Actor 1 is already enabled and task 1 is non-terminal.
+
+**Applied no-op.** Boundary 0 admits actor 1, producer 1, sequence 1, target 1, `SetEnabled(1)`. It emits nothing. Tick is 1, cursor 1, digest H0. The checkpoint body contains no applied-command history for this key.
+
+**Positive old-target replay.**
+
+| Step | Input | Expected |
+| --- | --- | --- |
+| 1 | Same key, `CancelReservation(0)`, at boundary 1 | `LateTarget`. Tick, cursor, digest, and full checkpoint bytes unchanged |
+| 2 | Save after step 0, restore, repeat step 1 | Identical `LateTarget` and unchanged bytes |
+| 3 | Empty boundary at tick 0 instead of step 0 | Byte-identical tick-1 checkpoint; step 1 produces the same `LateTarget` and unchanged bytes |
+
+Step 3 is the no-hidden-cache assertion. A no-op applied command and an empty boundary are indistinguishable in canonical state, and they must remain indistinguishable after restore.
+
+**Negative structural cases.** From the same tick-1 image, every case fails with no mutation:
+
+| Case | Expected |
+| --- | --- |
+| Old-target replay key with producer 0 | `InvalidProducer` (row 2) |
+| Old-target replay key with an unknown actor id | `UnknownActor` (row 3) |
+| The same key twice in one admission | `ConflictingIdentity` (row 4) |
+| A pending future key submitted again before its due tick | `ConflictingIdentity` (row 4) |
+
+**Future target.** At boundary 1, the same key with target 2 and `SetMode(Scheduled)` is an ordinary new command, not a historical replay. It is admitted, emits nothing, and applies at tick 2 with mode Scheduled. Re-submitting that key at tick 2 returns `LateTarget` and leaves the bytes unchanged. Save/restore before any case reproduces the same result and the same bytes.
+
+**Durable completion identities.** Consumed `CompleteTask` identities are unaffected: §7 still governs the 41-byte registry, including no-op replay for the same submitted id and `ConflictingIdentity` for a different payload or type.
 
 ## 10. C03-T01h — rollback and hostile saves
 
@@ -263,11 +292,14 @@ Actor 1 on edge 1, `traversed_cost` 0, travelling task 50, empty path.
 3. Empty `drive`. Actor arrives at site 2. No event.
 4. Repeat from the post-cancel save, disable the actor, then empty `drive`. Arrival still occurs. No task is created.
 
+**RT-01 timing clarification (owner approved, cancellation only).** Use initial tick 0, task 50 due 4, cursor 1 and H0. Submit `CancelReservation(0)` with key `(target 1, actor 1, producer 1, sequence 1)` through `drive(0, ...)`. The committed tick is `T = 1`: task 50 is Cancelled with reason 2, `task_id` is 0, and locus 3 / edge 1 / traversed 0 are preserved. The only events are id 1 kind 7 `(50, Cancelled)` and id 2 kind 5 `(50, reason 2)`; cursor is 3. Save/restore before and after cancellation must reproduce complete bytes. The next successful `drive(1, [])` commits tick 2 and spends the remaining cost 1, arriving at site 2 with edge 0 and traversed 0, silently. In step 4, submit `SetEnabled(0)` with key `(2,1,1,2)` at boundary 1: that same tick-2 `drive` also performs residual arrival despite disablement; a subsequent empty `drive` is silent and does not repeat arrival or create a task. Both branches preserve the post-cancel event cursor/digest across residual movement. An invalid `SetEnabled(2)` at boundary 1 must return `InvalidPayload` without advancing the tick or changing checkpoint bytes; a subsequent valid tick-2 retry still arrives. This qualification preserves steps 1–4 and does not alter other interruption/residual cases or any published golden value.
+
 ## 15. Coverage
 
 | Exit item | Section |
 | --- | --- |
 | C03-T01 | §§3–10 |
+| H09 applied non-completion replay | §9A |
 | M0-T06, including the one-unit case | §§11 and 3 |
 | M0-T07 Actor → Store → Cargo → Site, recipe, later-leg rollback | §12 |
 | M0-T08 cancel, disable, expiry, unreachable, exactly once | §13 |

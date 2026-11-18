@@ -1,7 +1,16 @@
 # C0.3 Implementation Specification
 
-Version 1.3-approved · 17 November 2026  
-Status: owner-authorized documentation after NF-05 packing-field remediation. Implementation is not authorized.
+Version 1.3-approved + RT-01 · 18 November 2026
+Status: owner-authorized documentation after NF-05, the targeted S1 H10/H09 clarifications, and cancellation-only RT-01. RT-01 authorizes the targeted documentation/tests and branch commit/push recorded in the owner decision record; it does not declare independent milestone acceptance.
+
+S1 H10 clarification: the project owner's targeted-remediation authorization
+permits the goal-0 clarification in §8 below. Other slice authorization and the
+frozen compatibility boundaries are unchanged. This is not an S1 acceptance verdict.
+
+S1 H09 clarification: the project owner's H09 Option B amendment narrows §5
+row 7 to durable identities. Applied non-completion keys have no persistent
+history. Checkpoint revision 1, the 41-byte registry, and published vectors are
+unchanged.
 
 This specification incorporates OD-01 through OD-16 as approved in `C0_3_OWNER_DECISION_RECORD.md` from `C0_3_OWNER_DECISIONS_PENDING.md` version 1.2, as amended by AM-01 through AM-08 from the R2.1-final remediation packet, the NF-01 through NF-04 documentation remediation, and the NF-05 preinstalled-task packing-field remediation. OC-EDGE is rejected. Fixture numbers in §12 are C0.3 fixture configuration. They are not the final gameplay balance of Sealed Heaven.
 
@@ -160,7 +169,7 @@ Rules are tested in order. The first match is the result. An error rolls the who
 | 4 | The same key appears twice in the batch, or the key is already pending | `ConflictingIdentity` |
 | 5 | The key is in the consumed registry and the submitted `CompleteTask` id equals the stored `submitted_task_id` | No-op, including when the target tick is old. Role 1 and role 2 both match this way |
 | 6 | The key is in the consumed registry and the submitted `CompleteTask` id differs from the stored `submitted_task_id` | `ConflictingIdentity`, even if both ids would resolve to the same task |
-| 7 | The key is in the consumed registry and the payload is not `CompleteTask`, or any applied command key is reused with a different command type or payload | `ConflictingIdentity` |
+| 7 | The key is in the consumed registry and the payload is not `CompleteTask` | `ConflictingIdentity` |
 | 8 | The payload is a cancel, the reservation exists, and the command actor is not the stored claimant | `InvalidPayload` |
 | 9 | The payload is a cancel, the reservation exists, the actor is the claimant, and that task is already terminal | No-op, including when the target tick is old |
 | 10 | `target_tick` is less than or equal to the current tick, and no earlier rule matched | `LateTarget` |
@@ -169,6 +178,8 @@ Rules are tested in order. The first match is the result. An error rolls the who
 | 13 | Non-zero cancel whose reservation task is non-terminal and is not `actor.task_id` | `InvalidPayload` |
 | 14 | Unknown cancel id, or cancel 0 when the actor has no current task | No-op |
 | 15 | Otherwise | Admit |
+
+Rows 4 and 7 are the durable-identity rules. For fixture 3, a durable identity is a pending command or a consumed completion registry record. An ordinary non-completion command that has been applied and is no longer present in canonical state has no persistent identity: a later submission with a target tick at or before the current tick reaches row 10 and returns `LateTarget`, while a later submission with a future target is an ordinary new command. Rows 2–4 still run before row 10. Restore does not reconstruct hidden history, and identical canonical checkpoint bytes produce identical later behavior. This is the approved H09 amendment; it does not change revision 1, the 41-byte registry, or any published vector.
 
 Due commands sort by `(target tick, actor ID, producer ID, sequence)`, ascending. That order is the C03 fixture order. It is not global gameplay fairness.
 
@@ -261,13 +272,49 @@ Work orders current tasks by `(actor id, task id)`. First match:
 | 6 | `Reserved`, empty path, not at the target | `InvalidState` for the boundary |
 | 7 | `Travelling`, locus 3, path empty | Spend one cost on the current edge. Do not search |
 | 8 | `Travelling`, stored path | One progress step, or arrive and enter `Executing` |
-| 9 | `Executing` | `Completing`, one kind 7, no legs |
+| 9a | `Executing`, goal 0, unconsumed completion list empty | No change and no event |
+| 9b | `Executing`, goal 1–5, or goal 0 with a non-empty unconsumed completion list | `Completing`, one kind 7, no legs |
 | 10 | `Completing`, unconsumed list non-empty or `due_tick` equals the tick | Legs, one release per own reservation, `Done` |
 | 11 | `Completing`, neither requested nor due | No event |
 
 `progress_ticks` increases by 1 on each advancing work-phase transition in the table above. Reservation promotion in §6.1 does not increment `progress_ticks`. Rest and return home have no reservations and no legs. Their successful completion is kind 4 with an empty leg list, then kind 7 `Done`. Disablement or a zero-id cancel on that path is kind 7 `Failed` or `Cancelled`, then kind 5, and no kind 4. Work releases one tool and one workstation without debiting them. A scripted haul completes one hop per task. Actor → store, store → cargo, and cargo → site are three successive current tasks. Autonomous haul is one debit and one credit in a single task.
 
-After task-owned work, residual edge travel runs for every actor with `locus` 3 and `task_id` 0, in ascending actor id. Each spends one edge cost with no event. Arrival places the actor on the destination site, clears `edge_id`, sets `traversed_cost` to 0, and emits no event. Residual travel runs for enabled and disabled actors.
+After task-owned work, residual edge travel runs for every actor with `locus` 3 and `task_id` 0, in ascending actor id, subject to the cancellation-only RT-01 exception below. Each spends one edge-cost unit with no event. Arrival places the actor on the destination site, clears `edge_id`, sets `traversed_cost` to 0, and emits no event. Residual travel runs for enabled and disabled actors.
+
+**Owner amendment RT-01 — cancellation only.** Let `T` be the staged tick of a successful `drive` in which invalidation actually cancels the current task (reason 2 under the existing disablement/cancellation/expiry precedence). That cancellation clears `task_id` but preserves the actor's mid-edge locus, `edge_id` and `traversed_cost`. The actor performs no residual movement in tick `T` merely because this cancellation cleared its task. Starting at staged tick `T+1`, residual work may spend one remaining edge-cost unit per tick under the existing rule, including if the actor is disabled. The remaining cost is never discarded. A tick-`T` checkpoint therefore retains the on-edge/taskless state; restoring it neither moves the actor early nor adds another waiting tick. Prefix events are not emitted again, and residual progress/arrival do not advance the event cursor or digest. A successful `drive(T-1, ...)` commits tick `T`; the next successful `drive(T, ...)` commits `T+1`. A failed boundary leaves tick, position and all checkpoint bytes unchanged and may be retried at the same boundary. This exception does not change other causes of task-id clearing, other residual-work cases, task-owned work, completion, or navigation ordering. Authority: `C0_3_OWNER_DECISION_RECORD.md`, RT-01.
+
+### 8.1 Owner-authorized S1 H10 clarification
+
+Goal 0 is scripted, not an autonomous decision goal. A completion command only
+appends provenance in the command phase. For goal 0 in Executing, a non-empty
+unconsumed list enables the single work transition to Completing (one kind 7 and
+one progress tick); legs never run in that same transition. Requests received in
+Queued or Reserved remain on the task until its ordinary stage transitions reach
+Completing. Reservation promotion and Reserved-to-Executing behavior are unchanged.
+
+The creation-tick skip and overdue rule precede these rules for every goal. There
+is no implicit extension of due_tick. A request reaching Executing at its due tick
+can advance it to Completing but cannot complete it that tick. If it survives
+invalidation, the following overdue boundary returns InvalidState with full
+rollback. A request with an old target still follows §5 admission; a future-target
+request cannot override an overdue task. With no request, goal-0 Executing remains
+unchanged through its due tick and an overdue attempt fails the same way.
+
+Completing retains rule 10 for every goal: it applies only on a later-than-creation
+tick, with a request or at its due tick, after invalidation. An explicitly installed
+or BeginTask-created Completing task may therefore use the existing source-2
+due-tick path without a request; no new autonomous goal selection is introduced.
+If creation and due coincide, creation skip still wins and the next surviving
+boundary is overdue. Goals 1–5 keep their unconditional Executing-to-Completing
+transition. No transition performs two work steps in one tick.
+
+Disablement, cancellation and expiry still run before work, in that priority.
+They release once, move every unconsumed key to role 2, set the terminal stage and
+clear actor.task_id, even when work would otherwise be overdue. Successful work
+uses the existing kind-4 / ascending reason-8 releases / kind-7 Done order and the
+lowest unconsumed key as role 1. Requests and progress persist in existing fields;
+restore does not emit prefix events or add a readiness flag. An error restores
+every pre-call byte, including any completion admitted during the failed boundary.
 
 ## 9. Navigation
 
@@ -277,7 +324,7 @@ Route successors sort by destination site id, then edge id. Grid successors are 
 
 A missing path at decision rejects the goal with reason 5 before a task is created. A travelling task that already has an empty path and is standing on a site fails in work with the invalidation event order and reason 5. It transfers nothing. A stored path is authoritative across save and load. Search runs only for an empty path on a travelling task that is on a site, or when a decision selects a goal that needs a path. Search does not run while `locus` is 3. No commit relocates a mid-edge actor to an endpoint to start a search.
 
-Cancel and failure leave the actor on the edge. Residual travel in §8 then spends the remaining cost. Remaining tick cost is `edge.cost - traversed_cost`. That cost is never discarded and never spent as a teleport.
+Cancel and failure leave the actor on the edge. Residual travel in §8 then spends the remaining cost; for cancellation, RT-01 in §8 starts that residual movement at the next boundary, not the cancellation boundary. Remaining tick cost is `edge.cost - traversed_cost`. That cost is never discarded and never spent as a teleport.
 
 A transfer has one owner before the commit and one owner after it. A failed leg does not leave stock on an intermediate owner.
 

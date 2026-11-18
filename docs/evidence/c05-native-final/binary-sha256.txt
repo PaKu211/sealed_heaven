@@ -1,0 +1,3 @@
+Algorithm: SHA256
+Hash: 4421E31DD362F9A638F6A918F1604E17F286402565CD13A9D566DE6C3CB2FD44
+Path: apps/sealed_playable/target/release/sealed_agency.exe
