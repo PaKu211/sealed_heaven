@@ -256,6 +256,26 @@ fn c05_duplicate_same_frame_intent_and_step_commit_once() {
 }
 
 #[test]
+fn c05_nonadjacent_duplicate_intent_commits_once() {
+    let mut app = app();
+    frame(
+        &mut app,
+        0,
+        vec![
+            Action::Intent(Intent::Talk(1)),
+            Action::Select(Target::HerbPatch),
+            Action::Intent(Intent::Talk(1)),
+            Action::Step,
+        ],
+    );
+    let s = app.world().resource::<Session>();
+    assert_eq!(s.selected, Target::HerbPatch);
+    assert_eq!(s.world().tick(), 1);
+    assert_eq!(s.queued(), 0);
+    assert_eq!(s.recent.len(), 1);
+}
+
+#[test]
 fn c05_running_frame_includes_the_intent_received_in_that_frame() {
     let mut app = app();
     frame(&mut app, 0, vec![Action::Resume]);

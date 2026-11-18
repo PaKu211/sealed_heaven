@@ -1,9 +1,8 @@
 # C0.5 continuation
 
-Status: input-pipeline remediation, automated verification, and a fresh native
-keyboard/mouse run are recorded below. **Milestone remains NOT ACCEPTED** until
-the separate independent audit returns PASS. Do not merge to main, force-push,
-or start C0.6.
+Status: **C0.5 PASS** for the approved player-agency contract. Independent
+re-review returned PASS after the same-frame duplicate-intent fix. Do not merge
+to main, force-push, or start C0.6.
 
 Base C0.4: `f35bfd3664d4baf2feaf78755b1a18d29cccf795`. Branch:
 `feat/c05-player-agency`. First verified increment `ad0410cf469eea29df47baa84de4da4e7f45fd72`
@@ -12,8 +11,30 @@ core/client remediation plus reports; preserve all existing changes.
 
 Latest verified implementation/evidence checkpoint (not acceptance) was pushed
 as `a50fcad8fd5333dde3292211622cbf60a93727d5`; `origin/feat/c05-player-agency`
-matched that SHA. This checkpoint is still awaiting independent core/client-delta
-review and final acceptance.
+matched that SHA. The acceptance increment is the following commit on this
+branch. It records the independent re-review and the non-adjacent intent dedupe.
+
+## Independent re-review
+
+A separate auditor inspected the post-remediation source, re-ran the three
+forgery tests, the exhausted-cursor test, and the agency input tests, and read
+`C0_5_VERIFICATION_LOG.txt` plus `docs/evidence/c05-native-final`. First verdict
+was FAIL: repeated intents were collapsed only when consecutive. That host gap
+was fixed and `c05_verify.ps1` was rerun (exit 0; root 100 passed, 1 ignored;
+agency 9 passed in both profiles). The same auditor then returned PASS with no
+remaining findings. The exhausted NPC cursor stays the approved contract:
+restore of a cursor-only `u64::MAX` blob succeeds, later drives may succeed
+while the frozen kernel accepts them, and the drive that returns `Error::Npc`
+leaves the checkpoint unchanged. The three forged outcomes still restore as
+`InvalidState` and do not replace the live world.
+
+## Next
+
+Do not merge this branch into main. Do not begin C0.6 until its contract is
+written. The recommended next milestone is a session/content extension that
+keeps this tick kernel, the 4096-tick horizon, and one-way occupancy. It is not
+authorized by this acceptance. The ignored 4096-tick roundtrip, NPC overlap of
+the player, and the absence of a 30-day/R2 sample remain limitations.
 
 ## Implemented and checked
 
@@ -34,17 +55,12 @@ review and final acceptance.
   `C:\Users\PC_4\AppData\Local\Temp\opencode\c05-performance-final-03`;
   see `C0_5_PERFORMANCE_BASELINE.md`. Not an R2/30-day claim.
 
-## Outstanding acceptance blocker
+## Historical blocker, now closed
 
-Initial independent core source audit found CORE-01, with three reproducible
-history-forgery variants; see `C0_5_CORE_INDEPENDENT_REVIEW.md`. Domain-author
-remediation is present and root regression tests pass in debug/release, but the
-review must be rerun by a **different independent core auditor** against the
-post-remediation tree, including the public-API forgery probe, bounded replay,
-and valid occupancy/request controls. This continuation session cannot spawn an
-independent subagent, so it has not self-approved the fix. An independent final
-acceptance review must also explicitly cover remaining criteria. Do not call
-C0.5 complete or push/commit a final acceptance claim until that is done.
+The first core review recorded CORE-01 in `C0_5_CORE_INDEPENDENT_REVIEW.md`.
+That restore gap was remediated before this acceptance. The paragraph below is
+the record of that open item; the independent re-review section above is the
+closing verdict.
 
 Button labels were `FocusPolicy::Block` by default, so a click on the label
 never pressed the parent button and a later step could advance with no intent.
@@ -62,14 +78,8 @@ same-frame input were fixed and exercised by native and automated tests.
 
 ## Next bounded actions
 
-1. Obtain a separate independent core re-review of the exact uncommitted tree;
-   retain evidence and findings in the report.
-2. If findings remain, remediate narrowly and rerun full verifier, native gate
-   if affected, performance if core timing changes, and independent re-review.
-3. Inspect final git diff, stage only authorized C0.5 files, commit a meaningful
-   verified increment, push normally to this branch, then compare remote SHA.
-4. Update reports with exact commit and honest acceptance state. No main merge or
-   C0.6 authorization.
+1. This re-review is closed PASS. Do not merge to main and do not start C0.6.
+2. Push only `feat/c05-player-agency` and confirm the remote SHA.
 
 Owner-approved scope includes one-way occupancy: NPCs may later overlap the
 player, but player entry into currently occupied cells is rejected. No dependency,
