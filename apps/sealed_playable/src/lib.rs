@@ -3,6 +3,7 @@ pub mod agency;
 pub mod clock;
 pub mod locale;
 pub mod persistence;
+pub mod supply;
 pub mod view;
 
 use bevy::prelude::*;

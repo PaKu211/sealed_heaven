@@ -19,6 +19,7 @@ use sealed_playable::{
     clock::{self, PlannedBlock},
     hex,
     locale::{Catalog, Locale},
+    supply::Phase,
     view::View,
 };
 use sealed_sim::player5::{
@@ -81,7 +82,7 @@ pub fn run() {
         .insert_resource(ClearColor(Color::srgb(0.035, 0.055, 0.065)))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Sealed Heaven — C0.6 Qinghe".into(),
+                title: "Sealed Heaven — C0.7 Qinghe".into(),
                 resolution: (1440, 960).into(),
                 resize_constraints: bevy::window::WindowResizeConstraints {
                     min_width: 1280.0,
@@ -797,6 +798,37 @@ fn body_text(session: &Session, cat: &Catalog) -> String {
         t(block_key(clock::planned_block(minute))),
         t("c06.schedule_note")
     );
+    if let Ok(supply) = session.supply().status() {
+        let _ = writeln!(
+            text,
+            "\n{}\n{}\n{}: {}\n{}: {}\n{}: {} / {}\n{}: {}\n{}: {}\n{}: {}",
+            t("c07.supply"),
+            t("c07.note"),
+            t("c07.demand"),
+            supply.demand,
+            t("c07.worker"),
+            supply.worker,
+            t("c07.progress"),
+            supply.deliveries,
+            supply.demand,
+            t("c07.carrier"),
+            supply.carrier,
+            t("c07.shrine"),
+            supply.shrine,
+            t("c07.total"),
+            supply.total
+        );
+        let _ = writeln!(text, "{}", t(phase_key(supply.phase)));
+        let _ = writeln!(
+            text,
+            "{}: {}",
+            t("c06.goal"),
+            supply
+                .goal
+                .map(|goal| t(goal_key(goal)))
+                .unwrap_or_else(|| t("c06.no_task"))
+        );
+    }
     let _ = writeln!(
         text,
         "\n{}: {} / {}\n{}: {}\n",
@@ -940,6 +972,28 @@ fn block_key(block: PlannedBlock) -> &'static str {
         PlannedBlock::Eat => "c06.block.eat",
         PlannedBlock::Work => "c06.block.work",
         PlannedBlock::Socialize => "c06.block.socialize",
+    }
+}
+
+fn phase_key(phase: Phase) -> &'static str {
+    match phase {
+        Phase::Requested => "c07.phase.requested",
+        Phase::Assigned => "c07.phase.assigned",
+        Phase::InProgress => "c07.phase.progress",
+        Phase::Completed => "c07.phase.completed",
+        Phase::Rejected => "c07.phase.rejected",
+        Phase::Cancelled => "c07.phase.cancelled",
+    }
+}
+
+fn goal_key(goal: u8) -> &'static str {
+    match goal {
+        1 => "c06.goal.1",
+        2 => "c06.goal.2",
+        3 => "c06.goal.3",
+        4 => "c06.goal.4",
+        5 => "c06.goal.5",
+        _ => "c06.no_task",
     }
 }
 

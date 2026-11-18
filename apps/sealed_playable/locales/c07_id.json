@@ -1,0 +1,16 @@
+{
+  "c07.supply": "Pasokan kuil",
+  "c07.note": "Herba milik aktor pada buku C0.3. Ini bukan gudang ruangan, dan bukan tabib desa.",
+  "c07.demand": "Permintaan",
+  "c07.worker": "Pengangkut",
+  "c07.progress": "Pengiriman",
+  "c07.carrier": "Dibawa",
+  "c07.shrine": "Di kuil",
+  "c07.total": "Jumlah herba",
+  "c07.phase.requested": "Diminta",
+  "c07.phase.assigned": "Ditugaskan",
+  "c07.phase.progress": "Berjalan",
+  "c07.phase.completed": "Selesai",
+  "c07.phase.rejected": "Ditolak",
+  "c07.phase.cancelled": "Dibatalkan"
+}
