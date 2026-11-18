@@ -19,6 +19,10 @@ ownership, request/completion flags, command identities, sequence high-water,
 event cursor/digest. Restore is bounded, rejects malformed/inconsistent/unknown
 versions and publishes only a complete validated candidate. No implicit import,
 migration, rewriting or overwriting of C0.4 saves; use `checkpoint.c05`.
+The frozen C03 exhausted event cursor (`next_event_id == u64::MAX`) remains a
+valid atomic-failure state: restore may preserve that cursor only when all other
+NPC history bytes and its digest match exact replay; the next failing NPC step
+must leave the whole aggregate unchanged.
 
 ## Authored slice
 
@@ -61,6 +65,13 @@ Gameplay rejection is a committed reasoned event; malformed input or tick/cursor
 overflow aborts the entire aggregate including NPC work.
 
 ## Host and UI
+
+Restore-audit remediation: validate historical range/occupancy by replaying the
+actual frozen NPC history and each player outcome, not by trusting checksummed
+history assertions. Explicit slice horizon4096 ticks (also4096 commands) bounds
+this work: reject larger saves before replay; refuse drives at the horizon
+atomically. At2 Hz this is about34m08s, not a long-run/M0 promise. C05 rev1 remains
+an unaccepted development format; no accepted checkpoint schema changes.
 
 Bevy owns input, camera, selection and read-only snapshots only. Bounded input
 buffer, canonical stamping at the eligible boundary, no ECS writes to domain

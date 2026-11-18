@@ -1,4 +1,4 @@
-# C0.5 implementation report — verification in progress
+# C0.5 implementation report — implementation verified; acceptance pending
 
 Accepted base: `f35bfd3664d4baf2feaf78755b1a18d29cccf795`.
 Development branch: `feat/c05-player-agency`. No final acceptance yet.
@@ -30,8 +30,16 @@ command identities per slice timeline. Input queue32 is transient, not admitted.
 
 ## Verification state
 
-Parent full verification passed: root93 tests+5 benchmark tests+2 doctests in
-debug/release; app33 tests in each profile (all old26 retained), both formatting,
-check/strict Clippy, canonical packers, debug/release binary builds. Log complete.
-Native gameplay and independent core/client reviews are pending. See handoff.
-These are not a milestone PASS. Report exact verified commits at delivery.
+Final full verification passed: root 100 tests (1 maximum-horizon latency probe
+explicitly ignored), 5 benchmark tests, and 2 doctests in debug/release; app 41
+tests per profile, formatting, checks, strict Clippy, canonical packers and
+debug/release binary builds. Native foreground gameplay completed and final
+headless/native measurements are documented. Independent client source review
+passed after fixes. Core remediation adds exact frozen-NPC replay with a bounded
+4096-tick horizon and the three original regressions; the independent public-API
+probe also passes 8/8 in debug/release, including exhausted-cursor atomic failure.
+CLIENT-04 button-label click-through was fixed and exercised in the latest native
+run, but not independently reviewed. **A distinct independent core/client delta
+re-review is still required**, and final independent acceptance is not
+available. Therefore C0.5 remains NOT ACCEPTED despite successful implementation
+and tests. See handoff and reports for limitations and exact evidence.

@@ -233,13 +233,36 @@ impl Plugin for AgencyPlugin {
 }
 
 pub fn drive_frame(mut session: ResMut<Session>, mut input: ResMut<Input>) {
+    let actions = std::mem::take(&mut input.actions);
     let mut transport = false;
-    for action in std::mem::take(&mut input.actions) {
-        transport |= matches!(
-            action,
-            Action::Pause | Action::Resume | Action::Load | Action::Reset
-        ) || matches!(action, Action::Step) && session.paused;
-        session.act(action);
+    let mut steps = 0u32;
+    let mut previous_intent = None;
+    // Admit every non-step action before any step. A same-frame Step therefore
+    // cannot advance past an intent that arrived later in the raw action list.
+    // Identical intents in one frame collapse to one command.
+    for action in actions {
+        match action {
+            Action::Step => steps = steps.saturating_add(1),
+            Action::Intent(intent) => {
+                if previous_intent == Some(intent) {
+                    continue;
+                }
+                previous_intent = Some(intent);
+                session.act(Action::Intent(intent));
+            }
+            other => {
+                previous_intent = None;
+                transport |= matches!(
+                    other,
+                    Action::Pause | Action::Resume | Action::Load | Action::Reset
+                );
+                session.act(other);
+            }
+        }
+    }
+    if steps > 0 && session.paused {
+        transport = true;
+        session.act(Action::Step);
     }
     let elapsed = std::mem::take(&mut input.elapsed_ns);
     if !session.paused && !transport {

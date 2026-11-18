@@ -13,6 +13,8 @@ const MAX_BYTES: usize = MAX_NPC_BYTES + MAX_COMMANDS * RECORD_SIZE + 256;
 
 fn content_hash() -> [u8; 32] {
     let mut content = b"SH:C05:CONTENT:v1;12x9;player21@0,4;wall6:1..6/gate4;patch9,2;shrine3,5;healer1;herbs3;rangeManhattan<=1;NPC1=3,3/2=9,5/9=10,7;grid=3+x,3+y;NPCfirst;oneAction;producer1;registry4096;batch4096;owners=source1,player21,shrine1;ledgerSeparate;repeatTalk;deliverOnce;sequenceHighwater;eventChain:v1".to_vec();
+    content.extend(b";completeNPCAndPlayerReplay;maxTicks:u64le=");
+    content.extend(MAX_TICKS.to_le_bytes());
     content.extend(sha256(DEMO));
     sha256(&content)
 }
@@ -72,6 +74,11 @@ fn decode_inner(bytes: &[u8]) -> Result<World, RestoreError> {
         return Err(RestoreError::ContentMismatch);
     }
     let tick = r.u64()?;
+    // Reject hostile u64 clocks before parsing the NPC candidate or doing any
+    // replay. Drive enforces the same horizon, so valid saves remain loadable.
+    if tick > MAX_TICKS {
+        return Err(RestoreError::InvalidState);
+    }
     if r.u32()? != PLAYER_ID {
         return Err(RestoreError::InvalidState);
     }
@@ -152,46 +159,16 @@ fn decode_inner(bytes: &[u8]) -> Result<World, RestoreError> {
     Ok(candidate)
 }
 
-/// Validate authored NPC identity and the complete finite C05 history. The event
-/// chain is reconstructed rather than trusting a saved cursor or digest. Static
-/// movement and ledger successes replay without inventing historical NPC cells.
+/// Replay the complete bounded history from the authored initial state. Only the
+/// unchanged NPC kernel supplies historical positions; `apply` checks the exact
+/// same live eligibility predicates for both successful and rejected actions.
+/// No recorded outcome, final NPC state, cursor, or digest is trusted or repaired.
 fn validate(world: &World) -> Result<(), RestoreError> {
     let invalid = RestoreError::InvalidState;
-    let initial = World::settlement();
-    let w = world.npcs.world3.as_ref().ok_or(invalid)?;
-    let authored = initial.npcs.world3.as_ref().ok_or(invalid)?;
-    if world.npcs.fixture_id != 3
-        || w.seed != authored.seed
-        || w.wake_interval != authored.wake_interval
-        || w.next_actor_id != 21
-        || w.actors.len() != 20
-        || !w.registry.is_empty()
-        || !w.pending.is_empty()
-        || w.sites != authored.sites
-        || w.holders != authored.holders
-        || w.edges != authored.edges
-        || w.grid_site != authored.grid_site
-        || w.grid_w != authored.grid_w
-        || w.grid_h != authored.grid_h
-        || w.grid != authored.grid
-    {
+    if world.tick() > MAX_TICKS {
         return Err(invalid);
     }
-    for id in 1..=20 {
-        let actor = w.actors.get(&id).ok_or(invalid)?;
-        let original = &authored.actors[&id];
-        if actor.enabled != 1
-            || actor.home != original.home
-            || actor.roles != original.roles
-            || actor.relationship != original.relationship
-        {
-            return Err(invalid);
-        }
-    }
-    if world.tick() == 0 && world.npcs.domain_checkpoint_bytes() != DEMO {
-        return Err(invalid);
-    }
-    let mut replay = initial;
+    let mut replay = World::settlement();
     let mut previous_tick = 0;
     for (&key, record) in &world.registry {
         if key.actor_id != PLAYER_ID
@@ -203,42 +180,36 @@ fn validate(world: &World) -> Result<(), RestoreError> {
             return Err(invalid);
         }
         previous_tick = key.target_tick;
-        replay.next_sequence = key.sequence.checked_add(1).ok_or(invalid)?;
-        match (record.intent, record.outcome) {
-            (Intent::Move(direction), Outcome::Moved) => {
-                let p = moved(replay.position, direction).ok_or(invalid)?;
-                if !walkable(p) {
-                    return Err(invalid);
-                }
-                replay.position = p;
-            }
-            (Intent::Talk(1), Outcome::Requested) => replay.requested = true,
-            (Intent::Gather, Outcome::Gathered) => {
-                if !replay.requested || !adjacent(replay.position, PATCH) {
-                    return Err(invalid);
-                }
-                replay.transfer(0, 1).map_err(|_| invalid)?;
-            }
-            (Intent::Deliver, Outcome::Delivered) => {
-                if !replay.requested || replay.completed || !adjacent(replay.position, SHRINE) {
-                    return Err(invalid);
-                }
-                replay.transfer(1, 2).map_err(|_| invalid)?;
-                replay.completed = true;
-            }
-            (intent, Outcome::Rejected(reason)) if rejection_matches(&replay, intent, reason) => {}
-            _ => return Err(invalid),
+        let next_sequence = key.sequence.checked_add(1).ok_or(invalid)?;
+        advance_npcs(&mut replay, key.target_tick)?;
+        let outcome = replay.apply(record.intent);
+        if outcome != record.outcome {
+            return Err(invalid);
         }
         let event = Event {
             id: replay.next_event_id,
             tick: key.target_tick,
             key,
-            outcome: record.outcome,
+            outcome,
         };
         replay.next_event_id = replay.next_event_id.checked_add(1).ok_or(invalid)?;
+        replay.next_sequence = next_sequence;
         replay.digest = extend_digest(replay.digest, event);
+        replay.registry.insert(
+            key,
+            Record {
+                intent: record.intent,
+                outcome,
+            },
+        );
     }
-    if world.position != replay.position
+    // Also replay empty/retry-only boundaries after the final recorded command.
+    advance_npcs(&mut replay, world.tick())?;
+    if !same_npc_history_except_exhausted_event_cursor(
+        &world.npcs.domain_checkpoint_bytes(),
+        &replay.npcs.domain_checkpoint_bytes(),
+    ) || world.registry != replay.registry
+        || world.position != replay.position
         || world.herbs != replay.herbs
         || world.requested != replay.requested
         || world.completed != replay.completed
@@ -257,44 +228,42 @@ fn validate(world: &World) -> Result<(), RestoreError> {
     Ok(())
 }
 
-fn rejection_matches(replay: &World, intent: Intent, reason: Rejection) -> bool {
-    use Rejection::*;
-    match intent {
-        Intent::Move(direction) => match moved(replay.position, direction) {
-            None => reason == OutOfBounds,
-            Some(p) if p.x >= WIDTH || p.y >= HEIGHT => reason == OutOfBounds,
-            Some(p) if !walkable(p) => reason == Terrain,
-            Some(_) => reason == Occupied,
-        },
-        Intent::Talk(1) => reason == OutOfRange,
-        Intent::Talk(_) => reason == UnknownTarget,
-        Intent::Gather => {
-            let expected = if !adjacent(replay.position, PATCH) {
-                OutOfRange
-            } else if !replay.requested {
-                RequestNotAccepted
-            } else if replay.source_herbs() == 0 {
-                Empty
-            } else {
-                return false;
-            };
-            reason == expected
-        }
-        Intent::Deliver => {
-            let expected = if !adjacent(replay.position, SHRINE) {
-                OutOfRange
-            } else if !replay.requested {
-                RequestNotAccepted
-            } else if replay.completed {
-                AlreadyCompleted
-            } else if replay.player_herbs() == 0 {
-                Empty
-            } else {
-                return false;
-            };
-            reason == expected
-        }
+/// The frozen C03 event cursor is a durable checked counter whose exhaustion is
+/// a supported atomic-drive failure state. All other NPC bytes, including its
+/// event digest, must match exact replay; permit only this cursor to differ.
+fn same_npc_history_except_exhausted_event_cursor(saved: &[u8], replayed: &[u8]) -> bool {
+    const TRAILER: usize = 32;
+    const DIGEST: usize = 32;
+    const EVENT_CURSOR: usize = 8;
+    let Some(cursor_start) = saved.len().checked_sub(TRAILER + DIGEST + EVENT_CURSOR) else {
+        return false;
+    };
+    if saved.len() != replayed.len() || cursor_start + EVENT_CURSOR > saved.len() - TRAILER {
+        return false;
     }
+    let Some(cursor_bytes) = saved.get(cursor_start..cursor_start + EVENT_CURSOR) else {
+        return false;
+    };
+    if u64::from_le_bytes(cursor_bytes.try_into().expect("fixed-width event cursor")) != u64::MAX {
+        return saved == replayed;
+    }
+    let digest_start = cursor_start + EVENT_CURSOR;
+    let digest_end = saved.len() - TRAILER;
+    saved[..cursor_start] == replayed[..cursor_start]
+        && saved[digest_start..digest_end] == replayed[digest_start..digest_end]
+}
+
+/// Call the frozen NPC drive directly: no recursive restore/World::drive and no
+/// per-tick checkpoint serialization. Across the entire candidate this loop can
+/// execute at most MAX_TICKS times, not MAX_TICKS times per command.
+fn advance_npcs(replay: &mut World, target_tick: u64) -> Result<(), RestoreError> {
+    while replay.tick() < target_tick {
+        replay
+            .npcs
+            .drive(replay.tick(), &[])
+            .map_err(|_| RestoreError::InvalidState)?;
+    }
+    Ok(())
 }
 
 pub(super) fn put_key(bytes: &mut Vec<u8>, key: Key) {

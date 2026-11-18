@@ -4,6 +4,8 @@
 //! one new player action against that committed snapshot. NPCs retain their original
 //! collision-free rules: a later NPC arrival may overlap the player, who can leave.
 //! C05 herbs have their own finite, typed ledger; they are never C03 stocks.
+//! This prototype has a finite 4096-tick horizon so complete save-history
+//! validation has a deterministic work bound. The frozen C03 kernel is unchanged.
 
 use std::collections::BTreeMap;
 
@@ -18,8 +20,10 @@ pub const WIDTH: u32 = 12;
 pub const HEIGHT: u32 = 9;
 pub const MAX_COMMANDS: usize = 4096;
 pub const MAX_BATCH: usize = 4096;
+/// Inclusive save horizon. No drive may advance beyond this logical tick.
+pub const MAX_TICKS: u64 = 4096;
 const MAX_NPC_BYTES: usize = 16 * 1024 * 1024;
-const DEMO: &[u8] = include_bytes!("../apps/sealed_playable/assets/demo.c03");
+const DEMO: &[u8] = include_bytes!("player5/settlement.c03");
 const START: Position = Position { x: 0, y: 4 };
 const PATCH: Position = Position { x: 9, y: 2 };
 const SHRINE: Position = Position { x: 3, y: 5 };
@@ -258,8 +262,13 @@ impl World {
     /// Exact registered retries publish no event but still advance NPCs one tick.
     /// New commands must target `boundary + 1` and have sequence >= the durable
     /// highwater. At most one new unique command is allowed (duplicates deduplicate).
+    /// At `MAX_TICKS`, every further drive fails with `Error::Capacity`, including
+    /// empty batches and exact retries; the last checkpoint remains loadable.
     /// Every fatal admission or NPC failure preserves the entire previous checkpoint.
     pub fn drive(&mut self, boundary: u64, batch: &[Command]) -> Result<Vec<Event>, Error> {
+        if boundary >= MAX_TICKS {
+            return Err(Error::Capacity);
+        }
         if boundary != self.tick() {
             return Err(Error::WrongBoundary {
                 expected: self.tick(),

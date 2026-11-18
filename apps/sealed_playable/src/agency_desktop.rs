@@ -11,6 +11,7 @@ use bevy::{
         view::screenshot::{Screenshot, save_to_disk},
     },
     text::LineBreak,
+    ui::FocusPolicy,
     window::PrimaryWindow,
 };
 use sealed_playable::{
@@ -41,6 +42,8 @@ struct Performance {
 struct MainCamera;
 #[derive(Component)]
 struct PlayerMarker;
+#[derive(Component)]
+struct PlayerIdentity;
 #[derive(Component)]
 struct NpcMarker(u32);
 #[derive(Component)]
@@ -148,6 +151,27 @@ fn context_intent(target: Target) -> Intent {
     }
 }
 
+fn spawn_player(commands: &mut Commands, position: Position) {
+    commands
+        .spawn((
+            PlayerMarker,
+            Sprite::from_color(Color::srgb(1.0, 0.8, 0.23), Vec2::splat(23.0)),
+            Transform::from_translation(at(position).extend(8.0)),
+        ))
+        .with_children(|player| {
+            player.spawn((
+                PlayerIdentity,
+                Text2d::new("21"),
+                TextFont {
+                    font_size: 11.0,
+                    ..default()
+                },
+                TextColor(Color::BLACK),
+                Transform::from_xyz(0.0, 0.0, 1.0),
+            ));
+        });
+}
+
 fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets<Font>>) {
     fonts
         .insert(
@@ -224,11 +248,7 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
             Visibility::Hidden,
         ));
     }
-    commands.spawn((
-        PlayerMarker,
-        Sprite::from_color(Color::srgb(1.0, 0.8, 0.23), Vec2::splat(23.0)),
-        Transform::from_translation(at(session.world().player_position()).extend(8.0)),
-    ));
+    spawn_player(&mut commands, session.world().player_position());
     commands.spawn((
         TargetRing,
         Sprite::from_color(Color::srgba(0.9, 0.9, 1.0, 0.3), Vec2::splat(44.0)),
@@ -243,17 +263,6 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
         },
         TextColor(INK),
         Transform::from_xyz(-130.0, 95.0, 9.0),
-    ));
-    commands.spawn((
-        Text2d::new("21"),
-        TextFont {
-            font_size: 11.0,
-            ..default()
-        },
-        TextColor(Color::srgb(1.0, 0.85, 0.3)),
-        Transform::from_translation(
-            (at(Position { x: 0, y: 4 }) + Vec2::new(0.0, -21.0)).extend(7.0),
-        ),
     ));
     commands
         .spawn((
@@ -306,6 +315,9 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
                     b.spawn((
                         Text::default(),
                         label,
+                        // The label sits above the button. Pass lets the click
+                        // reach the Button so mouse and keyboard share one action.
+                        FocusPolicy::Pass,
                         TextFont {
                             font_size: 14.0,
                             ..default()
@@ -354,6 +366,7 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
                     button.spawn((
                         Text::default(),
                         Label::Context,
+                        FocusPolicy::Pass,
                         TextFont {
                             font_size: 15.0,
                             ..default()
@@ -417,13 +430,6 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
         });
 }
 
-fn toggle(session: &Session) -> Action {
-    if session.paused {
-        Action::Resume
-    } else {
-        Action::Pause
-    }
-}
 fn language(locale: Locale) -> Locale {
     if locale == Locale::English {
         Locale::Indonesian
@@ -432,38 +438,77 @@ fn language(locale: Locale) -> Locale {
     }
 }
 
+/// Effective control state for an ordered frame, never a gameplay-state copy.
+struct PendingControls {
+    paused: bool,
+    selected: Target,
+    locale: Locale,
+}
+impl PendingControls {
+    fn new(session: &Session, actions: &[Action]) -> Self {
+        let mut state = Self {
+            paused: session.paused,
+            selected: session.selected,
+            locale: session.locale,
+        };
+        for action in actions {
+            state.observe(action);
+        }
+        state
+    }
+    fn observe(&mut self, action: &Action) {
+        match action {
+            Action::Pause | Action::Load | Action::Reset => self.paused = true,
+            Action::Resume => self.paused = false,
+            Action::Select(target) => self.selected = *target,
+            Action::Language(locale) => self.locale = *locale,
+            _ => {}
+        }
+    }
+    fn toggle(&self) -> Action {
+        if self.paused {
+            Action::Resume
+        } else {
+            Action::Pause
+        }
+    }
+}
+
 fn buttons(
     buttons: Query<(&Interaction, &Control), Changed<Interaction>>,
     session: Res<Session>,
     mut input: ResMut<Input>,
 ) {
+    let mut pending = PendingControls::new(&session, &input.actions);
     for (interaction, control) in &buttons {
         if *interaction != Interaction::Pressed {
             continue;
         }
         let action = match control {
-            Control::Toggle => toggle(&session),
+            Control::Toggle => pending.toggle(),
             Control::Step => Action::Step,
             Control::Save => Action::Save,
             Control::Load => Action::Load,
             Control::Reset => Action::Reset,
-            Control::Language => Action::Language(language(session.locale)),
-            Control::Interact => Action::Intent(context_intent(session.selected)),
+            Control::Language => Action::Language(language(pending.locale)),
+            Control::Interact => Action::Intent(context_intent(pending.selected)),
             Control::Follow => continue,
         };
+        pending.observe(&action);
         input.actions.push(action);
     }
 }
 
 fn keyboard(
     mut keys: MessageReader<KeyboardInput>,
-    time: Res<Time>,
+    time: Res<Time<Real>>,
     held: Res<ButtonInput<KeyCode>>,
     session: Res<Session>,
     mut input: ResMut<Input>,
     mut repeat: Local<f64>,
 ) {
     input.elapsed_ns = time.delta().as_nanos();
+    let mut pending = PendingControls::new(&session, &input.actions);
     let movement = |key| match key {
         KeyCode::KeyW | KeyCode::ArrowUp => Some(Direction::North),
         KeyCode::KeyD | KeyCode::ArrowRight => Some(Direction::East),
@@ -482,27 +527,28 @@ fn keyboard(
             Some(Action::Intent(Intent::Move(direction)))
         } else {
             match event.key_code {
-                KeyCode::Space => Some(toggle(&session)),
+                KeyCode::Space => Some(pending.toggle()),
                 KeyCode::KeyN => Some(Action::Step),
                 KeyCode::F5 => Some(Action::Save),
                 KeyCode::F9 => Some(Action::Load),
                 KeyCode::KeyR => Some(Action::Reset),
-                KeyCode::KeyL => Some(Action::Language(language(session.locale))),
-                KeyCode::KeyE => Some(Action::Intent(context_intent(session.selected))),
+                KeyCode::KeyL => Some(Action::Language(language(pending.locale))),
+                KeyCode::KeyE => Some(Action::Intent(context_intent(pending.selected))),
                 KeyCode::Tab => {
                     let all = targets();
-                    let index = all.iter().position(|t| *t == session.selected).unwrap_or(0);
+                    let index = all.iter().position(|t| *t == pending.selected).unwrap_or(0);
                     Some(Action::Select(all[(index + 1) % all.len()]))
                 }
                 _ => None,
             }
         };
         if let Some(action) = action {
+            pending.observe(&action);
             input.actions.push(action);
         }
     }
     *repeat += time.delta_secs_f64();
-    if !new_move && *repeat >= 0.5 && session.queued() == 0 && !session.paused {
+    if !new_move && *repeat >= 0.5 && session.queued() == 0 && !pending.paused {
         for key in [
             KeyCode::KeyW,
             KeyCode::ArrowUp,
@@ -816,7 +862,7 @@ fn paint(
     }
 }
 
-fn metrics(time: Res<Time>, mut perf: ResMut<Performance>) {
+fn metrics(time: Res<Time<Real>>, mut perf: ResMut<Performance>) {
     perf.frames += 1;
     if perf.frames > 60 {
         perf.intervals_ms.push_back(time.delta_secs_f64() * 1000.0);
@@ -906,6 +952,149 @@ fn capture(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn native_input_app() -> App {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AgencyPlugin))
+            .add_message::<KeyboardInput>()
+            .init_resource::<ButtonInput<KeyCode>>()
+            .init_resource::<Performance>()
+            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                std::time::Duration::ZERO,
+            ))
+            .add_systems(Update, (keyboard.before(drive_frame), metrics));
+        app.update();
+        app
+    }
+
+    fn press(app: &mut App, key: KeyCode) {
+        app.world_mut().write_message(KeyboardInput {
+            key_code: key,
+            logical_key: bevy::input::keyboard::Key::Unidentified(
+                bevy::input::keyboard::NativeKey::Unidentified,
+            ),
+            state: ButtonState::Pressed,
+            text: None,
+            repeat: false,
+            window: Entity::PLACEHOLDER,
+        });
+    }
+
+    #[test]
+    fn c05_client01_native_real_clock_retains_stalls_and_frame_intervals() {
+        let mut app = native_input_app();
+        app.world_mut()
+            .resource_mut::<Session>()
+            .act(Action::Resume);
+        app.world_mut().resource_mut::<Performance>().frames = 60;
+        app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+            std::time::Duration::from_secs(1),
+        ));
+        app.update();
+        assert_eq!(app.world().resource::<Session>().world().tick(), 2);
+        app.update();
+        assert_eq!(app.world().resource::<Session>().world().tick(), 4);
+        assert_eq!(
+            app.world()
+                .resource::<Performance>()
+                .intervals_ms
+                .back()
+                .copied(),
+            Some(1000.0)
+        );
+    }
+
+    #[test]
+    fn c05_client04_later_frame_step_shows_out_of_range_rejection() {
+        let mut app = native_input_app();
+        app.insert_resource(Strings(Catalog::agency().unwrap()));
+        press(&mut app, KeyCode::KeyE);
+        app.update();
+        assert_eq!(app.world().resource::<Session>().queued(), 1);
+        assert_eq!(app.world().resource::<Session>().world().tick(), 0);
+        press(&mut app, KeyCode::KeyN);
+        app.update();
+        let world = app.world();
+        let session = world.resource::<Session>();
+        let body = body_text(session, &world.resource::<Strings>().0);
+        assert!(!session.world().requested());
+        assert_eq!(session.queued(), 0);
+        assert_eq!(session.world().tick(), 1);
+        assert!(body.contains("Target is not within one cell"), "{body}");
+    }
+
+    #[test]
+    fn c05_client02_batched_controls_use_effective_ordered_state() {
+        let mut app = native_input_app();
+        for key in [KeyCode::Tab, KeyCode::KeyE, KeyCode::KeyN] {
+            press(&mut app, key);
+        }
+        app.update();
+        let session = app.world().resource::<Session>();
+        assert_eq!(session.selected, Target::HerbPatch);
+        assert_eq!(session.admitted.back().unwrap().intent, Intent::Gather);
+        for key in [
+            KeyCode::Tab,
+            KeyCode::Tab,
+            KeyCode::Space,
+            KeyCode::Space,
+            KeyCode::KeyL,
+            KeyCode::KeyL,
+        ] {
+            press(&mut app, key);
+        }
+        app.update();
+        let session = app.world().resource::<Session>();
+        assert_eq!(session.selected, Target::Npc(2));
+        assert!(session.paused);
+        assert_eq!(session.locale, Locale::English);
+        // A preceding UI button action must also affect this frame's keys.
+        app.world_mut()
+            .resource_mut::<Input>()
+            .actions
+            .push(Action::Select(Target::Npc(1)));
+        press(&mut app, KeyCode::Tab);
+        press(&mut app, KeyCode::KeyE);
+        press(&mut app, KeyCode::KeyN);
+        app.update();
+        let session = app.world().resource::<Session>();
+        assert_eq!(session.selected, Target::HerbPatch);
+        assert_eq!(session.admitted.back().unwrap().intent, Intent::Gather);
+    }
+
+    #[test]
+    fn c05_client03_player_label_follows_hierarchy_after_move_and_reset() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, TransformPlugin, AgencyPlugin))
+            .insert_resource(Strings(Catalog::agency().unwrap()))
+            .add_systems(Startup, |mut commands: Commands, session: Res<Session>| {
+                spawn_player(&mut commands, session.world().player_position());
+                commands.spawn((TargetRing, Transform::default(), Visibility::Visible));
+            })
+            .add_systems(Update, paint.after(drive_frame));
+        app.update();
+        for action in [Action::Intent(Intent::Move(Direction::East)), Action::Step] {
+            app.world_mut().resource_mut::<Input>().actions.push(action);
+        }
+        app.update();
+        for reset in [false, true] {
+            if reset {
+                app.world_mut()
+                    .resource_mut::<Input>()
+                    .actions
+                    .push(Action::Reset);
+                app.update();
+            }
+            let world = app.world_mut();
+            let expected = at(world.resource::<Session>().world().player_position());
+            let mut labels = world
+                .query_filtered::<(&ChildOf, &Transform, &GlobalTransform), With<PlayerIdentity>>();
+            let (parent, local, global) = labels.single(world).unwrap();
+            assert!(world.get::<PlayerMarker>(parent.parent()).is_some());
+            assert_eq!(local.translation, Vec3::new(0.0, 0.0, 1.0));
+            assert_eq!(global.translation().truncate(), expected);
+        }
+    }
     #[test]
     fn every_reason_and_target_has_a_translated_label() {
         let catalog = Catalog::agency().unwrap();

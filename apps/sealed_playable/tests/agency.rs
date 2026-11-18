@@ -4,7 +4,7 @@ use sealed_playable::{
     locale::Locale,
 };
 use sealed_sim::player5::{
-    Command, Direction::*, Intent, Key, Outcome, PLAYER_ID, Position, Target, World,
+    Command, Direction::*, Intent, Key, Outcome, PLAYER_ID, Position, Rejection, Target, World,
 };
 
 fn app() -> App {
@@ -213,4 +213,77 @@ fn c05_invalid_load_keeps_live_state_and_reset_clears_timeline_inputs() {
     assert_eq!(s.world().checkpoint(), World::settlement().checkpoint());
     assert_eq!(s.queued(), 0);
     assert!(s.diagnostic.is_empty());
+}
+
+#[test]
+fn c05_same_frame_step_before_intent_still_commits_that_intent() {
+    let mut app = app();
+    frame(
+        &mut app,
+        0,
+        vec![Action::Step, Action::Intent(Intent::Talk(1))],
+    );
+    let s = app.world().resource::<Session>();
+    assert_eq!(s.world().tick(), 1);
+    assert_eq!(s.queued(), 0);
+    assert_eq!(
+        s.recent.back().unwrap().outcome,
+        Outcome::Rejected(Rejection::OutOfRange)
+    );
+}
+
+#[test]
+fn c05_duplicate_same_frame_intent_and_step_commit_once() {
+    let mut app = app();
+    frame(
+        &mut app,
+        0,
+        vec![
+            Action::Intent(Intent::Talk(1)),
+            Action::Intent(Intent::Talk(1)),
+            Action::Step,
+            Action::Step,
+        ],
+    );
+    let s = app.world().resource::<Session>();
+    assert_eq!(s.world().tick(), 1);
+    assert_eq!(s.queued(), 0);
+    assert_eq!(s.recent.len(), 1);
+    assert_eq!(
+        s.recent.back().unwrap().outcome,
+        Outcome::Rejected(Rejection::OutOfRange)
+    );
+}
+
+#[test]
+fn c05_running_frame_includes_the_intent_received_in_that_frame() {
+    let mut app = app();
+    frame(&mut app, 0, vec![Action::Resume]);
+    frame(&mut app, TICK_NS, vec![Action::Intent(Intent::Talk(1))]);
+    let s = app.world().resource::<Session>();
+    assert!(!s.paused);
+    assert_eq!(s.world().tick(), 1);
+    assert_eq!(s.queued(), 0);
+    assert_eq!(
+        s.recent.back().unwrap().outcome,
+        Outcome::Rejected(Rejection::OutOfRange)
+    );
+}
+
+#[test]
+fn c05_paused_intent_is_not_consumed_by_elapsed_time() {
+    let mut app = app();
+    frame(
+        &mut app,
+        TICK_NS * 4,
+        vec![Action::Intent(Intent::Move(East))],
+    );
+    let s = app.world().resource::<Session>();
+    assert_eq!(s.world().tick(), 0);
+    assert_eq!(s.queued(), 1);
+    frame(&mut app, TICK_NS, vec![Action::Step]);
+    let s = app.world().resource::<Session>();
+    assert_eq!(s.world().tick(), 1);
+    assert_eq!(s.queued(), 0);
+    assert_eq!(s.world().player_position(), Position { x: 1, y: 4 });
 }

@@ -1,6 +1,6 @@
 # C0.5 reproducible performance tooling
 
-**C05/scaled timing/native baseline: NOT YET RUN.** One standalone 20-NPC tooling
+**Final C05/scaled timing and native sample: RUN (2026-11-18).** One standalone 20-NPC tooling
 smoke measurement is recorded below, not a C05 acceptance result or hardware
 scalability guarantee. Core/app work is concurrent; run the full matrix after it
 is stable. No profiling dependency was added.
@@ -169,7 +169,8 @@ frame interval as a complete per-frame distribution or GPU time. Record native
 build/profile, capture method, foreground state, duration, warmup, observation
 cadence and input/capture overhead alongside evidence. Headless process resource
 metrics do NOT stand in for native CPU/memory; measure the native process over an
-identified interval separately. Native rendering performance is **not yet run**.
+identified interval separately. A short foreground native sample is now recorded
+in the final-matrix section below; it is not a full-frame distribution or soak.
 
 ## C04 cadence comparison
 
@@ -182,3 +183,69 @@ That sample cannot isolate frozen-kernel compute time or prove a kernel ceiling
 of 1.44 TPS. Compare the new drive duration/unpaced TPS separately; then collect
 a matched native sample before attributing any difference to C05 or claiming a
 speedup/regression. This benchmark does not change the nominal 2 Hz policy.
+
+## First complete headless matrix (executed during development)
+
+Executed with the shipped wrapper, release MSVC, 10 warmup + 100 timed ticks,
+three fresh iterations (300 durations per row), no player commands. Raw local
+evidence: `C:/Users/PC_4/AppData/Local/Temp/opencode/c05-performance-baseline-01`.
+Concurrent verification/compilation was present; these are real observations but
+not an idle matched native comparison. Final evidence is to be archived after
+audit/remediation, with its exact implementation/binary identity.
+
+| World | Mean drive ms | p95 ms | Max ms | Unpaced drive TPS | Final checkpoint bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Frozen NPC20 | 0.2361 | 0.4441 | 0.7533 | 4235.79 | 110613 |
+| Frozen NPC100 | 0.9986 | 1.9633 | 3.1535 | 1001.41 | 550005 |
+| Frozen NPC1000 | 24.0852 | 83.0659 | 113.6301 | 41.52 | 5493165 |
+| C05 aggregate20 | 0.4033 | 0.7022 | 0.8143 | 2479.55 | 110808 |
+
+The 1000-actor row has substantial variance and checkpoint growth; no production
+scalability promise follows from a short horizon with finite food and shared
+tiny topology. C05 aggregate100/1000 correctly reported unavailable (exit3), not
+fabricated player or graphical populations. These are initial concurrent-run
+measurements; a final matrix follows.
+
+## Final matched headless matrix and native observation
+
+Release MSVC, 10 warmup + 100 timed ticks, three fresh iterations (300 drive
+samples per supported row), final remediation tree. Raw evidence:
+`C:\Users\PC_4\AppData\Local\Temp\opencode\c05-performance-final-03`.
+Benchmark executable SHA256 `5e88a3e6c8df935e10cfe74583fdc0bafce83c59c8f2fcb53f214b5569a36a89`.
+The metadata records exact source status (uncommitted concurrent edits), machine
+and toolchain. Rows below are unpaced canonical `World::drive` measurements, not
+the nominal 2 Hz game cadence.
+
+| World | Mean drive ms | p95 ms | Max ms | Unpaced drive TPS | Final checkpoint bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Frozen NPC20 | 0.2105 | 0.3788 | 0.4576 | 4750.74 | 110613 |
+| Frozen NPC100 | 0.8661 | 1.6385 | 1.8984 | 1154.62 | 550005 |
+| Frozen NPC1000 | 24.0910 | 79.0367 | 116.7981 | 41.51 | 5493165 |
+| C05 aggregate20 | 0.3955 | 0.7058 | 0.8756 | 2528.45 | 110808 |
+
+C05 aggregate100/1000 were correctly `unavailable` (exit 3); no scaled C05
+population was fabricated. Child CPU samples were 0.0625s/20, 0.2656s/100,
+7.4375s/1000 NPC and 0.1875s/C05-20 over whole child lifetime, not drive-only.
+Observed live peak working sets were 5.82/10.30/52.12/6.52 MB respectively, all
+marked incomplete lower bounds because Windows exit peak accounting was unavailable.
+Raw per-tick drive durations are in each JSON result.
+
+Native foreground release run: `c05-native-gameplay-09`, exact client SHA256
+`4421e31dd362f9a638f6a918f1604e17f286402565cd13a9d566de6c3cb2fd44`. Ten-second
+run interval yielded 21 ticks (2.098 observed wall TPS) at configured 2 Hz;
+process CPU 2.0625 s (20.60% one core), working set 442.0 MB after sample,
+474.4 MB peak, 165 entities, 20 NPCs. Captured frame interval summary from 31
+F12 snapshots: 16.670 ms mean of per-snapshot reported means, p95 16.674 ms,
+max 16.675 ms; this is not a full frame-time sample distribution or GPU timing.
+Tick compute during gameplay averaged 0.176 ms (p95 0.259 ms, 46 samples).
+These native values include rendering and boundaries/capture/input uncertainty.
+
+The C0.4 report's 1.44 observed TPS was a single debug foreground sample under
+capture/focus effects; the new 2.098 TPS sample is close to nominal 2 Hz and is
+not directly matched. Neither contradicts the independent unpaced drive TPS:
+host pacing and scheduling dominate observed wall TPS while kernel compute is
+measured separately. Do not claim a speedup from this comparison.
+
+The short 100-tick rows retain checkpoint-growth and 1000-actor variance limits;
+they are characterization only, not a production scalability promise. Native
+CPU/memory is one short sample, not a long soak.

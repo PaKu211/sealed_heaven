@@ -31,6 +31,10 @@ fn unchanged(world: &mut World, boundary: u64, batch: &[Command], error: Error) 
 #[test]
 fn authored_identity_terrain_projection_and_ledger() {
     let mut w = World::settlement();
+    assert_eq!(
+        DEMO,
+        include_bytes!("../../apps/sealed_playable/assets/demo.c03")
+    );
     assert_eq!(w.npcs().domain_checkpoint_bytes(), DEMO);
     assert_eq!(w.npcs().next_actor_id(), 21);
     assert_eq!(w.player_position(), START);
@@ -517,6 +521,278 @@ fn resign(bytes: &mut [u8]) {
     let end = bytes.len() - 32;
     let digest = sha256(&bytes[..end]);
     bytes[end..].copy_from_slice(&digest);
+}
+
+/// Mutate the final recorded outcome and recompute both unkeyed hashes exactly
+/// as an external save editor can. No private simulation fields are changed.
+fn forge_last_outcome(
+    world: &World,
+    event: Event,
+    previous_digest: [u8; 32],
+    encoded_outcome: [u8; 2],
+    player_x: u32,
+    requested: bool,
+) -> Vec<u8> {
+    let mut bytes = world.checkpoint();
+    let record = 159 + (event.id as usize - 1) * 31;
+    bytes[record + 29..record + 31].copy_from_slice(&encoded_outcome);
+    bytes[58..62].copy_from_slice(&player_x.to_le_bytes());
+    bytes[105] = u8::from(requested);
+    let mut chain = b"SH:C05:EVENT:v1".to_vec();
+    chain.extend(previous_digest);
+    chain.extend(event.id.to_le_bytes());
+    chain.extend(event.tick.to_le_bytes());
+    chain.extend(&bytes[record..record + 24]);
+    chain.extend(encoded_outcome);
+    bytes[123..155].copy_from_slice(&sha256(&chain));
+    resign(&mut bytes);
+    assert_eq!(
+        sha256(&bytes[..bytes.len() - 32]),
+        bytes[bytes.len() - 32..]
+    );
+    bytes
+}
+
+#[test]
+fn audit_regression_remote_talk_cannot_restore_as_requested() {
+    let mut world = World::settlement();
+    let previous_digest = world.event_digest();
+    let c = command(&world, Intent::Talk(1));
+    let event = world.drive(0, &[c]).unwrap()[0];
+    assert_eq!(event.outcome, Outcome::Rejected(Rejection::OutOfRange));
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+    let forged = forge_last_outcome(&world, event, previous_digest, [2, 0], 0, true);
+    assert_eq!(
+        World::restore(&forged).map(|_| ()),
+        Err(Error::Restore(RestoreError::InvalidState))
+    );
+}
+
+#[test]
+fn audit_regression_clear_cell_cannot_restore_as_occupied_rejection() {
+    let mut world = World::settlement();
+    let previous_digest = world.event_digest();
+    let c = command(&world, Intent::Move(Direction::East));
+    let event = world.drive(0, &[c]).unwrap()[0];
+    assert_eq!(event.outcome, Outcome::Moved);
+    assert!(!world.occupied(Position { x: 1, y: 4 }));
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+    let forged = forge_last_outcome(&world, event, previous_digest, [5, 3], 0, false);
+    assert_eq!(
+        World::restore(&forged).map(|_| ()),
+        Err(Error::Restore(RestoreError::InvalidState))
+    );
+}
+
+#[test]
+fn audit_regression_occupied_entry_cannot_restore_as_moved() {
+    let mut world = World::settlement();
+    for direction in [Direction::East, Direction::East, Direction::North] {
+        assert_eq!(act(&mut world, Intent::Move(direction)), Outcome::Moved);
+    }
+    let previous_digest = world.event_digest();
+    let c = command(&world, Intent::Move(Direction::East));
+    let event = world.drive(3, &[c]).unwrap()[0];
+    assert_eq!(event.outcome, Outcome::Rejected(Rejection::Occupied));
+    assert!(world.occupied(Position { x: 3, y: 3 }));
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+    let forged = forge_last_outcome(&world, event, previous_digest, [1, 0], 3, false);
+    assert_eq!(
+        World::restore(&forged).map(|_| ()),
+        Err(Error::Restore(RestoreError::InvalidState))
+    );
+}
+
+#[test]
+fn nearby_requests_and_legal_occupancy_rejections_replay_exactly() {
+    let mut world = World::settlement();
+    for direction in [Direction::East, Direction::East, Direction::North] {
+        assert_eq!(act(&mut world, Intent::Move(direction)), Outcome::Moved);
+    }
+    // Exercise command gaps: replay must advance NPCs to each target, not once
+    // per registry record. A nearby NPC1 remains a live target after the gap.
+    for _ in 0..3 {
+        world.drive(world.tick(), &[]).unwrap();
+    }
+    let previous_digest = world.event_digest();
+    let c = command(&world, Intent::Talk(1));
+    let event = world.drive(world.tick(), &[c]).unwrap()[0];
+    assert_eq!(event.outcome, Outcome::Requested);
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+    let forged = forge_last_outcome(&world, event, previous_digest, [5, 4], 2, false);
+    assert_eq!(
+        World::restore(&forged).map(|_| ()),
+        Err(Error::Restore(RestoreError::InvalidState))
+    );
+    assert_eq!(act(&mut world, Intent::Talk(1)), Outcome::Requested);
+    assert_eq!(world.player_herbs(), 0);
+    assert_eq!(
+        act(&mut world, Intent::Move(Direction::East)),
+        Outcome::Rejected(Rejection::Occupied)
+    );
+    // A retry-only boundary is absent from the registry but must still replay.
+    assert!(world.drive(world.tick(), &[c]).unwrap().is_empty());
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+}
+
+#[test]
+fn authentic_c03_structure_is_insufficient_without_exact_npc_evolution() {
+    for with_command in [false, true] {
+        let mut world = World::settlement();
+        if with_command {
+            act(&mut world, Intent::Move(Direction::East));
+        }
+        for _ in 0..8 {
+            world.drive(world.tick(), &[]).unwrap();
+        }
+        let bytes = world.checkpoint();
+        assert_eq!(World::restore(&bytes).unwrap(), world);
+        let count = u32::from_le_bytes(bytes[155..159].try_into().unwrap()) as usize;
+        let npc_start = 159 + count * 31 + 4;
+        let npc_end = bytes.len() - 32;
+        // C03 digest corruption and a non-exhausted, replay-inconsistent event
+        // cursor are not reachable by exact NPC replay.
+        for digest_forgery in [false, true] {
+            let mut forged = bytes.clone();
+            if digest_forgery {
+                forged[npc_end - 64] ^= 1;
+            } else {
+                let cursor =
+                    u64::from_le_bytes(forged[npc_end - 72..npc_end - 64].try_into().unwrap());
+                forged[npc_end - 72..npc_end - 64]
+                    .copy_from_slice(&cursor.checked_add(1).unwrap().to_le_bytes());
+            }
+            resign(&mut forged[npc_start..npc_end]);
+            resign(&mut forged);
+            assert_eq!(
+                World::restore(&forged).map(|_| ()),
+                Err(Error::Restore(RestoreError::InvalidState))
+            );
+        }
+    }
+}
+
+#[test]
+fn exhausted_authentic_npc_event_cursor_restores_and_fails_drive_atomically() {
+    let mut initial = World::settlement();
+    initial.drive(0, &[]).unwrap();
+    let mut bytes = initial.checkpoint();
+    let npc_start = 163;
+    let npc_len = u32::from_le_bytes(bytes[159..163].try_into().unwrap()) as usize;
+    let npc_end = npc_start + npc_len;
+    bytes[npc_end - 72..npc_end - 64].copy_from_slice(&u64::MAX.to_le_bytes());
+    resign(&mut bytes[npc_start..npc_end]);
+    resign(&mut bytes);
+    let mut restored = World::restore(&bytes).unwrap();
+    assert_eq!(restored.checkpoint(), bytes);
+
+    for _ in 0..50 {
+        let before = restored.checkpoint();
+        let command = command(&restored, Intent::Move(Direction::East));
+        match restored.drive(restored.tick(), &[command]) {
+            Err(Error::Npc(_)) => {
+                assert_eq!(restored.checkpoint(), before);
+                return;
+            }
+            Ok(_) => {}
+            Err(error) => panic!("unexpected NPC cursor error: {error:?}"),
+        }
+    }
+    panic!("exhausted NPC event cursor did not fail within 50 boundaries");
+}
+
+#[test]
+fn finite_horizon_admission_and_huge_clock_rejection_are_bounded() {
+    assert_eq!(MAX_TICKS, 4096);
+    assert_eq!(MAX_TICKS as usize, MAX_COMMANDS);
+    let mut initial = World::settlement();
+    unchanged(&mut initial, MAX_TICKS, &[], Error::Capacity);
+    unchanged(&mut initial, u64::MAX, &[], Error::Capacity);
+    // A private near-horizon clock isolates the drive admission guard without
+    // replaying thousands of NPC ticks in every ordinary test run. The ignored
+    // budget test below separately exercises an authentic maximum-length save.
+    let mut world = World::settlement();
+    world.npcs.tick = MAX_TICKS - 1;
+    world.npcs.world3.as_mut().unwrap().tick = MAX_TICKS - 1;
+    let c = command(&world, Intent::Talk(99));
+    assert_eq!(
+        world.drive(MAX_TICKS - 1, &[c]).unwrap()[0].outcome,
+        Outcome::Rejected(Rejection::UnknownTarget)
+    );
+    assert_eq!(world.tick(), MAX_TICKS);
+    unchanged(&mut world, MAX_TICKS, &[], Error::Capacity);
+    unchanged(&mut world, MAX_TICKS, &[c], Error::Capacity);
+    let new = command(&world, Intent::Gather);
+    unchanged(&mut world, MAX_TICKS, &[new], Error::Capacity);
+    let original = World::settlement().checkpoint();
+    let start = std::time::Instant::now();
+    for tick in [MAX_TICKS + 1, u64::MAX] {
+        let mut forged = original.clone();
+        forged[46..54].copy_from_slice(&tick.to_le_bytes());
+        // Match the inner C03 tick and recompute both checksums too.
+        let npc_start = 163;
+        let npc_end = forged.len() - 32;
+        forged[npc_start + 50..npc_start + 58].copy_from_slice(&tick.to_le_bytes());
+        resign(&mut forged[npc_start..npc_end]);
+        resign(&mut forged);
+        assert_eq!(
+            World::restore(&forged).map(|_| ()),
+            Err(Error::Restore(RestoreError::InvalidState))
+        );
+        // Even without the remainder of the file, the header must reject on the
+        // clock, proving the bound is checked before candidate parsing/replay.
+        assert_eq!(
+            World::restore(&forged[..54]).map(|_| ()),
+            Err(Error::Restore(RestoreError::InvalidState))
+        );
+    }
+    eprintln!(
+        "over-horizon/hostile-u64 header rejection: {:?}",
+        start.elapsed()
+    );
+}
+
+#[test]
+#[ignore = "explicit maximum-horizon latency probe; avoid repeated 4096-tick replay in the default suite"]
+fn maximum_valid_horizon_budget_roundtrip() {
+    let mut world = World::settlement();
+    let drive_start = std::time::Instant::now();
+    for _ in 0..MAX_TICKS - 1 {
+        world.drive(world.tick(), &[]).unwrap();
+        if world.tick().is_multiple_of(1024) {
+            eprintln!(
+                "maximum-horizon fixture generation: tick {}, elapsed {:?}",
+                world.tick(),
+                drive_start.elapsed()
+            );
+        }
+    }
+    let c = command(&world, Intent::Talk(99));
+    assert_eq!(
+        world.drive(MAX_TICKS - 1, &[c]).unwrap()[0].outcome,
+        Outcome::Rejected(Rejection::UnknownTarget)
+    );
+    let drive_elapsed = drive_start.elapsed();
+    let bytes = world.checkpoint();
+    eprintln!(
+        "maximum-horizon fixture generated: {} bytes, drive {:?}; starting restore",
+        bytes.len(),
+        drive_elapsed
+    );
+    let restore_start = std::time::Instant::now();
+    let restored = World::restore(&bytes).unwrap();
+    let restore_elapsed = restore_start.elapsed();
+    assert_eq!(restored.checkpoint(), bytes);
+    assert_eq!(restored, world);
+    unchanged(&mut world, MAX_TICKS, &[], Error::Capacity);
+    unchanged(&mut world, MAX_TICKS, &[c], Error::Capacity);
+    eprintln!(
+        "maximum valid horizon: {} ticks, {} checkpoint bytes, drive {:?}, restore {:?}",
+        MAX_TICKS,
+        bytes.len(),
+        drive_elapsed,
+        restore_elapsed
+    );
 }
 
 #[test]

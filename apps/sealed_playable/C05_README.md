@@ -25,6 +25,10 @@ per timeline is a bounded prototype limit (reset starts a new timeline). NPCs ke
 the accepted abstract/shared site movement: the player cannot enter NPC-occupied
 cells, but an NPC can later arrive over the player, who may leave.
 
+The prototype stops at tick4096 (about34m08s at2 Hz); save/history validation is
+bounded by this horizon. Reset starts a new attempt. This is not a long-run world
+gate. The completed herb delivery can be saved and restored.
+
 C05 saves to `LOCALAPPDATA/SealedHeaven/checkpoint.c05` (same fallback base as C04),
 never the old `.c03` path. Queued unadmitted inputs, language, selection and camera
 are not saved; load/reset clears queues. No implicit old-save migration.
