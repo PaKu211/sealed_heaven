@@ -50,4 +50,5 @@ Foreground mouse/keyboard smoke completed against debug SHA-256
 continued tick-3 hash matched. Reset restored paused tick 0 and the S4 hash.
 Focused sample: 21 ticks in 14.558 seconds. No source defect found.
 Final independent audit PASS. Evidence: docs/evidence/c04-native-acceptance/.
-Remote acceptance SHA is appended after the push is verified.
+Acceptance evidence commit ea6d6430b93b94a49ff13ea018b169987ae4e16f was pushed to
+origin/feat/c04-first-playable and matched the fetched remote SHA. Main was not updated.

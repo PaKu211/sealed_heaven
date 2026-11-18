@@ -20,9 +20,9 @@ the deferred R2 performance gate, and it does not authorize C0.5.
 - Renderer reported by the application: NVIDIA GeForce RTX 4060 / Vulkan
 - Machine: 12th Gen Intel Core i7-12700F, 16,980,426,752 bytes physical memory, Windows
 
-The acceptance commit that adds this audit and the native evidence is the
-delivery commit on `feat/c04-first-playable`. Its remote SHA is recorded in
-`C0_4_EXECUTION_LOG.txt` after push. No merge to `main` and no force-push.
+The evidence and this audit were committed as `ea6d6430b93b94a49ff13ea018b169987ae4e16f`
+and that SHA matched `origin/feat/c04-first-playable` after push. No merge to
+`main` and no force-push.
 
 ## What was re-executed
 
