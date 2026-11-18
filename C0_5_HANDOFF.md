@@ -41,8 +41,7 @@ the player, and the absence of a 30-day/R2 sample remain limitations.
 - Core remediation replays exact frozen-NPC history for restore validation, with
   4096-tick bounded horizon and the three checksum-valid audit regressions.
 - Client fixes address real native timing, same-frame ordered input, and player
-  label transform; independent client source review recorded PASS in
-  `C0_5_CLIENT_INDEPENDENT_REVIEW.md`.
+  label transform. The client source review passed and is recorded in this handoff.
 - Full `tools/c05_verify.ps1` on this tree completed with exit 0: root 100 passed
   and 1 ignored maximum-horizon probe, 5 benchmark tests and 2 doctests in both
   profiles; app 41 tests per profile. Fmt/check/strict Clippy, packers and
@@ -57,10 +56,10 @@ the player, and the absence of a 30-day/R2 sample remain limitations.
 
 ## Historical blocker, now closed
 
-The first core review recorded CORE-01 in `C0_5_CORE_INDEPENDENT_REVIEW.md`.
-That restore gap was remediated before this acceptance. The paragraph below is
-the record of that open item; the independent re-review section above is the
-closing verdict.
+The first core review recorded CORE-01. That restore gap was remediated before
+this acceptance. The paragraph below is the record of that open item; the
+independent re-review section above is the closing verdict. The intermediate
+review notes were removed after this handoff became the record.
 
 Button labels were `FocusPolicy::Block` by default, so a click on the label
 never pressed the parent button and a later step could advance with no intent.
