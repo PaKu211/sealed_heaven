@@ -1,4 +1,5 @@
 //! Bevy host adapter; all gameplay is delegated to the frozen sealed_sim crate.
+pub mod agency;
 pub mod locale;
 pub mod persistence;
 pub mod view;

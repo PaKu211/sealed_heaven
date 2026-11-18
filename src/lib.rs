@@ -18,6 +18,7 @@
 mod domain;
 mod encoding;
 mod fixture3;
+pub mod player5;
 
 use std::collections::{BTreeMap, BTreeSet};
 

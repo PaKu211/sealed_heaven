@@ -3,6 +3,7 @@ name = "sealed_playable"
 version = "0.4.0"
 edition = "2024"
 publish = false
+default-run = "sealed_playable"
 
 [dependencies]
 sealed_sim = { path = "../.." }
@@ -18,4 +19,9 @@ desktop = ["bevy/bevy_asset", "bevy/bevy_color", "bevy/bevy_core_pipeline", "bev
 [[bin]]
 name = "sealed_playable"
 path = "src/main.rs"
+required-features = ["desktop"]
+
+[[bin]]
+name = "sealed_agency"
+path = "src/agency_main.rs"
 required-features = ["desktop"]

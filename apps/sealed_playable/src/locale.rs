@@ -134,6 +134,31 @@ pub struct Catalog {
 }
 
 impl Catalog {
+    /// C0.5 adds a namespaced overlay without changing the C0.4 dictionaries.
+    pub fn agency() -> Result<Self, String> {
+        let mut catalog = Self::load()?;
+        let en = parse_dictionary("c05/en", include_str!("../locales/c05_en.json"))?;
+        let id = parse_dictionary("c05/id", include_str!("../locales/c05_id.json"))?;
+        if !en.keys().eq(id.keys()) {
+            return Err("c05 dictionary key parity mismatch".into());
+        }
+        for key in AGENCY_KEYS {
+            if !en.contains_key(*key) {
+                return Err(format!("c05 missing required key {key}"));
+            }
+        }
+        for (key, value) in en {
+            if catalog.english.insert(key.clone(), value).is_some() {
+                return Err(format!("c05 shadowed key {key}"));
+            }
+        }
+        for (key, value) in id {
+            if catalog.indonesian.insert(key.clone(), value).is_some() {
+                return Err(format!("c05 shadowed key {key}"));
+            }
+        }
+        Ok(catalog)
+    }
     pub fn load() -> Result<Self, String> {
         Self::from_json(
             include_str!("../locales/en.json"),
@@ -186,6 +211,53 @@ impl Catalog {
             .unwrap_or_else(|| key.to_owned())
     }
 }
+
+pub const AGENCY_KEYS: &[&str] = &[
+    "c05.title",
+    "c05.player",
+    "c05.settlement",
+    "c05.healer",
+    "c05.patch",
+    "c05.shrine",
+    "c05.herbs",
+    "c05.source",
+    "c05.delivered",
+    "c05.inventory",
+    "c05.target",
+    "c05.range",
+    "c05.far",
+    "c05.talk",
+    "c05.gather",
+    "c05.deliver",
+    "c05.controls",
+    "c05.ready",
+    "c05.queued",
+    "c05.queue_full",
+    "c05.resolved",
+    "c05.request",
+    "c05.complete",
+    "c05.unmet",
+    "c05.npc_alive",
+    "c05.queue",
+    "c05.moved",
+    "c05.requested",
+    "c05.gathered",
+    "c05.delivered_ok",
+    "c05.rejected",
+    "c05.r_out_of_range",
+    "c05.r_terrain",
+    "c05.r_occupied",
+    "c05.r_empty",
+    "c05.r_request",
+    "c05.r_complete",
+    "c05.r_npc",
+    "c05.r_overflow",
+    "c05.pending",
+    "c05.follow",
+    "c05.saved_prefix",
+    "c05.cell",
+    "c05.entry",
+];
 
 struct Dictionary(BTreeMap<String, String>);
 
@@ -240,6 +312,22 @@ mod tests {
 
     const ENGLISH: &str = include_str!("../locales/en.json");
     const INDONESIAN: &str = include_str!("../locales/id.json");
+
+    #[test]
+    fn c05_overlay_covers_both_languages_without_changing_old_labels() {
+        let catalog = Catalog::agency().unwrap();
+        let old = Catalog::load().unwrap();
+        for key in REQUIRED_KEYS {
+            for locale in [Locale::English, Locale::Indonesian] {
+                assert_eq!(catalog.text(locale, key), old.text(locale, key));
+            }
+        }
+        for key in AGENCY_KEYS {
+            for locale in [Locale::English, Locale::Indonesian] {
+                assert_ne!(catalog.text(locale, key), *key);
+            }
+        }
+    }
 
     fn changed_dictionary(
         source: &str,
