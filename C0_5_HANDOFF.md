@@ -1,5 +1,8 @@
 # C0.5 continuation
 
+C0.6 continues on `feat/c06-readable-village` in the `sealed-heaven-c06` worktree.
+This file remains the C0.5 record. See `C0_6_HANDOFF.md`.
+
 Status: **C0.5 PASS** for the approved player-agency contract. Independent
 re-review returned PASS after the same-frame duplicate-intent fix. Do not merge
 to main, force-push, or start C0.6.

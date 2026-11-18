@@ -38,7 +38,7 @@ public static class C05Input {
       GetWindowThreadProcessId(hwnd,out owner);
       var text=new System.Text.StringBuilder(256);
       GetWindowText(hwnd,text,text.Capacity);
-      if(owner==pid && text.ToString().Contains("C0.5")) {found=hwnd;return false;}
+      if(owner==pid && text.ToString().Contains("Sealed Heaven")) {found=hwnd;return false;}
       return true;
     },IntPtr.Zero);
     return found;
