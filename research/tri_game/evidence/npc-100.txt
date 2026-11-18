@@ -1,0 +1,3 @@
+﻿exit=0
+{"label":"npc-active-100","actors":100,"samples":300,"mean_ns":890912,"p50_ns":830400,"p95_ns":1666200,"max_ns":2534300,"total_ns":267273600,"unpaced_tps":1122.445314,"decisions":7500,"resource_events":43500,"final_checkpoint_bytes":550005,"final_hash":"1f34202503edb1dfea7aaf3ec621cf60d93266fd7184dc7dcb4a5fa8275e0fa6","peak_working_set":9170944}
+

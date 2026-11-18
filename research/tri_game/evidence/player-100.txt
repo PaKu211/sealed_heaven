@@ -1,0 +1,10 @@
+﻿exit=3
+tri_game.exe : status: unavailable
+At line:1 char:282
++ ... ist) { Write-Host "RUN $name"; $output = & $exe @arglist 2>&1 | Out-S ...
++                                              ~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (status: unavailable:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+C05 aggregate populations other than the authored 20 NPCs are not supported
+

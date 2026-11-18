@@ -1,0 +1,3 @@
+﻿exit=0
+{"label":"npc-dormant-1000","actors":1000,"samples":300,"mean_ns":59413,"p50_ns":53300,"p95_ns":93300,"max_ns":352300,"total_ns":17824100,"unpaced_tps":16831.144350,"decisions":0,"resource_events":0,"final_checkpoint_bytes":145365,"final_hash":"6ed0de80395c739ec2bac2312158d189064d5a5bce29361140cc58047c3a09df","peak_working_set":5120000}
+

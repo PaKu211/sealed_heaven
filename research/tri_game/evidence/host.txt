@@ -1,0 +1,10 @@
+﻿
+
+Name                      : 12th Gen Intel(R) Core(TM) i7-12700F
+NumberOfLogicalProcessors : 20
+
+
+
+
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+8c7ada0fa54b1b402cf0bc54c345cea1d253dd37

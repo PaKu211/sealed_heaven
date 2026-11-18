@@ -1,0 +1,3 @@
+﻿exit=0
+{"label":"c05-player-20","actors":20,"samples":300,"mean_ns":431444,"p50_ns":411600,"p95_ns":810600,"max_ns":1039600,"total_ns":129433300,"unpaced_tps":2317.796116,"decisions":0,"resource_events":0,"final_checkpoint_bytes":110808,"final_hash":"811819991b23707644cab8ce4aafe14746668b23648b8918a549fd940b694ea0","peak_working_set":5689344}
+
