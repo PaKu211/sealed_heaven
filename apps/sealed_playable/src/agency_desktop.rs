@@ -16,8 +16,10 @@ use bevy::{
 };
 use sealed_playable::{
     agency::{Action, AgencyPlugin, Input, Session, drive_frame},
+    clock::{self, PlannedBlock},
     hex,
     locale::{Catalog, Locale},
+    supply::Phase,
     view::View,
 };
 use sealed_sim::player5::{
@@ -80,7 +82,7 @@ pub fn run() {
         .insert_resource(ClearColor(Color::srgb(0.035, 0.055, 0.065)))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Sealed Heaven — C0.5 Qinghe".into(),
+                title: "Sealed Heaven — C0.7 Qinghe".into(),
                 resolution: (1440, 960).into(),
                 resize_constraints: bevy::window::WindowResizeConstraints {
                     min_width: 1280.0,
@@ -99,7 +101,7 @@ pub fn run() {
                 .chain()
                 .before(drive_frame),
         )
-        .add_systems(Update, (follow_camera, scroll, metrics))
+        .add_systems(Update, (follow_camera, scroll, metrics, day_night))
         .add_systems(Update, (paint, capture).chain().after(drive_frame))
         .run();
 }
@@ -155,13 +157,14 @@ fn spawn_player(commands: &mut Commands, position: Position) {
     commands
         .spawn((
             PlayerMarker,
-            Sprite::from_color(Color::srgb(1.0, 0.8, 0.23), Vec2::splat(23.0)),
+            Sprite::from_color(Color::srgb(0.96, 0.78, 0.22), Vec2::new(26.0, 34.0)),
             Transform::from_translation(at(position).extend(8.0)),
         ))
         .with_children(|player| {
             player.spawn((
                 PlayerIdentity,
-                Text2d::new("21"),
+                Label::Key("c06.you"),
+                Text2d::new("You"),
                 TextFont {
                     font_size: 11.0,
                     ..default()
@@ -188,12 +191,15 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
     for y in 0..HEIGHT {
         for x in 0..WIDTH {
             let pos = Position { x, y };
+            let lane = session.world().is_walkable(pos) && y == 4;
             let color = if !session.world().is_walkable(pos) {
-                Color::srgb(0.15, 0.17, 0.19)
+                Color::srgb(0.12, 0.13, 0.15)
             } else if x == 6 && y == 4 {
-                Color::srgb(0.41, 0.32, 0.19)
+                Color::srgb(0.55, 0.42, 0.22)
+            } else if lane {
+                Color::srgb(0.36, 0.32, 0.22)
             } else {
-                Color::srgb(if (x + y) % 2 == 0 { 0.12 } else { 0.14 }, 0.22, 0.18)
+                Color::srgb(if (x + y) % 2 == 0 { 0.16 } else { 0.2 }, 0.34, 0.22)
             };
             commands.spawn((
                 Sprite::from_color(color, Vec2::splat(CELL - 2.0)),
@@ -233,6 +239,22 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
             Transform::from_translation((at(p) + Vec2::new(0.0, -31.0)).extend(7.0)),
         ));
     }
+    for (key, position) in [
+        ("c06.yard", Position { x: 3, y: 3 }),
+        ("c06.homes", Position { x: 9, y: 5 }),
+        ("c06.edge", Position { x: 10, y: 7 }),
+    ] {
+        commands.spawn((
+            Text2d::default(),
+            Label::Key(key),
+            TextFont {
+                font_size: 11.0,
+                ..default()
+            },
+            TextColor(INK),
+            Transform::from_translation((at(position) + Vec2::new(0.0, 28.0)).extend(7.0)),
+        ));
+    }
     for id in 1..=20 {
         commands.spawn((
             NpcMarker(id),
@@ -242,7 +264,7 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
                 } else {
                     Color::srgb(0.35, 0.61, 0.81)
                 },
-                Vec2::splat(if id == 1 { 15.0 } else { 7.0 }),
+                Vec2::splat(if id == 1 { 18.0 } else { 12.0 }),
             ),
             Transform::default(),
             Visibility::Hidden,
@@ -282,7 +304,7 @@ fn setup(mut commands: Commands, session: Res<Session>, mut fonts: ResMut<Assets
         .with_children(|bar| {
             bar.spawn((
                 Text::default(),
-                Label::Key("c05.title"),
+                Label::Key("c06.title"),
                 TextFont {
                     font_size: 19.0,
                     ..default()
@@ -733,13 +755,78 @@ fn body_text(session: &Session, cat: &Catalog) -> String {
         && let Ok(view) = View::from_sim(world.npcs())
         && let Some(actor) = view.actors.iter().find(|a| a.id == id)
     {
+        let goal = view
+            .tasks
+            .iter()
+            .find(|task| task.id == actor.task)
+            .map(|task| task.goal);
+        let goal_text = t(match goal {
+            Some(1) => "c06.goal.1",
+            Some(2) => "c06.goal.2",
+            Some(3) => "c06.goal.3",
+            Some(4) => "c06.goal.4",
+            Some(5) => "c06.goal.5",
+            _ => "c06.no_task",
+        });
         let _ = writeln!(
             text,
-            "{}: {:?}\n{}: {}",
+            "{}: {:?}\n{}: {}\n{}: {}",
             t("inspector.needs"),
             actor.needs,
             t("inspector.task"),
-            actor.task
+            actor.task,
+            t("c06.goal"),
+            goal_text
+        );
+    }
+    let minute = clock::minute_of_day(world.tick());
+    let (hour, mins) = clock::clock_hhmm(minute);
+    let _ = writeln!(
+        text,
+        "\n{}: {:02}:{:02} · {} {}\n{}\n{}: {}\n{}",
+        t("c06.clock"),
+        hour,
+        mins,
+        t("c06.day"),
+        clock::day_number(world.tick()),
+        t(if clock::is_night(minute) {
+            "c06.night"
+        } else {
+            "c06.daylight"
+        }),
+        t("c06.schedule"),
+        t(block_key(clock::planned_block(minute))),
+        t("c06.schedule_note")
+    );
+    if let Ok(supply) = session.supply().status() {
+        let _ = writeln!(
+            text,
+            "\n{}\n{}\n{}: {}\n{}: {}\n{}: {} / {}\n{}: {}\n{}: {}\n{}: {}",
+            t("c07.supply"),
+            t("c07.note"),
+            t("c07.demand"),
+            supply.demand,
+            t("c07.worker"),
+            supply.worker,
+            t("c07.progress"),
+            supply.deliveries,
+            supply.demand,
+            t("c07.carrier"),
+            supply.carrier,
+            t("c07.shrine"),
+            supply.shrine,
+            t("c07.total"),
+            supply.total
+        );
+        let _ = writeln!(text, "{}", t(phase_key(supply.phase)));
+        let _ = writeln!(
+            text,
+            "{}: {}",
+            t("c06.goal"),
+            supply
+                .goal
+                .map(|goal| t(goal_key(goal)))
+                .unwrap_or_else(|| t("c06.no_task"))
         );
     }
     let _ = writeln!(
@@ -780,7 +867,7 @@ fn paint(
         (With<PlayerMarker>, Without<NpcMarker>, Without<TargetRing>),
     >,
     mut npcs: Query<
-        (&NpcMarker, &mut Transform, &mut Visibility),
+        (&NpcMarker, &mut Transform, &mut Visibility, &mut Sprite),
         (Without<PlayerMarker>, Without<TargetRing>),
     >,
     mut ring: Single<
@@ -791,11 +878,20 @@ fn paint(
 ) {
     let world = session.world();
     player.translation = at(world.player_position()).extend(8.0);
-    for (marker, mut transform, mut visible) in &mut npcs {
+    let facts = View::from_sim(world.npcs()).ok();
+    for (marker, mut transform, mut visible, mut sprite) in &mut npcs {
         if let Some(pos) = world.npc_position(marker.0) {
             transform.translation =
                 npc_at(marker.0, pos).extend(if marker.0 == 1 { 6.0 } else { 5.0 });
             *visible = Visibility::Visible;
+            let goal = facts.as_ref().and_then(|view| {
+                let actor = view.actors.iter().find(|actor| actor.id == marker.0)?;
+                view.tasks
+                    .iter()
+                    .find(|task| task.id == actor.task)
+                    .map(|task| task.goal)
+            });
+            sprite.color = goal_color(goal.unwrap_or(0));
         } else {
             *visible = Visibility::Hidden;
         }
@@ -832,20 +928,28 @@ fn paint(
                 "controls.pause"
             }),
             Label::Help => t("c05.controls"),
-            Label::Summary => format!(
-                "{}\n{}: ({},{}) · {} {}\n{}",
-                t("c05.player"),
-                t("c05.cell"),
-                world.player_position().x,
-                world.player_position().y,
-                t("inspector.tick"),
-                world.tick(),
-                t(if session.paused {
-                    "status.paused"
-                } else {
-                    "status.running"
-                })
-            ),
+            Label::Summary => {
+                let minute = clock::minute_of_day(world.tick());
+                let (hour, mins) = clock::clock_hhmm(minute);
+                format!(
+                    "{}\n{}: ({},{}) · {} {} · {:02}:{:02}\n{} {} · {}",
+                    t("c05.player"),
+                    t("c05.cell"),
+                    world.player_position().x,
+                    world.player_position().y,
+                    t("inspector.tick"),
+                    world.tick(),
+                    hour,
+                    mins,
+                    t("c06.day"),
+                    clock::day_number(world.tick()),
+                    t(if session.paused {
+                        "status.paused"
+                    } else {
+                        "status.running"
+                    })
+                )
+            }
             Label::Body => body_text(&session, cat),
             Label::Context => t(match session.selected {
                 Target::Npc(_) => "c05.talk",
@@ -860,6 +964,57 @@ fn paint(
             text.0 = value;
         }
     }
+}
+
+fn block_key(block: PlannedBlock) -> &'static str {
+    match block {
+        PlannedBlock::Sleep => "c06.block.sleep",
+        PlannedBlock::Eat => "c06.block.eat",
+        PlannedBlock::Work => "c06.block.work",
+        PlannedBlock::Socialize => "c06.block.socialize",
+    }
+}
+
+fn phase_key(phase: Phase) -> &'static str {
+    match phase {
+        Phase::Requested => "c07.phase.requested",
+        Phase::Assigned => "c07.phase.assigned",
+        Phase::InProgress => "c07.phase.progress",
+        Phase::Completed => "c07.phase.completed",
+        Phase::Rejected => "c07.phase.rejected",
+        Phase::Cancelled => "c07.phase.cancelled",
+    }
+}
+
+fn goal_key(goal: u8) -> &'static str {
+    match goal {
+        1 => "c06.goal.1",
+        2 => "c06.goal.2",
+        3 => "c06.goal.3",
+        4 => "c06.goal.4",
+        5 => "c06.goal.5",
+        _ => "c06.no_task",
+    }
+}
+
+fn goal_color(goal: u8) -> Color {
+    match goal {
+        1 => Color::srgb(0.45, 0.78, 0.38),
+        2 => Color::srgb(0.45, 0.58, 0.86),
+        3 => Color::srgb(0.86, 0.55, 0.24),
+        4 => Color::srgb(0.9, 0.78, 0.28),
+        5 => Color::srgb(0.72, 0.46, 0.78),
+        _ => Color::srgb(0.55, 0.58, 0.6),
+    }
+}
+
+fn day_night(session: Res<Session>, mut clear: ResMut<ClearColor>) {
+    let night = clock::is_night(clock::minute_of_day(session.world().tick()));
+    clear.0 = if night {
+        Color::srgb(0.015, 0.02, 0.04)
+    } else {
+        Color::srgb(0.07, 0.1, 0.08)
+    };
 }
 
 fn metrics(time: Res<Time<Real>>, mut perf: ResMut<Performance>) {

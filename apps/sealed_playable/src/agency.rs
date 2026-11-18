@@ -2,6 +2,7 @@
 pub mod persistence;
 
 use crate::locale::Locale;
+use crate::supply::Supply;
 use bevy::prelude::*;
 use sealed_sim::player5::{Command, Event, Intent, Key, PLAYER_ID, Target, World};
 use std::collections::{BTreeMap, VecDeque};
@@ -55,6 +56,7 @@ pub struct Session {
     pub evidence: Vec<Evidence>,
     /// Wall-time observations only; never inputs to domain rules/checkpoints.
     pub tick_samples_ns: VecDeque<u128>,
+    supply: Supply,
 }
 
 impl Default for Session {
@@ -75,6 +77,7 @@ impl Default for Session {
             capture: false,
             evidence: Vec::new(),
             tick_samples_ns: VecDeque::new(),
+            supply: Supply::shrine(),
         }
     }
 }
@@ -82,6 +85,14 @@ impl Default for Session {
 impl Session {
     pub fn world(&self) -> &World {
         &self.world
+    }
+
+    pub fn supply(&self) -> &Supply {
+        &self.supply
+    }
+
+    fn supply_path(&self) -> PathBuf {
+        self.save_path.with_file_name("shrine-supply.c03")
     }
 
     pub fn queued(&self) -> usize {
@@ -144,6 +155,9 @@ impl Session {
                         events,
                     });
                 }
+                if let Err(error) = self.supply.step() {
+                    self.diagnostic = error;
+                }
                 true
             }
         }
@@ -173,19 +187,28 @@ impl Session {
                 self.advance();
             }
             Action::Step => {}
-            Action::Save => match persistence::save(&self.save_path, &self.world.checkpoint()) {
-                Ok(()) => {
-                    self.status = "status.saved".into();
-                    self.diagnostic.clear();
+            Action::Save => {
+                match persistence::save(&self.save_path, &self.world.checkpoint())
+                    .and_then(|_| persistence::save(&self.supply_path(), &self.supply.checkpoint()))
+                {
+                    Ok(()) => {
+                        self.status = "status.saved".into();
+                        self.diagnostic.clear();
+                    }
+                    Err(error) => self.fail(error),
                 }
-                Err(error) => self.fail(error),
-            },
+            }
             Action::Load => {
                 match persistence::load(&self.save_path)
                     .and_then(|bytes| World::restore(&bytes).map_err(|error| format!("{error:?}")))
-                {
-                    Ok(world) => {
+                    .and_then(|world| {
+                        let bytes = persistence::load(&self.supply_path())?;
+                        let supply = Supply::restore(&bytes, self.supply.demand())?;
+                        Ok((world, supply))
+                    }) {
+                    Ok((world, supply)) => {
                         self.world = world;
+                        self.supply = supply;
                         self.clear_transient();
                         self.status = "status.loaded".into();
                     }
@@ -194,6 +217,7 @@ impl Session {
             }
             Action::Reset => {
                 self.world = World::settlement();
+                self.supply = Supply::shrine();
                 self.clear_transient();
                 self.status = "status.reset".into();
             }

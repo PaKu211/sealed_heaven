@@ -157,6 +157,36 @@ impl Catalog {
                 return Err(format!("c05 shadowed key {key}"));
             }
         }
+        let c06_en = parse_dictionary("c06/en", include_str!("../locales/c06_en.json"))?;
+        let c06_id = parse_dictionary("c06/id", include_str!("../locales/c06_id.json"))?;
+        if !c06_en.keys().eq(c06_id.keys()) {
+            return Err("c06 dictionary key parity mismatch".into());
+        }
+        for (key, value) in c06_en {
+            if catalog.english.insert(key.clone(), value).is_some() {
+                return Err(format!("c06 shadowed key {key}"));
+            }
+        }
+        for (key, value) in c06_id {
+            if catalog.indonesian.insert(key.clone(), value).is_some() {
+                return Err(format!("c06 shadowed key {key}"));
+            }
+        }
+        let c07_en = parse_dictionary("c07/en", include_str!("../locales/c07_en.json"))?;
+        let c07_id = parse_dictionary("c07/id", include_str!("../locales/c07_id.json"))?;
+        if !c07_en.keys().eq(c07_id.keys()) {
+            return Err("c07 dictionary key parity mismatch".into());
+        }
+        for (key, value) in c07_en {
+            if catalog.english.insert(key.clone(), value).is_some() {
+                return Err(format!("c07 shadowed key {key}"));
+            }
+        }
+        for (key, value) in c07_id {
+            if catalog.indonesian.insert(key.clone(), value).is_some() {
+                return Err(format!("c07 shadowed key {key}"));
+            }
+        }
         Ok(catalog)
     }
     pub fn load() -> Result<Self, String> {
