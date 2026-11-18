@@ -1,0 +1,18 @@
+﻿{
+    "seconds":  14.558,
+    "ticks_advanced":  21,
+    "observed_ticks_per_second":  1.44,
+    "nominal_tick_hz":  2,
+    "process_cpu_seconds":  16.078,
+    "cpu_one_core_equivalent_percent":  110.4,
+    "working_set_bytes_before":  521945088,
+    "working_set_bytes_after":  509370368,
+    "peak_working_set_bytes":  534978560,
+    "build":  "debug",
+    "actors":  20,
+    "renderer":  "NVIDIA GeForce RTX 4060 / Vulkan",
+    "cpu":  "12th Gen Intel(R) Core(TM) i7-12700F",
+    "physical_memory_bytes":  16980426752,
+    "sampling":  "The window stayed in the foreground. Process.CPU covers the whole debug process for the measured run, including rendering.",
+    "limitation":  "Short twenty-NPC debug observation after an earlier unfocused interval had already been caught up at no more than eight ticks per frame. Not an FPS benchmark and not the deferred 30-day or R2 gate."
+}

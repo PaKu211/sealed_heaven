@@ -1,8 +1,8 @@
 # Sealed Heaven — First Playable
 
-**Current acceptance: automated checks pass; native input gate is blocked.**
-This is a runnable development prototype, not independently accepted C0.4.
-See `../../C0_4_NATIVE_INPUT_BLOCKER.md` for the exact remaining native checklist.
+**Current acceptance: C0.4 independent audit PASS.**
+Native evidence is `../../docs/evidence/c04-native-acceptance/`. The verdict is
+`../../C0_4_FINAL_INDEPENDENT_AUDIT.md`. This does not accept the 30-day or R2 gate.
 
 Native 2D Bevy presentation of the **unchanged C0.3 kernel**. The app starts
 paused with the exact accepted S4 mixed-goal twenty-NPC fixture. No external game

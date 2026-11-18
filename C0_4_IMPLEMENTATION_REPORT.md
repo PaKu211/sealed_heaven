@@ -1,4 +1,4 @@
-# C0.4 implementation report — native acceptance blocked
+# C0.4 implementation report — accepted
 
 18 November 2026. Branch `feat/c04-first-playable`; accepted C0.3 baseline
 `14d229bedc308d7e50225122caaec0ce5732a201`.
@@ -42,22 +42,25 @@ per profile; both fmt/check/strict Clippy and packers pass. Native debug and rel
 executables exist. The final log is `C0_4_VERIFICATION_LOG.txt`.
 
 Actual native framebuffer evidence shows twenty actors, readable UTF-8 text,
-roads/grid and the kernel's tick-1 Eat/Executing state. Reliable full mouse/input
-automation was not available: guarded foreground access failed, and the complete
-native smoke did not pass. Partial screenshots are explicitly labeled under
-`docs/evidence/c04-native-partial/`. See `C0_4_NATIVE_INPUT_BLOCKER.md` for the
-required operator/access continuation. C0.4 is NOT accepted.
+roads/grid and the kernel's tick-1 Eat/Executing state. The earlier foreground
+blocker is closed by a later foreground mouse and keyboard run. Forty-nine
+game framebuffer pairs, the action log, and the performance sample are under
+`docs/evidence/c04-native-acceptance/`. Partial screenshots under
+`docs/evidence/c04-native-partial/` are historical and are not the acceptance
+evidence. Independent final acceptance is `C0_4_FINAL_INDEPENDENT_AUDIT.md`.
 
 ## Basic performance observations and limitations
 
 Native renderer reported NVIDIA GeForce RTX 4060 / Vulkan on Windows, i7-12700F,
 approximately 16 GiB system RAM. An intermediate paused twenty-NPC debug sample
-reported working set 497,659,904 bytes (about 475 MiB). This is an observation of
-that presentation build, not a final running/FPS benchmark. Cold full Bevy app
-release verification built dependencies in 9m17s; the cached repeat rebuilt the
-app in 12.48s. Final local debug/release executable sizes are 84,369,920 and
-46,057,984 bytes. Running-window sampling remains unverified with native input.
-No modest-hardware guarantee, FPS budget, 30-day or R2 acceptance is claimed.
+reported working set 497,659,904 bytes (about 475 MiB). A later foreground debug
+run of the same twenty NPCs advanced 21 ticks in 14.558 seconds (1.44 ticks per
+second against the 2 Hz clock), used 16.078 seconds of process CPU, and had a
+peak working set of 534,978,560 bytes. Cold full Bevy app release verification
+built dependencies in 9m17s; the cached repeat rebuilt the app in 12.48s. Final
+local debug/release executable sizes are 84,369,920 and 46,057,984 bytes. This
+is a short debug observation, not an FPS benchmark. No modest-hardware
+guarantee, 30-day soak, or R2 acceptance is claimed.
 
 ## Boundaries
 

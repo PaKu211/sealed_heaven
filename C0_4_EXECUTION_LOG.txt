@@ -42,3 +42,12 @@ Partial game-only PNG/JSON/log evidence archived at docs/evidence/c04-native-par
 C04-T07 BLOCKED on safe reliable desktop input; final acceptance NOT granted.
 Exact continuation: resolve access or operator checklist in C0_4_NATIVE_INPUT_BLOCKER.md,
 then finish native smoke/running observation and independent final acceptance.
+18 November 2026 continuation: verify.ps1 repeated on 0cc47cd, all recorded exits 0.
+Foreground mouse/keyboard smoke completed against debug SHA-256
+302a3b3a3bf09ab67bde09865cf192596045a17a0d0bcbf68b9bcea716c80aa7.
+49 framebuffer pairs validated at 1424x821. Tick-2 save/load hash
+6f1131bcb9541f94bea374a7a4aba875e3c1149242a3109a333a9ad14a445599 matched, and the
+continued tick-3 hash matched. Reset restored paused tick 0 and the S4 hash.
+Focused sample: 21 ticks in 14.558 seconds. No source defect found.
+Final independent audit PASS. Evidence: docs/evidence/c04-native-acceptance/.
+Remote acceptance SHA is appended after the push is verified.

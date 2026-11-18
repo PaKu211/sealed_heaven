@@ -1,7 +1,14 @@
 # C0.4 native-input access blocker
 
-18 November 2026. **C0.4 is NOT accepted.** All automated checks pass, but C04-T07
-requires reliable mouse/toolbar, keyboard, save/load and locale interaction.
+**Closed 18 November 2026.** A later foreground session completed the mouse,
+toolbar, keyboard, save/load, locale, camera, pause, and reset checks. The
+acceptance evidence is `docs/evidence/c04-native-acceptance/` and the verdict is
+`C0_4_FINAL_INDEPENDENT_AUDIT.md`. The notes below are the historical blocker,
+not the current milestone status.
+
+18 November 2026, original note. At that time C0.4 was not accepted. All
+automated checks had passed, but C04-T07 still required reliable mouse/toolbar,
+keyboard, save/load and locale interaction.
 
 ## Observed evidence
 

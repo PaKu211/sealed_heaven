@@ -23,11 +23,13 @@ desktop app fmt/check/strict Clippy/debug/release/build passed (17 library + 3
 desktop + 6 integration tests in each profile). Runnable debug/release outputs
 exist. `C0_4_VERIFICATION_LOG.txt` records the final automated pass.
 
-Native gate BLOCKED by unavailable reliable foreground/input access. Partial
-game-only framebuffer evidence shows startup and actual tick-1 Eat/Executing;
-full mouse/toolbar and remaining interactions did not pass. Guarded foreground
-attempts were refused. Do not substitute headless tests for C04-T07.
+Native gate closed on 18 November 2026. A foreground mouse and keyboard run of
+the reviewed debug binary completed C04-T07, including toolbar clicks, NPC
+selection, save/load hash continuation, locale, camera, pause hold, and reset.
+Evidence is `docs/evidence/c04-native-acceptance/`. The older partial captures
+stay labeled and are not the acceptance evidence. `verify.ps1` was repeated on
+`0cc47cd` and passed. Independent final audit PASS:
+`C0_4_FINAL_INDEPENDENT_AUDIT.md`.
 
-Next: safe interactive desktop access or owner/operator evidence per
-`C0_4_NATIVE_INPUT_BLOCKER.md`, complete native smoke/performance, then independent
-final acceptance. C0.4 is NOT milestone PASS. No later milestone authorized.
+No product defect required a source change. C0.5 is not started. The 30-day soak
+and R2 performance gate remain deferred.
