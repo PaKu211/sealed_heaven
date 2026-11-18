@@ -2,6 +2,8 @@
 
 **Verdict: PASS**
 
+Feature commit `48085b62202ce9906a710f3622a1fc2965bc5dcd` on `feat/c06-readable-village`. The branch tip is the commit that records this line.
+
 Independent review by a separate reader ([review](d2ebea70-316f-4614-bdb5-3b6ea4ce1358)): no blockers. One HIGH finding, NPC 1's color ignoring the task goal, was fixed and then closed by that reader. This session's own check agrees.
 
 | Gate | Result |

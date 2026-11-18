@@ -1,6 +1,6 @@
 # C0.6 implementation report
 
-Branch `feat/c06-readable-village` from `main` `496045841cedaf0f485ebef4c9e123b3354c6760`.
+Feature commit `48085b62202ce9906a710f3622a1fc2965bc5dcd` on `feat/c06-readable-village`, from `main` `496045841cedaf0f485ebef4c9e123b3354c6760`. The branch tip is the commit that records this line.
 
 The village client now draws the player, a larger healer, other NPCs colored by their checkpoint task goal, the herb patch, the shrine, three canonical sites, and the y=4 lane. The clock is `floor(tick / 2) mod 1440`. The panel shows that time, the day, Night or Daylight, and a schedule line that says it does not move anyone. The inspector still prints needs and task id, and adds the goal from `View` tasks.
 

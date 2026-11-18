@@ -3,6 +3,8 @@
 **Verdict:** PASS. Do not merge to `main`. Do not start C0.7.
 
 **Branch:** `feat/c06-readable-village`  
+**Feature commit:** `48085b62202ce9906a710f3622a1fc2965bc5dcd`  
+**Branch tip:** the commit that records this line  
 **Base:** `496045841cedaf0f485ebef4c9e123b3354c6760`  
 **Worktree:** `sealed-heaven-c06`
 
