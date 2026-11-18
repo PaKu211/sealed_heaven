@@ -10,6 +10,11 @@ Base C0.4: `f35bfd3664d4baf2feaf78755b1a18d29cccf795`. Branch:
 was committed/pushed and remote matched. Current shared tree contains additional
 core/client remediation plus reports; preserve all existing changes.
 
+Latest verified implementation/evidence checkpoint (not acceptance) was pushed
+as `a50fcad8fd5333dde3292211622cbf60a93727d5`; `origin/feat/c05-player-agency`
+matched that SHA. This checkpoint is still awaiting independent core/client-delta
+review and final acceptance.
+
 ## Implemented and checked
 
 - Core remediation replays exact frozen-NPC history for restore validation, with
