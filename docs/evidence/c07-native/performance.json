@@ -1,0 +1,31 @@
+﻿{
+    "profile":  "release",
+    "seconds":  10.012612299999999,
+    "ticks":  21,
+    "nominal_hz":  2,
+    "observed_wall_tps":  2.0973547532645402,
+    "process_cpu_seconds":  1.9375,
+    "cpu_one_core_percent":  19.350594449762127,
+    "working_set_before_bytes":  456114176,
+    "working_set_after_bytes":  439377920,
+    "peak_working_set_bytes":  471691264,
+    "renderer":  "NVIDIA GeForce RTX 4060 / Vulkan",
+    "entities":  168,
+    "frame_time":  {
+                       "max_ms":  18.7553,
+                       "mean_ms":  16.670337000000004,
+                       "p50_ms":  16.6753,
+                       "p95_ms":  17.3974,
+                       "samples":  600
+                   },
+    "tick_compute":  {
+                         "max_ms":  0.2782,
+                         "mean_ms":  0.17139130434782612,
+                         "p50_ms":  0.1672,
+                         "p95_ms":  0.2552,
+                         "samples":  46
+                     },
+    "cpu":  "12th Gen Intel(R) Core(TM) i7-12700F",
+    "ram_bytes":  16980426752,
+    "scope":  "Foreground real-time client with 20 autonomous NPCs, paused-action loop already completed. Tick boundaries bracket F12 captures; wall sample excludes most capture wait but may include boundary/input latency. CPU includes rendering; frame_time is wall frame interval not isolated GPU work. Not R2/30-day."
+}

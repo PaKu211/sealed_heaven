@@ -1,80 +1,34 @@
 # C0.7 handoff
 
-**Verdict:** IN PROGRESS. Not accepted. Do not merge to `main`. Do not start C0.8.
+**Verdict:** Contract audit PASS in `C0_7_FINAL_AUDIT.md` for `56ccb51f6a3ee69bd29e5a35d63b62b9e4976042`. That review is not a second reader. Not merged by this pass.
 
 **Branch:** `feat/c07-shrine-supply`  
-**Base:** `e4598385291abd2e87133c97aa03ca49e91e1a1d` (`docs(c06): record the verified village commit` on `feat/c06-readable-village`)  
+**Base:** `e4598385291abd2e87133c97aa03ca49e91e1a1d`  
 **Worktree:** `sealed-heaven-c06`  
-**Stopped:** 2026-11-18, after the session was interrupted mid-implementation.
+**Date:** 2026-11-19
 
-## Already on origin
+## Fix
 
-| Work | Branch | SHA |
-|---|---|---|
-| Tri-game research spikes | `research/tri-game-integration-spikes` | `fa1da41dc23cae222803edd502896ebfb1d6f01a` |
-| C0.6 readable village | `feat/c06-readable-village` | `e4598385291abd2e87133c97aa03ca49e91e1a1d` |
+Session save/load sent the hauler checkpoint through the C0.5 `World::restore` validator, so the C0.3 ledger file was rejected and Load kept the reset shrine. The village file still uses `agency::persistence`. The hauler file uses `crate::persistence` (`View::validated`).
 
-Those branches were not changed by this checkpoint.
+After the haul that meets demand, the desk marks Completed on that same step. The panel no longer stays on "In progress" once the shrine quantity is 5 and the task id is 0.
 
-## What is in the working tree
+## Verification
 
-A playable-layer shrine desk on the existing C0.3 actor-owned ledger. Actor 1 starts with 12 spirit herbs (definition 7). The shrine site stock starts at 0. Empty kernel drives move one herb per haul. The desk stores demand 5 and the kernel task id it has already seen. It does not store a second quantity.
+`cargo test --manifest-path apps/sealed_playable/Cargo.toml --test c07_supply --test agency -- --test-threads=1`
 
-Files:
+9 supply tests passed, including `the_session_panel_follows_the_checkpoint_through_save_and_language`. 9 agency tests passed. Repeated after the phase-label change.
 
-- `apps/sealed_playable/src/supply.rs`
-- `apps/sealed_playable/tests/c07_supply.rs`
-- `apps/sealed_playable/locales/c07_en.json`
-- `apps/sealed_playable/locales/c07_id.json`
-- `apps/sealed_playable/src/agency.rs` — save/load/reset/step also touch `Supply`
-- `apps/sealed_playable/src/agency_desktop.rs` — panel reads `Supply::status`
-- `apps/sealed_playable/src/lib.rs`, `locale.rs`, `Cargo.toml`, `Cargo.lock` (`sha2 = 0.11.1`)
-- `C0_7_IMPLEMENTATION_SPEC.md`
-- `C0_7_ACCEPTANCE_TESTS.md`
+`tools/c05_verify.ps1` exit 0 after the save/load fix. Output copied to `C0_7_VERIFICATION_LOG.txt`. `C0_5_VERIFICATION_LOG.txt` restored. The five-line phase update came after that script; it is covered by the supply tests and by:
 
-Frozen `src/` (the kernel) was not edited.
+`cargo clippy --manifest-path apps/sealed_playable/Cargo.toml --all-targets --locked --offline -- -D warnings`
 
-## Verification actually run
+exit 0.
 
-Command, from the repo root, 2026-11-18:
+Native foreground loop, release `sealed_agency`, fresh directory:
 
-```
-cargo test --manifest-path apps/sealed_playable/Cargo.toml --test c07_supply -- --test-threads=1
-```
+`powershell -NoProfile -File tools/c05_native.ps1 -EvidenceDirectory docs/evidence/c07-native -Profile release`
 
-Result: **8 passed, 1 failed.** Debug build. Finished in about 7s compile + 0.07s tests.
+exit 0. Gameplay log ends in PASS. Capture `c05-019` shows Delivery 5/5, carried 7, shrine 5, total 12, Completed. Capture `c05-031` after reset shows Delivery 0/5, carried 12, shrine 0, Requested. Indonesian capture `c05-024` shows "Pasokan kuil".
 
-Passed:
-
-- `five_deliveries_conserve_twelve_herbs`
-- `a_second_demand_does_not_change_the_first`
-- `the_same_open_task_is_not_a_second_job`
-- `two_herbs_cannot_satisfy_a_demand_of_five`
-- `an_unknown_worker_rolls_back`
-- `cancelling_the_open_haul_keeps_the_herb_total`
-- `save_load_and_replay_match`
-- `the_panel_reads_the_checkpoint_not_a_private_balance`
-
-Failed:
-
-- `the_session_panel_follows_the_checkpoint_through_save_and_language` at `tests/c07_supply.rs:153`
-
-The test reaches shrine 5, total 12, and 5 deliveries, then Save, Reset, Load. After Load, `session.supply().checkpoint()` is the reset shrine checkpoint (carrier still holds 12, shrine 0), not the saved completed bytes. Direct `Supply::restore` in `save_load_and_replay_match` does match. The session path is the gap: `Session::act(Action::Load)` either rejects the saved supply bytes or does not install them.
-
-Compiler warning, not a failure: unused `again` in `five_deliveries_conserve_twelve_herbs`.
-
-## Not run
-
-- `tools/c05_verify.ps1` (frozen C0.1–C0.6 gate)
-- `cargo fmt` / `clippy -D warnings`
-- Native loop evidence under `docs/evidence/c07-native`
-- Daylight at tick 720 (explicitly out of this contract)
-- Multi-hauler contention (explicitly not claimed)
-
-## Resume
-
-1. Make `Action::Load` restore the supply checkpoint the session just saved, and keep the Indonesian locale assertion.
-2. Remove the unused `again` binding.
-3. Re-run the `c07_supply` test, then `tools/c05_verify.ps1`.
-4. Capture native evidence only after those gates pass.
-5. Do not treat this branch as accepted until a separate review.
+Kernel `src/` was not edited.
