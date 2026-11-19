@@ -212,6 +212,11 @@ impl Supply {
         self.sim
             .drive(tick, &[])
             .map_err(|error| format!("supply tick {tick}: {error:?}"))?;
+        let status = self.status()?;
+        if status.shrine >= self.desk.demand && status.task_id == 0 {
+            self.held = true;
+            self.phase = Phase::Completed;
+        }
         Ok(())
     }
 

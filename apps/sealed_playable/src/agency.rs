@@ -188,9 +188,11 @@ impl Session {
             }
             Action::Step => {}
             Action::Save => {
-                match persistence::save(&self.save_path, &self.world.checkpoint())
-                    .and_then(|_| persistence::save(&self.supply_path(), &self.supply.checkpoint()))
-                {
+                // The village file is a C0.5 world. The hauler file is a C0.3
+                // ledger checkpoint and must not pass through World::restore.
+                match persistence::save(&self.save_path, &self.world.checkpoint()).and_then(|_| {
+                    crate::persistence::save(&self.supply_path(), &self.supply.checkpoint())
+                }) {
                     Ok(()) => {
                         self.status = "status.saved".into();
                         self.diagnostic.clear();
@@ -202,7 +204,7 @@ impl Session {
                 match persistence::load(&self.save_path)
                     .and_then(|bytes| World::restore(&bytes).map_err(|error| format!("{error:?}")))
                     .and_then(|world| {
-                        let bytes = persistence::load(&self.supply_path())?;
+                        let bytes = crate::persistence::load(&self.supply_path())?;
                         let supply = Supply::restore(&bytes, self.supply.demand())?;
                         Ok((world, supply))
                     }) {

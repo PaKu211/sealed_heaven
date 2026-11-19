@@ -1,6 +1,10 @@
-//! C0.5 native host; canonical gameplay lives in sealed_sim::player5.
+//! Qinghe client. The default view is ASCII. `--window` opens the Bevy view.
 mod agency_desktop;
 
 fn main() {
-    agency_desktop::run();
+    if std::env::args().any(|arg| arg == "--window") {
+        agency_desktop::run();
+    } else {
+        sealed_playable::ascii::run();
+    }
 }

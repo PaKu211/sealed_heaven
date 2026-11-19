@@ -19,6 +19,7 @@ fn five_deliveries_conserve_twelve_herbs() {
     for _ in 0..10 {
         supply.step().unwrap();
     }
+    assert_eq!(supply.checkpoint(), again);
     let held = supply.status().unwrap();
     assert_eq!(held.shrine, 5);
     assert_eq!(held.total, 12);
