@@ -1,0 +1,580 @@
+C0.5 verification 2026-11-19T17:39:45.3018087+07:00
+
+> C:/Program Files/Git/cmd/git.exe rev-parse HEAD
+ba8c2707c787c8fd9a88ad83e66963df24569b02
+exit=0
+
+> C:/Program Files/Git/cmd/git.exe merge-base --is-ancestor f35bfd3664d4baf2feaf78755b1a18d29cccf795 HEAD
+exit=0
+
+> C:/Program Files/Git/cmd/git.exe diff --exit-code f35bfd3664d4baf2feaf78755b1a18d29cccf795 -- Cargo.lock Cargo.toml apps/sealed_playable/assets/demo.c03 apps/sealed_playable/assets/fonts/NotoSans-Regular.ttf apps/sealed_playable/assets/fonts/OFL.txt apps/sealed_playable/assets/fonts/README.md apps/sealed_playable/locales/en.json apps/sealed_playable/locales/id.json apps/sealed_playable/src/desktop.rs apps/sealed_playable/src/persistence.rs apps/sealed_playable/src/view.rs apps/sealed_playable/tests/adapter.rs docs/C0_1_ACCEPTANCE_TESTS.md docs/C0_1_IMPLEMENTATION_SPEC.md docs/C0_2_ACCEPTANCE_TESTS.md docs/C0_2_IMPLEMENTATION_SPEC.md docs/C0_3_ACCEPTANCE_TESTS.md docs/C0_3_IMPLEMENTATION_SPEC.md docs/C0_4_ACCEPTANCE_TESTS.md docs/C0_4_IMPLEMENTATION_SPEC.md docs/tools/c03_vectors.py rust-toolchain.toml src/domain.rs src/encoding.rs src/fixture3.rs src/fixture3/navigation.rs src/fixture3/validation.rs src/tests/c02.rs src/tests/c02_golden.rs src/tests/c03_remediation.rs src/tests/c03_s1.rs src/tests/c03_s2.rs src/tests/c03_s3.rs src/tests/c03_s4.rs src/tests/golden.rs src/tests/mod.rs
+exit=0
+Frozen implementations/contracts/vectors/assets/dependencies: unchanged; src/lib.rs additive export only
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe --version
+cargo 1.100.0 (3acc79c0c 2026-11-05)
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe fmt --all --check
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe check --all-targets --locked --offline
+    Checking sealed_sim v0.1.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.01s
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe clippy --all-targets --locked --offline -- -D warnings
+    Checking sealed_sim v0.1.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.42s
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe test --all-targets --locked --offline
+   Compiling sealed_sim v0.1.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.62s
+     Running unittests src\lib.rs (target\debug\build\sealed_sim/a84c646ca01fdd40\out\sealed_sim-a84c646ca01fdd40.exe)
+
+running 105 tests
+test player5::tests::maximum_valid_horizon_budget_roundtrip ... ignored, explicit maximum-horizon latency probe; avoid repeated 4096-tick replay in the default suite
+test fixture3::navigation::tests::search_uses_cost_then_entire_lexicographic_path_and_checks_overflow ... ok
+test player5::tests::authored_identity_terrain_projection_and_ledger ... ok
+test player5::tests::checked_transfers_never_partially_debit ... ok
+test player5::tests::frozen_npcs_can_overlap_player_and_player_can_leave ... ok
+test player5::combat_tests::settlement_checkpoints_remain_revision_one ... ok
+test tests::c01_t01_clock_pending_and_pause ... ok
+test tests::c01_t01_empty_steps_only_advance_the_clock ... ok
+test player5::tests::interaction_range_request_finite_transfer_and_repeat_rules ... ok
+test tests::c01_t03_conflicts_roll_back_in_any_input_order ... ok
+test tests::c01_t02_commit_revalidates_contention_and_disabled_actors ... ok
+test tests::c01_t02_orders_numeric_producer_before_sequence ... ok
+test tests::c01_t03_deduplicates_admitted_and_resubmitted_commands ... ok
+test tests::c01_t03_tick_cursor_and_ordinal_overflow_roll_back ... ok
+test tests::c01_t03_preflight_selects_boundary_key_and_diagnostic_in_order ... ok
+test tests::c01_t04_checkpoint_covers_each_mutable_field_group ... ok
+test tests::c01_t04_checkpoint_and_event_chain_golden_vectors ... ok
+test player5::tests::finite_horizon_admission_and_huge_clock_rejection_are_bounded ... ok
+test tests::c01_t04_named_rng_golden_vectors_and_stream_isolation ... ok
+test tests::c01_t05_seed_101_smoke ... ok
+test tests::c01_t04_queue_encoding_uses_numeric_order_independent_of_insertion ... ok
+test tests::c01_t05_replay_matches_every_checkpoint_and_concatenated_event_stream ... ok
+test player5::tests::exhausted_authentic_npc_event_cursor_restores_and_fails_drive_atomically ... ok
+test tests::c02::c02_t01b_ordinal_resume ... ok
+test tests::c02::c02_t01a_slot_prefix_resume ... ok
+test tests::c02::c02_t01c_cursor_continuity ... ok
+test player5::tests::audit_regression_remote_talk_cannot_restore_as_requested ... ok
+test player5::combat_tests::a_dead_player_cannot_act_again_and_dies_once ... ok
+test tests::c02::c02_t01d_failure_matrix ... ok
+test tests::c02::c02_t01g_bounded_counts ... ok
+test player5::tests::audit_regression_clear_cell_cannot_restore_as_occupied_rejection ... ok
+test tests::c02::c02_t02b_mode_before_commands_and_tasks ... ok
+test tests::c02::c02_t02c_disabled_mint ... ok
+test tests::c02::c02_t01e_file_round_trip ... ok
+test tests::c02::c02_t02a_primary_schedule ... ok
+test tests::c02::c02_t02d_grouped_overdue_and_overflow ... ok
+test tests::c03_remediation::b01_codec_preserves_variable_width_paths_and_validates_shape_without_navigation ... ok
+test tests::c02::c02_t01f_fixture_invariants ... ok
+test tests::c03_remediation::b01_completion_registry_transactions_and_all_roles_roundtrip ... ok
+test tests::c03_remediation::b01_cursors_links_and_domains_are_rejected_before_publication ... ok
+test tests::c03_remediation::b01_duplicate_and_unsorted_tables_are_not_normalized ... ok
+test tests::c03_remediation::b01_reservations_and_registry_are_validated ... ok
+test tests::c03_remediation::b01_duplicate_stock_registry_pending_and_namespace_collision ... ok
+test tests::c03_remediation::h02_same_phase_and_future_begin_cannot_orphan_tasks ... ok
+test tests::c03_remediation::h01_counts_header_grid_and_parse_before_semantics ... ok
+test tests::c03_remediation::h03_zero_completion_requires_an_actual_same_phase_begin ... ok
+test player5::tests::audit_regression_occupied_entry_cannot_restore_as_moved ... ok
+test tests::c03_remediation::h03_future_same_phase_dependency_survives_restore_and_requires_successful_creation ... ok
+test tests::c03_remediation::h04_bundle_contention_has_one_rejection_no_partial_allocation ... ok
+test tests::c03_remediation::h04_own_reservations_share_capacity_and_checked_aggregate ... ok
+test tests::c03_remediation::h05_producer_and_actor_checks_precede_duplicate_and_late_keys ... ok
+test tests::c03_remediation::h04_multiple_own_holds_fit_then_debit_and_release_exactly_once ... ok
+test tests::c03_remediation::h06_invalidation_orders_actors_not_record_ids ... ok
+test tests::c03_remediation::h06_disable_cancel_expiry_preempt_completion_and_replays_remain_silent ... ok
+test player5::combat_tests::attack_and_guard_use_the_published_integers ... ok
+test tests::c03_remediation::h07_schema_invalid_begin_and_new_stock_class_do_not_publish ... ok
+test tests::c03_remediation::h10_goal_zero_request_advances_once_then_applies_after_reload ... ok
+test tests::c03_remediation::h08_supported_scenarios_roundtrip_unsupported_consistent_content_is_rejected ... ok
+test tests::c03_remediation::h10_creation_skip_due_path_and_late_request_do_not_bypass_deadline ... ok
+test tests::c03_remediation::later_task_failure_undoes_earlier_transaction_and_owner_changes ... ok
+test tests::c03_remediation::h10_deadline_request_has_one_transition_no_extension_and_invalidation_can_win ... ok
+test tests::c03_remediation::h09_applied_noncompletion_replay_is_late_and_identity_free ... ok
+test player5::tests::registry_codec_rejects_payload_outcome_order_cursor_and_tick_corruption ... ok
+test tests::c03_remediation::h10_goal_zero_waiting_and_goals_one_through_five_have_distinct_rules ... ok
+test tests::c03_s1::c03_t01d_disable_after_acquire ... ok
+test tests::c03_remediation::h09_pending_duplicate_and_future_target_follow_first_match ... ok
+test tests::c03_s1::c03_t01b_expiry_and_t01c_cancel ... ok
+test tests::c03_s1::c03_t01e_completion_replay_is_exactly_once ... ok
+test tests::c03_s1::c03_t01h_hostile_checkpoint_and_bundle_atomicity ... ok
+test tests::c03_s1::c03_t01a_two_claimants_match_independent_blob ... ok
+test tests::c03_remediation::reordered_batches_and_loaded_prefix_match_at_every_boundary ... ok
+test tests::c03_remediation::overflow_after_staged_legs_events_and_ids_rolls_back_every_byte ... ok
+test tests::c03_s1::c03_t01f_later_leg_reservation_and_credit_roll_back ... ok
+test player5::tests::all_fatal_capacity_and_npc_failures_preserve_checkpoint ... ok
+test tests::c03_s2::decision_orders_actors_and_breaks_score_ties_toward_eat ... ok
+test tests::c03_s2::disable_cancel_and_expiry_release_the_eat_hold_once ... ok
+test tests::c03_s2::disabled_actor_records_winner_zero_and_overflow_rolls_back ... ok
+test tests::c03_s2::same_tick_enable_suppresses_decision_and_future_begin_still_rolls_back ... ok
+test tests::c03_s2::insufficient_food_and_foreign_hold_do_not_reserve ... ok
+test tests::c03_s2::save_before_decision_matches_a_continuous_eat ... ok
+test tests::c03_s2::eat_selects_reserves_and_consumes_once ... ok
+test tests::c03_s2::eat_event_contract_and_every_resume_split_match ... ok
+test tests::c03_s3::grid_ties_choose_north_north_east_east_and_resume_stored_path ... ok
+test tests::c03_s3::unreachable_home_rejects_before_creation_and_unreachable_task_releases ... ok
+test tests::c03_s3::rt01_failed_next_boundary_does_not_spend_cost_or_add_a_restore_wait ... ok
+test tests::c03_s3::haul_reserves_and_moves_lowest_inventory_stock_to_existing_or_new_home_stock ... ok
+test tests::c03_s3::edge_start_and_post_cancel_residual_save_preserve_cost_even_when_disabled ... ok
+test tests::c03_s3::rest_and_return_home_travel_one_tick_then_complete_without_reservations ... ok
+test tests::c03_s3::work_selects_lowest_distinct_tool_and_station_and_releases_without_debit ... ok
+test player5::combat_tests::the_same_trace_has_one_hash_and_survives_reload ... ok
+test tests::c03_s3::rt01_cancelled_edge_waits_one_boundary_then_resumes_after_restore_even_if_disabled ... ok
+test tests::c03_s3::m0_t07_four_locations_recipe_and_later_leg_rollback_at_tick_ten ... ok
+test tests::c03_s4::m0_t08_empty_rest_return_completion_and_disablement_precedence ... ok
+test tests::c03_s4::twenty_actor_later_overreserve_rolls_back_all_earlier_allocations_then_recovers ... ok
+test player5::tests::idempotence_conflicts_highwater_and_admission_are_atomic ... ok
+test tests::c03_s4::twenty_living_actors_run_all_five_goals_in_both_modes_and_resume_every_tick ... ok
+test tests::c03_s4::m0_t06_twenty_actor_contention_matches_published_checkpoint_and_event_contract ... ok
+test tests::c03_s4::twenty_actor_completion_future_command_restore_and_grouping_match_every_boundary ... ok
+test player5::tests::nearby_requests_and_legal_occupancy_rejections_replay_exactly ... ok
+test tests::c03_remediation::h01_truncations_bad_framing_and_content_precedence_never_publish ... ok
+test player5::tests::authentic_c03_structure_is_insufficient_without_exact_npc_evolution ... ok
+test player5::tests::rejected_events_consume_identity_chain_and_roundtrip_across_empty_boundaries ... ok
+test player5::tests::every_cell_direction_obeys_committed_npc_snapshot ... ok
+test player5::tests::scripted_full_loop_save_every_tick_and_npc_coexistence ... ok
+test player5::tests::checkpoint_bounds_corruption_identity_and_full_candidate_validation ... ok
+
+test result: ok. 104 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+     Running unittests examples\c05_bench.rs (target\debug\build\sealed_sim/d44bab151df11324\out\c05_bench-d44bab151df11324.exe)
+
+running 5 tests
+test tests::invalid_and_zero_counts_fail_before_benchmarking ... ok
+test tests::authored_twenty_is_the_immutable_c04_fixture ... ok
+test tests::percentiles_are_nearest_rank_not_interpolated ... ok
+test tests::genuine_scaled_fixtures_pass_initial_and_first_tick_oracles ... ok
+test tests::scaled_worlds_continue_and_restore_without_synthetic_steps ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe test --doc --locked --offline
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+   Doc-tests sealed_sim
+
+running 2 tests
+test src\lib.rs - Simulation::drive (line 766) ... ok
+test src\lib.rs - (line 3) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+all doctests ran in 0.49s; merged doctests compilation took 0.45s
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe test --all-targets --release --locked --offline
+   Compiling sealed_sim v0.1.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06)
+    Finished `release` profile [optimized] target(s) in 22.15s
+     Running unittests src\lib.rs (target\release\build\sealed_sim/6c9c7dbda6869c0b\out\sealed_sim-6c9c7dbda6869c0b.exe)
+
+running 105 tests
+test player5::tests::maximum_valid_horizon_budget_roundtrip ... ignored, explicit maximum-horizon latency probe; avoid repeated 4096-tick replay in the default suite
+test fixture3::navigation::tests::search_uses_cost_then_entire_lexicographic_path_and_checks_overflow ... ok
+test player5::combat_tests::settlement_checkpoints_remain_revision_one ... ok
+test player5::tests::authored_identity_terrain_projection_and_ledger ... ok
+test player5::tests::checked_transfers_never_partially_debit ... ok
+test player5::combat_tests::a_dead_player_cannot_act_again_and_dies_once ... ok
+test player5::tests::audit_regression_clear_cell_cannot_restore_as_occupied_rejection ... ok
+test player5::tests::audit_regression_remote_talk_cannot_restore_as_requested ... ok
+test player5::tests::frozen_npcs_can_overlap_player_and_player_can_leave ... ok
+test player5::tests::finite_horizon_admission_and_huge_clock_rejection_are_bounded ... ok
+test player5::tests::audit_regression_occupied_entry_cannot_restore_as_moved ... ok
+test tests::c01_t01_clock_pending_and_pause ... ok
+test player5::tests::exhausted_authentic_npc_event_cursor_restores_and_fails_drive_atomically ... ok
+test tests::c01_t01_empty_steps_only_advance_the_clock ... ok
+test tests::c01_t02_commit_revalidates_contention_and_disabled_actors ... ok
+test player5::combat_tests::the_same_trace_has_one_hash_and_survives_reload ... ok
+test tests::c01_t02_orders_numeric_producer_before_sequence ... ok
+test player5::combat_tests::attack_and_guard_use_the_published_integers ... ok
+test tests::c01_t03_conflicts_roll_back_in_any_input_order ... ok
+test player5::tests::all_fatal_capacity_and_npc_failures_preserve_checkpoint ... ok
+test player5::tests::interaction_range_request_finite_transfer_and_repeat_rules ... ok
+test tests::c01_t03_deduplicates_admitted_and_resubmitted_commands ... ok
+test tests::c01_t03_preflight_selects_boundary_key_and_diagnostic_in_order ... ok
+test tests::c01_t04_checkpoint_covers_each_mutable_field_group ... ok
+test tests::c01_t04_named_rng_golden_vectors_and_stream_isolation ... ok
+test tests::c01_t04_checkpoint_and_event_chain_golden_vectors ... ok
+test tests::c01_t05_seed_101_smoke ... ok
+test tests::c01_t03_tick_cursor_and_ordinal_overflow_roll_back ... ok
+test tests::c02::c02_t01a_slot_prefix_resume ... ok
+test tests::c01_t04_queue_encoding_uses_numeric_order_independent_of_insertion ... ok
+test player5::tests::registry_codec_rejects_payload_outcome_order_cursor_and_tick_corruption ... ok
+test tests::c01_t05_replay_matches_every_checkpoint_and_concatenated_event_stream ... ok
+test tests::c02::c02_t01b_ordinal_resume ... ok
+test tests::c02::c02_t01c_cursor_continuity ... ok
+test tests::c02::c02_t01d_failure_matrix ... ok
+test tests::c02::c02_t01g_bounded_counts ... ok
+test player5::tests::idempotence_conflicts_highwater_and_admission_are_atomic ... ok
+test tests::c02::c02_t01f_fixture_invariants ... ok
+test tests::c02::c02_t02b_mode_before_commands_and_tasks ... ok
+test tests::c02::c02_t02c_disabled_mint ... ok
+test tests::c02::c02_t02a_primary_schedule ... ok
+test tests::c02::c02_t02d_grouped_overdue_and_overflow ... ok
+test tests::c03_remediation::b01_codec_preserves_variable_width_paths_and_validates_shape_without_navigation ... ok
+test tests::c03_remediation::b01_completion_registry_transactions_and_all_roles_roundtrip ... ok
+test tests::c03_remediation::b01_cursors_links_and_domains_are_rejected_before_publication ... ok
+test player5::tests::nearby_requests_and_legal_occupancy_rejections_replay_exactly ... ok
+test tests::c03_remediation::b01_duplicate_and_unsorted_tables_are_not_normalized ... ok
+test tests::c03_remediation::b01_reservations_and_registry_are_validated ... ok
+test tests::c03_remediation::h01_counts_header_grid_and_parse_before_semantics ... ok
+test tests::c03_remediation::b01_duplicate_stock_registry_pending_and_namespace_collision ... ok
+test tests::c03_remediation::h02_same_phase_and_future_begin_cannot_orphan_tasks ... ok
+test player5::tests::authentic_c03_structure_is_insufficient_without_exact_npc_evolution ... ok
+test tests::c03_remediation::h03_future_same_phase_dependency_survives_restore_and_requires_successful_creation ... ok
+test tests::c02::c02_t01e_file_round_trip ... ok
+test tests::c03_remediation::h04_bundle_contention_has_one_rejection_no_partial_allocation ... ok
+test tests::c03_remediation::h03_zero_completion_requires_an_actual_same_phase_begin ... ok
+test tests::c03_remediation::h04_own_reservations_share_capacity_and_checked_aggregate ... ok
+test tests::c03_remediation::h05_producer_and_actor_checks_precede_duplicate_and_late_keys ... ok
+test tests::c03_remediation::h04_multiple_own_holds_fit_then_debit_and_release_exactly_once ... ok
+test tests::c03_remediation::h06_disable_cancel_expiry_preempt_completion_and_replays_remain_silent ... ok
+test tests::c03_remediation::h09_applied_noncompletion_replay_is_late_and_identity_free ... ok
+test tests::c03_remediation::h07_schema_invalid_begin_and_new_stock_class_do_not_publish ... ok
+test tests::c03_remediation::h06_invalidation_orders_actors_not_record_ids ... ok
+test tests::c03_remediation::h10_creation_skip_due_path_and_late_request_do_not_bypass_deadline ... ok
+test tests::c03_remediation::h09_pending_duplicate_and_future_target_follow_first_match ... ok
+test tests::c03_remediation::h10_deadline_request_has_one_transition_no_extension_and_invalidation_can_win ... ok
+test tests::c03_remediation::h08_supported_scenarios_roundtrip_unsupported_consistent_content_is_rejected ... ok
+test tests::c03_remediation::h10_goal_zero_request_advances_once_then_applies_after_reload ... ok
+test tests::c03_remediation::h01_truncations_bad_framing_and_content_precedence_never_publish ... ok
+test tests::c03_remediation::h10_goal_zero_waiting_and_goals_one_through_five_have_distinct_rules ... ok
+test tests::c03_remediation::later_task_failure_undoes_earlier_transaction_and_owner_changes ... ok
+test tests::c03_remediation::reordered_batches_and_loaded_prefix_match_at_every_boundary ... ok
+test tests::c03_remediation::overflow_after_staged_legs_events_and_ids_rolls_back_every_byte ... ok
+test tests::c03_s1::c03_t01a_two_claimants_match_independent_blob ... ok
+test tests::c03_s1::c03_t01e_completion_replay_is_exactly_once ... ok
+test tests::c03_s1::c03_t01d_disable_after_acquire ... ok
+test tests::c03_s1::c03_t01b_expiry_and_t01c_cancel ... ok
+test tests::c03_s1::c03_t01f_later_leg_reservation_and_credit_roll_back ... ok
+test player5::tests::rejected_events_consume_identity_chain_and_roundtrip_across_empty_boundaries ... ok
+test tests::c03_s1::c03_t01h_hostile_checkpoint_and_bundle_atomicity ... ok
+test tests::c03_s2::decision_orders_actors_and_breaks_score_ties_toward_eat ... ok
+test tests::c03_s2::disable_cancel_and_expiry_release_the_eat_hold_once ... ok
+test tests::c03_s2::disabled_actor_records_winner_zero_and_overflow_rolls_back ... ok
+test tests::c03_s2::eat_event_contract_and_every_resume_split_match ... ok
+test tests::c03_s2::insufficient_food_and_foreign_hold_do_not_reserve ... ok
+test tests::c03_s2::eat_selects_reserves_and_consumes_once ... ok
+test tests::c03_s2::same_tick_enable_suppresses_decision_and_future_begin_still_rolls_back ... ok
+test tests::c03_s2::save_before_decision_matches_a_continuous_eat ... ok
+test tests::c03_s3::edge_start_and_post_cancel_residual_save_preserve_cost_even_when_disabled ... ok
+test tests::c03_s3::grid_ties_choose_north_north_east_east_and_resume_stored_path ... ok
+test tests::c03_s3::haul_reserves_and_moves_lowest_inventory_stock_to_existing_or_new_home_stock ... ok
+test tests::c03_s3::rest_and_return_home_travel_one_tick_then_complete_without_reservations ... ok
+test tests::c03_s3::rt01_failed_next_boundary_does_not_spend_cost_or_add_a_restore_wait ... ok
+test tests::c03_s3::m0_t07_four_locations_recipe_and_later_leg_rollback_at_tick_ten ... ok
+test tests::c03_s3::rt01_cancelled_edge_waits_one_boundary_then_resumes_after_restore_even_if_disabled ... ok
+test tests::c03_s3::unreachable_home_rejects_before_creation_and_unreachable_task_releases ... ok
+test tests::c03_s3::work_selects_lowest_distinct_tool_and_station_and_releases_without_debit ... ok
+test tests::c03_s4::m0_t08_empty_rest_return_completion_and_disablement_precedence ... ok
+test tests::c03_s4::twenty_actor_later_overreserve_rolls_back_all_earlier_allocations_then_recovers ... ok
+test tests::c03_s4::m0_t06_twenty_actor_contention_matches_published_checkpoint_and_event_contract ... ok
+test tests::c03_s4::twenty_living_actors_run_all_five_goals_in_both_modes_and_resume_every_tick ... ok
+test tests::c03_s4::twenty_actor_completion_future_command_restore_and_grouping_match_every_boundary ... ok
+test player5::tests::checkpoint_bounds_corruption_identity_and_full_candidate_validation ... ok
+test player5::tests::scripted_full_loop_save_every_tick_and_npc_coexistence ... ok
+test player5::tests::every_cell_direction_obeys_committed_npc_snapshot ... ok
+
+test result: ok. 104 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests examples\c05_bench.rs (target\release\build\sealed_sim/bc013a72485fe6b6\out\c05_bench-bc013a72485fe6b6.exe)
+
+running 5 tests
+test tests::authored_twenty_is_the_immutable_c04_fixture ... ok
+test tests::invalid_and_zero_counts_fail_before_benchmarking ... ok
+test tests::percentiles_are_nearest_rank_not_interpolated ... ok
+test tests::genuine_scaled_fixtures_pass_initial_and_first_tick_oracles ... ok
+test tests::scaled_worlds_continue_and_restore_without_synthetic_steps ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe test --doc --release --locked --offline
+    Finished `release` profile [optimized] target(s) in 0.02s
+   Doc-tests sealed_sim
+
+running 2 tests
+test src\lib.rs - (line 3) ... ok
+test src\lib.rs - Simulation::drive (line 766) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+all doctests ran in 0.39s; merged doctests compilation took 0.36s
+exit=0
+
+> C:/Python314/python.exe docs/tools/c03_vectors.py --check
+Contract reference verified (no simulation output used).
+exit=0
+
+> C:/Python314/python.exe apps/sealed_playable/tools/pack_demo.py --check
+C0.3 S4 mixed fixture: 3657 bytes SHA256 f6a4be4d54a82e6400c31fd0a4c241c638399a1e1961b23eeddbbe6cba0dddad
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe fmt --manifest-path apps/sealed_playable/Cargo.toml --all --check
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe check --manifest-path apps/sealed_playable/Cargo.toml --all-targets --locked --offline
+    Checking sealed_playable v0.4.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06\apps\sealed_playable)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.35s
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe clippy --manifest-path apps/sealed_playable/Cargo.toml --all-targets --locked --offline -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe test --manifest-path apps/sealed_playable/Cargo.toml --locked --offline
+   Compiling sealed_playable v0.4.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06\apps\sealed_playable)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 48s
+     Running unittests src\lib.rs (apps\sealed_playable\target\debug\build\sealed_playable/964bd5e4648a4418\out\sealed_playable-964bd5e4648a4418.exe)
+
+running 24 tests
+test clock::tests::daylight_and_schedule_are_pure ... ok
+test clock::tests::formula_matches_the_milestone_contract ... ok
+test locale::tests::malformed_nonflat_nonstring_and_trailing_json_are_rejected ... ok
+test persistence::tests::c04_t05_default_path_is_application_specific ... ok
+test locale::tests::locale_codes_fall_back_to_english ... ok
+test locale::tests::indonesian_and_non_ascii_utf8_survive_verbatim ... ok
+test locale::tests::missing_translation_falls_back_to_english_and_unknown_key_is_diagnostic ... ok
+test locale::tests::duplicate_keys_are_rejected_before_map_conversion_in_either_language ... ok
+test locale::tests::switching_language_only_reads_catalog_and_never_formats_canonical_data ... ok
+test locale::tests::shipped_dictionaries_parse_and_cover_identical_required_keys ... ok
+test locale::tests::missing_required_keys_are_rejected_even_if_both_languages_omit_them ... ok
+test locale::tests::empty_and_whitespace_values_are_rejected_in_either_language ... ok
+test locale::tests::c05_overlay_covers_both_languages_without_changing_old_labels ... ok
+test locale::tests::extra_keys_must_also_have_parity ... ok
+test ascii::tests::language_and_target_commands_do_not_advance_the_tick ... ok
+test ascii::tests::the_opening_map_marks_the_player_wall_patch_and_shrine ... ok
+test persistence::tests::c04_t05_failed_persist_preserves_destination_and_cleans_tempfile ... ok
+test ascii::tests::one_east_command_moves_the_player_one_cell ... ok
+test agency::persistence::tests::save_is_separate_bounded_and_preserves_prior_on_failure ... ok
+test persistence::tests::c04_t05_windows_locked_existing_save_is_preserved ... ok
+test persistence::tests::c04_t05_invalid_candidates_preserve_previous_save ... ok
+test view::tests::c04_t02_projection_bounds ... ok
+test persistence::tests::c04_t05_read_bound_survives_growth_after_metadata ... ok
+test persistence::tests::c04_t05_save_replace_resume_at_ticks_2_and_50 ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+
+     Running unittests src\agency_main.rs (apps\sealed_playable\target\debug\build\sealed_playable/f402041da5b882c4\out\sealed_agency-f402041da5b882c4.exe)
+
+running 5 tests
+test agency_desktop::tests::every_reason_and_target_has_a_translated_label ... ok
+test agency_desktop::tests::c05_client02_batched_controls_use_effective_ordered_state ... ok
+test agency_desktop::tests::c05_client04_later_frame_step_shows_out_of_range_rejection ... ok
+test agency_desktop::tests::c05_client01_native_real_clock_retains_stalls_and_frame_intervals ... ok
+test agency_desktop::tests::c05_client03_player_label_follows_hierarchy_after_move_and_reset ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src\main.rs (apps\sealed_playable\target\debug\build\sealed_playable/54fc3a5051367cc1\out\sealed_playable-54fc3a5051367cc1.exe)
+
+running 3 tests
+test desktop::tests::edge_and_grid_positions_use_checkpoint_coordinates_only ... ok
+test desktop::tests::twenty_site_slots_are_distinct_and_stable ... ok
+test desktop::tests::loading_a_different_valid_actor_set_removes_ghost_markers ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests\adapter.rs (apps\sealed_playable\target\debug\build\sealed_playable/bb169faa19d92586\out\adapter-bb169faa19d92586.exe)
+
+running 6 tests
+test c04_t02_exact_s4_fixture_and_five_goals ... ok
+test c04_t04_pause_step_ui_and_invalid_drive_do_not_publish ... ok
+test c04_t05_bad_load_keeps_live_checkpoint_and_failed_save_keeps_prior_file ... ok
+test c04_t04_ignored_running_step_must_not_discard_frame_time ... ok
+test c04_t05_file_resume_and_language_preserve_every_future_tick ... ok
+test c04_t03_bevy_plugin_100_ticks_matches_headless_every_tick_for_all_frame_partitions ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.90s
+
+     Running tests\agency.rs (apps\sealed_playable\target\debug\build\sealed_playable/855926f372cde274\out\agency-855926f372cde274.exe)
+
+running 9 tests
+test c05_nonadjacent_duplicate_intent_commits_once ... ok
+test c05_duplicate_same_frame_intent_and_step_commit_once ... ok
+test c05_same_frame_step_before_intent_still_commits_that_intent ... ok
+test c05_running_frame_includes_the_intent_received_in_that_frame ... ok
+test c05_paused_intent_is_not_consumed_by_elapsed_time ... ok
+test c05_invalid_load_keeps_live_state_and_reset_clears_timeline_inputs ... ok
+test c05_paused_input_is_bounded_and_only_step_or_resume_commits ... ok
+test c05_running_disabled_step_and_catchup_preserve_all_elapsed_time ... ok
+test c05_full_loop_save_load_every_action_matches_headless_and_frame_partitions ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s
+
+     Running tests\c06_clock.rs (apps\sealed_playable\target\debug\build\sealed_playable/12744f4dd5ef0759\out\c06_clock-12744f4dd5ef0759.exe)
+
+running 3 tests
+test c06_copy_exists_in_both_languages ... ok
+test reading_the_clock_and_the_view_does_not_change_the_checkpoint ... ok
+test the_calendar_is_not_the_kernel_goal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\c07_supply.rs (apps\sealed_playable\target\debug\build\sealed_playable/e42d7c8caa478643\out\c07_supply-e42d7c8caa478643.exe)
+
+running 9 tests
+test a_second_demand_does_not_change_the_first ... ok
+test the_panel_reads_the_checkpoint_not_a_private_balance ... ok
+test an_unknown_worker_rolls_back ... ok
+test cancelling_the_open_haul_keeps_the_herb_total ... ok
+test the_same_open_task_is_not_a_second_job ... ok
+test five_deliveries_conserve_twelve_herbs ... ok
+test two_herbs_cannot_satisfy_a_demand_of_five ... ok
+test save_load_and_replay_match ... ok
+test the_session_panel_follows_the_checkpoint_through_save_and_language ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\c08_conflict.rs (apps\sealed_playable\target\debug\build\sealed_playable/d3b05bef2af3c800\out\c08_conflict-d3b05bef2af3c800.exe)
+
+running 2 tests
+test deliberation_does_not_tick_and_attack_guard_and_wait_do ... ok
+test scripted_and_direct_commands_match_and_supply_still_completes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+   Doc-tests sealed_playable
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe test --manifest-path apps/sealed_playable/Cargo.toml --release --locked --offline
+   Compiling sealed_sim v0.1.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06)
+   Compiling sealed_playable v0.4.0 (D:\projek\sealed\Sealed_Heaven_C0_1_Source (1)\sealed-heaven-c06\apps\sealed_playable)
+    Finished `release` profile [optimized] target(s) in 42.09s
+     Running unittests src\lib.rs (apps\sealed_playable\target\release\build\sealed_playable/dd248287d4a49dea\out\sealed_playable-dd248287d4a49dea.exe)
+
+running 24 tests
+test clock::tests::daylight_and_schedule_are_pure ... ok
+test clock::tests::formula_matches_the_milestone_contract ... ok
+test ascii::tests::language_and_target_commands_do_not_advance_the_tick ... ok
+test ascii::tests::the_opening_map_marks_the_player_wall_patch_and_shrine ... ok
+test locale::tests::c05_overlay_covers_both_languages_without_changing_old_labels ... ok
+test ascii::tests::one_east_command_moves_the_player_one_cell ... ok
+test locale::tests::indonesian_and_non_ascii_utf8_survive_verbatim ... ok
+test locale::tests::empty_and_whitespace_values_are_rejected_in_either_language ... ok
+test locale::tests::extra_keys_must_also_have_parity ... ok
+test locale::tests::locale_codes_fall_back_to_english ... ok
+test locale::tests::malformed_nonflat_nonstring_and_trailing_json_are_rejected ... ok
+test locale::tests::missing_translation_falls_back_to_english_and_unknown_key_is_diagnostic ... ok
+test persistence::tests::c04_t05_default_path_is_application_specific ... ok
+test locale::tests::shipped_dictionaries_parse_and_cover_identical_required_keys ... ok
+test locale::tests::switching_language_only_reads_catalog_and_never_formats_canonical_data ... ok
+test locale::tests::missing_required_keys_are_rejected_even_if_both_languages_omit_them ... ok
+test locale::tests::duplicate_keys_are_rejected_before_map_conversion_in_either_language ... ok
+test agency::persistence::tests::save_is_separate_bounded_and_preserves_prior_on_failure ... ok
+test view::tests::c04_t02_projection_bounds ... ok
+test persistence::tests::c04_t05_failed_persist_preserves_destination_and_cleans_tempfile ... ok
+test persistence::tests::c04_t05_windows_locked_existing_save_is_preserved ... ok
+test persistence::tests::c04_t05_invalid_candidates_preserve_previous_save ... ok
+test persistence::tests::c04_t05_read_bound_survives_growth_after_metadata ... ok
+test persistence::tests::c04_t05_save_replace_resume_at_ticks_2_and_50 ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src\agency_main.rs (apps\sealed_playable\target\release\build\sealed_playable/44d93599697856e0\out\sealed_agency-44d93599697856e0.exe)
+
+running 5 tests
+test agency_desktop::tests::every_reason_and_target_has_a_translated_label ... ok
+test agency_desktop::tests::c05_client02_batched_controls_use_effective_ordered_state ... ok
+test agency_desktop::tests::c05_client04_later_frame_step_shows_out_of_range_rejection ... ok
+test agency_desktop::tests::c05_client01_native_real_clock_retains_stalls_and_frame_intervals ... ok
+test agency_desktop::tests::c05_client03_player_label_follows_hierarchy_after_move_and_reset ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (apps\sealed_playable\target\release\build\sealed_playable/44052cebb6d469c9\out\sealed_playable-44052cebb6d469c9.exe)
+
+running 3 tests
+test desktop::tests::edge_and_grid_positions_use_checkpoint_coordinates_only ... ok
+test desktop::tests::twenty_site_slots_are_distinct_and_stable ... ok
+test desktop::tests::loading_a_different_valid_actor_set_removes_ghost_markers ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\adapter.rs (apps\sealed_playable\target\release\build\sealed_playable/4e24e4f41a19f106\out\adapter-4e24e4f41a19f106.exe)
+
+running 6 tests
+test c04_t02_exact_s4_fixture_and_five_goals ... ok
+test c04_t04_pause_step_ui_and_invalid_drive_do_not_publish ... ok
+test c04_t04_ignored_running_step_must_not_discard_frame_time ... ok
+test c04_t05_bad_load_keeps_live_checkpoint_and_failed_save_keeps_prior_file ... ok
+test c04_t05_file_resume_and_language_preserve_every_future_tick ... ok
+test c04_t03_bevy_plugin_100_ticks_matches_headless_every_tick_for_all_frame_partitions ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests\agency.rs (apps\sealed_playable\target\release\build\sealed_playable/6ded540f63b15e5c\out\agency-6ded540f63b15e5c.exe)
+
+running 9 tests
+test c05_duplicate_same_frame_intent_and_step_commit_once ... ok
+test c05_same_frame_step_before_intent_still_commits_that_intent ... ok
+test c05_paused_intent_is_not_consumed_by_elapsed_time ... ok
+test c05_running_frame_includes_the_intent_received_in_that_frame ... ok
+test c05_nonadjacent_duplicate_intent_commits_once ... ok
+test c05_paused_input_is_bounded_and_only_step_or_resume_commits ... ok
+test c05_invalid_load_keeps_live_state_and_reset_clears_timeline_inputs ... ok
+test c05_running_disabled_step_and_catchup_preserve_all_elapsed_time ... ok
+test c05_full_loop_save_load_every_action_matches_headless_and_frame_partitions ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests\c06_clock.rs (apps\sealed_playable\target\release\build\sealed_playable/a9c9bc45f81d5db7\out\c06_clock-a9c9bc45f81d5db7.exe)
+
+running 3 tests
+test reading_the_clock_and_the_view_does_not_change_the_checkpoint ... ok
+test c06_copy_exists_in_both_languages ... ok
+test the_calendar_is_not_the_kernel_goal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\c07_supply.rs (apps\sealed_playable\target\release\build\sealed_playable/455221e353f941a6\out\c07_supply-455221e353f941a6.exe)
+
+running 9 tests
+test the_panel_reads_the_checkpoint_not_a_private_balance ... ok
+test a_second_demand_does_not_change_the_first ... ok
+test an_unknown_worker_rolls_back ... ok
+test the_same_open_task_is_not_a_second_job ... ok
+test cancelling_the_open_haul_keeps_the_herb_total ... ok
+test two_herbs_cannot_satisfy_a_demand_of_five ... ok
+test five_deliveries_conserve_twelve_herbs ... ok
+test save_load_and_replay_match ... ok
+test the_session_panel_follows_the_checkpoint_through_save_and_language ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\c08_conflict.rs (apps\sealed_playable\target\release\build\sealed_playable/15a03b7a4d3294da\out\c08_conflict-15a03b7a4d3294da.exe)
+
+running 2 tests
+test scripted_and_direct_commands_match_and_supply_still_completes ... ok
+test deliberation_does_not_tick_and_attack_guard_and_wait_do ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests sealed_playable
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe build --manifest-path apps/sealed_playable/Cargo.toml --bins --locked --offline
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s
+exit=0
+
+> C:\Users\PC_4\.cargo\bin\cargo.exe build --manifest-path apps/sealed_playable/Cargo.toml --bins --release --locked --offline
+    Finished `release` profile [optimized] target(s) in 0.32s
+exit=0
+
+Automated verification complete; native gameplay/performance and independent acceptance are separate gates.

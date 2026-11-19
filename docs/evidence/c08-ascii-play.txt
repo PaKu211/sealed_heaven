@@ -1,0 +1,271 @@
+﻿Sealed Heaven — Qinghe
+tick 0  player (0,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  @  .  .  .  .  .  .  .  !  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  .  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:00  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 0 / 5  Carried: 12  At the shrine: 0  Herb total: 12  Requested
+Enter Qinghe: Space to resume; approach Yun and press E.
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 1  player (1,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  @  .  .  .  .  .  .  !  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  .  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:00  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 0 / 5  Carried: 12  At the shrine: 0  Herb total: 12  Requested
+Action resolved by the canonical simulation
+#1 t1 Moved one cell
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 2  player (2,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  @  .  .  .  .  .  !  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:01  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 1 / 5  Carried: 12  At the shrine: 0  Herb total: 12  Assigned
+Action resolved by the canonical simulation
+#2 t2 Moved one cell
+#1 t1 Moved one cell
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 3  player (3,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  .  @  .  .  .  .  !  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:01  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 1 / 5  Carried: 12  At the shrine: 0  Herb total: 12  In progress
+Action resolved by the canonical simulation
+#3 t3 Moved one cell
+#2 t2 Moved one cell
+#1 t1 Moved one cell
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 4  player (4,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  .  .  @  .  .  !  .  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:02  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 1 / 5  Carried: 11  At the shrine: 1  Herb total: 12  In progress
+Action resolved by the canonical simulation
+#4 t4 Moved one cell
+#3 t3 Moved one cell
+#2 t2 Moved one cell
+#1 t1 Moved one cell
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 5  player (4,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  .  .  @  .  !  .  .  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:02  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 1 / 5  Carried: 11  At the shrine: 1  Herb total: 12  Requested
+Action resolved by the canonical simulation
+#5 t5 Rejected: Target is not within one cell
+#4 t4 Moved one cell
+#3 t3 Moved one cell
+#2 t2 Moved one cell
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 6  player (4,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  .  .  @  !  .  .  .  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:03  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 2 / 5  Carried: 11  At the shrine: 1  Herb total: 12  Assigned
+Action resolved by the canonical simulation
+#6 t6 Raised a guard
+#5 t5 Rejected: Target is not within one cell
+#4 t4 Moved one cell
+#3 t3 Moved one cell
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 7  player (3,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  .  @  !  .  .  .  .  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Spirit herbs: 0   Patch stock: 3   Shrine stock: 0
+Find Healer Yun and ask about the herb request.
+Selected interaction target: Healer Yun · NPC 1
+Village clock: 00:03  Day 1  Night
+HP Lin · wandering novice · Player 21: 6  Hostile HP: 4
+Shrine supply  Demand: 5  Hauler: 1  Delivery: 2 / 5  Carried: 10  At the shrine: 2  Herb total: 12  In progress
+Action resolved by the canonical simulation
+#7 t7 Moved one cell
+#6 t6 Raised a guard
+#5 t5 Rejected: Target is not within one cell
+#4 t4 Moved one cell
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 7  player (3,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  .  @  !  .  .  .  .  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Herba roh: 0   Stok rumpun: 3   Stok kuil: 0
+Temui Tabib Yun dan tanyakan permintaan herba.
+Sasaran interaksi terpilih: Tabib Yun · NPC 1
+Jam desa: 00:03  Hari 1  Malam
+Nyawa Lin · murid pengelana · Pemain 21: 6  Musuh Nyawa: 4
+Pasokan kuil  Permintaan: 5  Pengangkut: 1  Pengiriman: 2 / 5  Dibawa: 10  Di kuil: 2  Jumlah herba: 12  Berjalan
+Aksi diputuskan oleh simulasi kanonis
+#7 t7 Bergerak satu petak
+#6 t6 Mengangkat gardu
+#5 t5 Ditolak: Sasaran tidak berada dalam satu petak
+#4 t4 Bergerak satu petak
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+
+Sealed Heaven — Qinghe
+tick 8  player (3,4)  paused
+    0  1  2  3  4  5  6  7  8  9 10 11 
+ 0  .  .  .  .  .  .  .  .  .  .  .  . 
+ 1  .  .  .  .  .  .  #  .  .  .  .  . 
+ 2  .  .  .  .  .  .  #  .  .  *  .  . 
+ 3  .  .  . [Y] .  .  #  .  .  .  .  . 
+ 4  .  .  .  @  !  .  .  .  .  .  .  . 
+ 5  .  .  .  +  .  .  #  .  .  2  .  . 
+ 6  .  .  .  .  .  .  #  .  .  .  .  . 
+ 7  .  .  .  .  .  .  .  .  .  .  .  . 
+ 8  .  .  .  .  .  .  .  .  .  .  .  . 
+@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected
+
+Herba roh: 0   Stok rumpun: 3   Stok kuil: 0
+Temui Tabib Yun dan tanyakan permintaan herba.
+Sasaran interaksi terpilih: Tabib Yun · NPC 1
+Jam desa: 00:04  Hari 1  Malam
+Nyawa Lin · murid pengelana · Pemain 21: 4  Musuh Nyawa: 4
+#9 t8 Kena 2 22 -> 21
+Pasokan kuil  Permintaan: 5  Pengangkut: 1  Pengiriman: 2 / 5  Dibawa: 10  Di kuil: 2  Jumlah herba: 12  Diminta
+Aksi diputuskan oleh simulasi kanonis
+#8 t8 Menunggu satu tick
+#7 t7 Bergerak satu petak
+#6 t6 Mengangkat gardu
+#5 t5 Ditolak: Sasaran tidak berada dalam satu petak
+
+wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit
+

@@ -187,6 +187,21 @@ impl Catalog {
                 return Err(format!("c07 shadowed key {key}"));
             }
         }
+        let c08_en = parse_dictionary("c08/en", include_str!("../locales/c08_en.json"))?;
+        let c08_id = parse_dictionary("c08/id", include_str!("../locales/c08_id.json"))?;
+        if !c08_en.keys().eq(c08_id.keys()) {
+            return Err("c08 dictionary key parity mismatch".into());
+        }
+        for (key, value) in c08_en {
+            if catalog.english.insert(key.clone(), value).is_some() {
+                return Err(format!("c08 shadowed key {key}"));
+            }
+        }
+        for (key, value) in c08_id {
+            if catalog.indonesian.insert(key.clone(), value).is_some() {
+                return Err(format!("c08 shadowed key {key}"));
+            }
+        }
         Ok(catalog)
     }
     pub fn load() -> Result<Self, String> {

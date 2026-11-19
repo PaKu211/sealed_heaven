@@ -697,6 +697,7 @@ fn rejection_key(rejection: Rejection) -> &'static str {
         Rejection::Empty => "c05.r_empty",
         Rejection::AlreadyCompleted => "c05.r_complete",
         Rejection::Overflow => "c05.r_overflow",
+        Rejection::Incapacitated => "c08.r_dead",
     }
 }
 
@@ -706,6 +707,9 @@ fn event_text(event: &Event, cat: &Catalog, locale: Locale) -> String {
         Outcome::Requested => cat.text(locale, "c05.requested"),
         Outcome::Gathered => cat.text(locale, "c05.gathered"),
         Outcome::Delivered => cat.text(locale, "c05.delivered_ok"),
+        Outcome::Waited => cat.text(locale, "c08.waited"),
+        Outcome::Struck => cat.text(locale, "c08.struck"),
+        Outcome::Guarded => cat.text(locale, "c08.guarded"),
         Outcome::Rejected(reason) => format!(
             "{}: {}",
             cat.text(locale, "c05.rejected"),
@@ -1264,6 +1268,7 @@ mod tests {
                 Rejection::Empty,
                 Rejection::AlreadyCompleted,
                 Rejection::Overflow,
+                Rejection::Incapacitated,
             ] {
                 let key = rejection_key(rejection);
                 assert_ne!(catalog.text(locale, key), key);

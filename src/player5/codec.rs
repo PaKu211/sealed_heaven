@@ -20,9 +20,46 @@ fn content_hash() -> [u8; 32] {
 }
 
 pub(super) fn encode(world: &World) -> Vec<u8> {
+    if world.combat.is_some() {
+        encode_v2(world)
+    } else {
+        encode_v1(world)
+    }
+}
+
+fn encode_v1(world: &World) -> Vec<u8> {
     let mut bytes = MAGIC.to_vec();
     bytes.extend(1u16.to_le_bytes());
     bytes.extend(content_hash());
+    write_body(&mut bytes, world);
+    bytes.extend(sha256(&bytes));
+    bytes
+}
+
+fn encode_v2(world: &World) -> Vec<u8> {
+    let combat = world.combat.as_ref().expect("revision 2 has a foe");
+    let mut bytes = MAGIC.to_vec();
+    bytes.extend(2u16.to_le_bytes());
+    bytes.extend(content_hash_v2());
+    write_body(&mut bytes, world);
+    bytes.extend(FOE_ID.to_le_bytes());
+    bytes.extend(combat.foe.x.to_le_bytes());
+    bytes.extend(combat.foe.y.to_le_bytes());
+    bytes.extend(combat.player_hp.to_le_bytes());
+    bytes.push(u8::from(combat.player_alive));
+    bytes.extend(combat.foe_hp.to_le_bytes());
+    bytes.push(u8::from(combat.foe_alive));
+    bytes.extend(sha256(&bytes));
+    bytes
+}
+
+fn content_hash_v2() -> [u8; 32] {
+    let mut bytes = b"SH:C08:CONTENT:v1;foe22@8,4;hp=player6,foe4;strike2;guard1;aggro4;order=npc,player,foe;tie=NESW;deathOnce".to_vec();
+    bytes.extend(content_hash());
+    sha256(&bytes)
+}
+
+fn write_body(bytes: &mut Vec<u8>, world: &World) {
     bytes.extend(world.tick().to_le_bytes());
     bytes.extend(PLAYER_ID.to_le_bytes());
     bytes.extend(world.position.x.to_le_bytes());
@@ -43,15 +80,13 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
     bytes.extend(world.digest);
     bytes.extend((world.registry.len() as u32).to_le_bytes());
     for (&key, record) in &world.registry {
-        put_key(&mut bytes, key);
-        put_intent(&mut bytes, record.intent);
-        put_outcome(&mut bytes, record.outcome);
+        put_key(bytes, key);
+        put_intent(bytes, record.intent);
+        put_outcome(bytes, record.outcome);
     }
     let npcs = world.npcs.domain_checkpoint_bytes();
     bytes.extend((npcs.len() as u32).to_le_bytes());
     bytes.extend(npcs);
-    bytes.extend(sha256(&bytes));
-    bytes
 }
 
 pub(super) fn decode(bytes: &[u8]) -> Result<World, Error> {
@@ -67,10 +102,15 @@ fn decode_inner(bytes: &[u8]) -> Result<World, RestoreError> {
         return Err(RestoreError::UnsupportedFormat);
     }
     let revision = r.u16()?;
-    if revision != 1 {
+    if revision != 1 && revision != 2 {
         return Err(RestoreError::UnsupportedRevision { found: revision });
     }
-    if r.take(32)? != content_hash() {
+    let expected = if revision == 1 {
+        content_hash()
+    } else {
+        content_hash_v2()
+    };
+    if r.take(32)? != expected {
         return Err(RestoreError::ContentMismatch);
     }
     let tick = r.u64()?;
@@ -129,6 +169,25 @@ fn decode_inner(bytes: &[u8]) -> Result<World, RestoreError> {
         return Err(RestoreError::Corrupt);
     }
     let npc_bytes = r.take(npc_length)?;
+    let combat = if revision == 2 {
+        if r.u32()? != FOE_ID {
+            return Err(RestoreError::InvalidState);
+        }
+        Some(Combat {
+            foe: Position {
+                x: r.u32()?,
+                y: r.u32()?,
+            },
+            player_hp: r.u16()?,
+            player_alive: r.boolean()?,
+            foe_hp: r.u16()?,
+            foe_alive: r.boolean()?,
+            guard: false,
+            log: Vec::new(),
+        })
+    } else {
+        None
+    };
     let checksum_at = r.at;
     let checksum: [u8; 32] = r.array()?;
     if r.remaining() != 0 {
@@ -144,7 +203,7 @@ fn decode_inner(bytes: &[u8]) -> Result<World, RestoreError> {
     if npcs.tick() != tick || npcs.domain_checkpoint_bytes() != npc_bytes {
         return Err(RestoreError::InvalidState);
     }
-    let candidate = World {
+    let mut candidate = World {
         npcs,
         position,
         herbs,
@@ -154,8 +213,9 @@ fn decode_inner(bytes: &[u8]) -> Result<World, RestoreError> {
         next_sequence,
         next_event_id,
         digest,
+        combat,
     };
-    validate(&candidate)?;
+    validate(&mut candidate)?;
     Ok(candidate)
 }
 
@@ -163,12 +223,16 @@ fn decode_inner(bytes: &[u8]) -> Result<World, RestoreError> {
 /// unchanged NPC kernel supplies historical positions; `apply` checks the exact
 /// same live eligibility predicates for both successful and rejected actions.
 /// No recorded outcome, final NPC state, cursor, or digest is trusted or repaired.
-fn validate(world: &World) -> Result<(), RestoreError> {
+fn validate(world: &mut World) -> Result<(), RestoreError> {
     let invalid = RestoreError::InvalidState;
     if world.tick() > MAX_TICKS {
         return Err(invalid);
     }
-    let mut replay = World::settlement();
+    let mut replay = if world.combat.is_some() {
+        World::conflict()
+    } else {
+        World::settlement()
+    };
     let mut previous_tick = 0;
     for (&key, record) in &world.registry {
         if key.actor_id != PLAYER_ID
@@ -181,7 +245,7 @@ fn validate(world: &World) -> Result<(), RestoreError> {
         }
         previous_tick = key.target_tick;
         let next_sequence = key.sequence.checked_add(1).ok_or(invalid)?;
-        advance_npcs(&mut replay, key.target_tick)?;
+        climb(&mut replay, key.target_tick, true)?;
         let outcome = replay.apply(record.intent);
         if outcome != record.outcome {
             return Err(invalid);
@@ -202,9 +266,11 @@ fn validate(world: &World) -> Result<(), RestoreError> {
                 outcome,
             },
         );
+        replay
+            .resolve_hostile()
+            .map_err(|_| RestoreError::InvalidState)?;
     }
-    // Also replay empty/retry-only boundaries after the final recorded command.
-    advance_npcs(&mut replay, world.tick())?;
+    climb(&mut replay, world.tick(), false)?;
     if !same_npc_history_except_exhausted_event_cursor(
         &world.npcs.domain_checkpoint_bytes(),
         &replay.npcs.domain_checkpoint_bytes(),
@@ -222,10 +288,27 @@ fn validate(world: &World) -> Result<(), RestoreError> {
             .checked_add(world.player_herbs())
             .and_then(|n| n.checked_add(world.delivered_herbs()))
             != Some(3)
+        || combat_snapshot(world.combat.as_ref()) != combat_snapshot(replay.combat.as_ref())
     {
         return Err(invalid);
     }
+    if let Some(slot) = world.combat.as_mut() {
+        slot.log = replay.combat.unwrap().log;
+    }
     Ok(())
+}
+
+fn combat_snapshot(combat: Option<&Combat>) -> Option<(u16, bool, bool, Position, u16, bool)> {
+    combat.map(|combat| {
+        (
+            combat.player_hp,
+            combat.player_alive,
+            combat.guard,
+            combat.foe,
+            combat.foe_hp,
+            combat.foe_alive,
+        )
+    })
 }
 
 /// The frozen C03 event cursor is a durable checked counter whose exhaustion is
@@ -256,12 +339,18 @@ fn same_npc_history_except_exhausted_event_cursor(saved: &[u8], replayed: &[u8])
 /// Call the frozen NPC drive directly: no recursive restore/World::drive and no
 /// per-tick checkpoint serialization. Across the entire candidate this loop can
 /// execute at most MAX_TICKS times, not MAX_TICKS times per command.
-fn advance_npcs(replay: &mut World, target_tick: u64) -> Result<(), RestoreError> {
-    while replay.tick() < target_tick {
+fn climb(replay: &mut World, target: u64, hold_hostile: bool) -> Result<(), RestoreError> {
+    while replay.tick() < target {
+        let last = replay.tick() + 1 == target;
         replay
             .npcs
             .drive(replay.tick(), &[])
             .map_err(|_| RestoreError::InvalidState)?;
+        if !(hold_hostile && last) {
+            replay
+                .resolve_hostile()
+                .map_err(|_| RestoreError::InvalidState)?;
+        }
     }
     Ok(())
 }
@@ -282,6 +371,9 @@ fn put_intent(bytes: &mut Vec<u8>, intent: Intent) {
         Intent::Talk(id) => (2, id),
         Intent::Gather => (3, 0),
         Intent::Deliver => (4, 0),
+        Intent::Attack => (5, 0),
+        Intent::Guard => (6, 0),
+        Intent::Wait => (7, 0),
     };
     bytes.push(tag);
     bytes.extend(argument.to_le_bytes());
@@ -293,6 +385,9 @@ pub(super) fn put_outcome(bytes: &mut Vec<u8>, outcome: Outcome) {
         Outcome::Requested => (2, 0),
         Outcome::Gathered => (3, 0),
         Outcome::Delivered => (4, 0),
+        Outcome::Waited => (6, 0),
+        Outcome::Struck => (7, 0),
+        Outcome::Guarded => (8, 0),
         Outcome::Rejected(reason) => (
             5,
             match reason {
@@ -305,6 +400,7 @@ pub(super) fn put_outcome(bytes: &mut Vec<u8>, outcome: Outcome) {
                 Rejection::Empty => 7,
                 Rejection::AlreadyCompleted => 8,
                 Rejection::Overflow => 9,
+                Rejection::Incapacitated => 10,
             },
         ),
     };
@@ -371,6 +467,9 @@ impl<'a> Reader<'a> {
             (2, id) => Ok(Intent::Talk(id)),
             (3, 0) => Ok(Intent::Gather),
             (4, 0) => Ok(Intent::Deliver),
+            (5, 0) => Ok(Intent::Attack),
+            (6, 0) => Ok(Intent::Guard),
+            (7, 0) => Ok(Intent::Wait),
             _ => Err(RestoreError::Corrupt),
         }
     }
@@ -382,6 +481,9 @@ impl<'a> Reader<'a> {
             (2, 0) => Ok(Outcome::Requested),
             (3, 0) => Ok(Outcome::Gathered),
             (4, 0) => Ok(Outcome::Delivered),
+            (6, 0) => Ok(Outcome::Waited),
+            (7, 0) => Ok(Outcome::Struck),
+            (8, 0) => Ok(Outcome::Guarded),
             (5, n) => Ok(Outcome::Rejected(match n {
                 1 => Rejection::OutOfBounds,
                 2 => Rejection::Terrain,
@@ -392,6 +494,7 @@ impl<'a> Reader<'a> {
                 7 => Rejection::Empty,
                 8 => Rejection::AlreadyCompleted,
                 9 => Rejection::Overflow,
+                10 => Rejection::Incapacitated,
                 _ => return Err(RestoreError::Corrupt),
             })),
             _ => Err(RestoreError::Corrupt),

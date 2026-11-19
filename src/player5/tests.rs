@@ -806,12 +806,18 @@ fn checkpoint_bounds_corruption_identity_and_full_candidate_validation() {
     trailing.push(0);
     assert!(World::restore(&trailing).is_err());
     let mut version = bytes.clone();
-    version[12] = 2;
+    version[12] = 3;
     assert_eq!(
         World::restore(&version),
         Err(Error::Restore(RestoreError::UnsupportedRevision {
-            found: 2
+            found: 3
         }))
+    );
+    let mut version = bytes.clone();
+    version[12] = 2;
+    assert_eq!(
+        World::restore(&version),
+        Err(Error::Restore(RestoreError::ContentMismatch))
     );
     let mut content = bytes.clone();
     content[14] ^= 1;

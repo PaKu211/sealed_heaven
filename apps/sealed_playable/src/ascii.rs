@@ -8,7 +8,7 @@ use crate::clock;
 use crate::locale::{Catalog, Locale};
 use crate::supply::Phase;
 use sealed_sim::player5::{
-    Direction, Event, HEIGHT, Intent, Outcome, Position, Rejection, Target, WIDTH,
+    CombatKind, Direction, Event, HEIGHT, Intent, Outcome, Position, Rejection, Target, WIDTH,
 };
 use std::fmt::Write;
 use std::io::{self, BufRead, Write as IoWrite};
@@ -20,7 +20,7 @@ pub enum Command {
 
 pub fn run() {
     let catalog = Catalog::agency().expect("validated localization");
-    let mut session = Session::default();
+    let mut session = Session::conflict();
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
         println!("{}", frame(&session, &catalog));
         for token in script.split(|c: char| c.is_whitespace() || c == ',') {
@@ -72,8 +72,20 @@ pub fn apply(session: &mut Session, token: &str) -> Command {
             one_turn(session, context_intent(session.selected));
             Command::Continue
         }
-        "n" | "step" => {
-            one_step(session);
+        "f" | "attack" => {
+            one_turn(session, Intent::Attack);
+            Command::Continue
+        }
+        "b" | "guard" => {
+            one_turn(session, Intent::Guard);
+            Command::Continue
+        }
+        "n" | "step" | "wait" => {
+            if session.world().combat().is_some() {
+                one_turn(session, Intent::Wait);
+            } else {
+                one_step(session);
+            }
             Command::Continue
         }
         "t" | "tab" => {
@@ -148,7 +160,7 @@ pub fn frame(session: &Session, catalog: &Catalog) -> String {
     );
     out.push_str(&panel(session, catalog));
     out.push_str(
-        "\nwasd move | e use | t next target | n step | p pause | l language | r reset | v save | o load | q quit\n",
+        "\nwasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit\n",
     );
     out
 }
@@ -196,6 +208,13 @@ fn cell(world: &sealed_sim::player5::World, position: Position, selected: Target
         '@'
     } else if let Some(id) = (1..=20).find(|id| world.npc_position(*id) == Some(position)) {
         npc_glyph(id)
+    } else if world
+        .combat()
+        .is_some_and(|combat| combat.foe == position && combat.foe_alive)
+    {
+        '!'
+    } else if world.combat().is_some_and(|combat| combat.foe == position) {
+        'x'
     } else if world.target_position(Target::HerbPatch) == Some(position) {
         '*'
     } else if world.target_position(Target::Shrine) == Some(position) {
@@ -260,6 +279,34 @@ fn panel(session: &Session, catalog: &Catalog) -> String {
             "c06.daylight"
         })
     );
+    if let Some(combat) = world.combat() {
+        let _ = writeln!(
+            text,
+            "{} {}: {}  {} {}: {}{}",
+            t("c08.hp"),
+            t("c05.player"),
+            combat.player_hp,
+            t("c08.foe"),
+            t("c08.hp"),
+            combat.foe_hp,
+            if combat.guard {
+                format!("  {}", t("c08.guard"))
+            } else {
+                String::new()
+            }
+        );
+        for event in combat.log.iter().rev().take(3) {
+            let verb = match event.kind {
+                CombatKind::Hit { amount } => format!("{} {amount}", t("c08.hit")),
+                CombatKind::Death => t("c08.death"),
+            };
+            let _ = writeln!(
+                text,
+                "#{} t{} {} {} -> {}",
+                event.id, event.tick, verb, event.source, event.target
+            );
+        }
+    }
     if let Ok(supply) = session.supply().status() {
         let _ = writeln!(
             text,
@@ -311,6 +358,9 @@ fn event_text(event: &Event, catalog: &Catalog, locale: Locale) -> String {
         Outcome::Requested => catalog.text(locale, "c05.requested"),
         Outcome::Gathered => catalog.text(locale, "c05.gathered"),
         Outcome::Delivered => catalog.text(locale, "c05.delivered_ok"),
+        Outcome::Waited => catalog.text(locale, "c08.waited"),
+        Outcome::Struck => catalog.text(locale, "c08.struck"),
+        Outcome::Guarded => catalog.text(locale, "c08.guarded"),
         Outcome::Rejected(reason) => format!(
             "{}: {}",
             catalog.text(locale, "c05.rejected"),
@@ -330,6 +380,7 @@ fn rejection_key(rejection: Rejection) -> &'static str {
         Rejection::Empty => "c05.r_empty",
         Rejection::AlreadyCompleted => "c05.r_complete",
         Rejection::Overflow => "c05.r_overflow",
+        Rejection::Incapacitated => "c08.r_dead",
     }
 }
 

@@ -57,6 +57,7 @@ pub struct Session {
     /// Wall-time observations only; never inputs to domain rules/checkpoints.
     pub tick_samples_ns: VecDeque<u128>,
     supply: Supply,
+    conflict_scenario: bool,
 }
 
 impl Default for Session {
@@ -78,11 +79,19 @@ impl Default for Session {
             evidence: Vec::new(),
             tick_samples_ns: VecDeque::new(),
             supply: Supply::shrine(),
+            conflict_scenario: false,
         }
     }
 }
 
 impl Session {
+    pub fn conflict() -> Self {
+        Self {
+            world: World::conflict(),
+            conflict_scenario: true,
+            ..Self::default()
+        }
+    }
     pub fn world(&self) -> &World {
         &self.world
     }
@@ -209,6 +218,7 @@ impl Session {
                         Ok((world, supply))
                     }) {
                     Ok((world, supply)) => {
+                        self.conflict_scenario = world.combat().is_some();
                         self.world = world;
                         self.supply = supply;
                         self.clear_transient();
@@ -218,7 +228,11 @@ impl Session {
                 }
             }
             Action::Reset => {
-                self.world = World::settlement();
+                self.world = if self.conflict_scenario {
+                    World::conflict()
+                } else {
+                    World::settlement()
+                };
                 self.supply = Supply::shrine();
                 self.clear_transient();
                 self.status = "status.reset".into();

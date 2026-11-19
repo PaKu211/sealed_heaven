@@ -13,9 +13,17 @@ use crate::{RestoreError, Simulation, StepError, encoding::sha256};
 
 mod codec;
 #[cfg(test)]
+mod combat_tests;
+#[cfg(test)]
 mod tests;
 
 pub const PLAYER_ID: u32 = 21;
+pub const FOE_ID: u32 = 22;
+pub const PLAYER_HP: u16 = 6;
+pub const FOE_HP: u16 = 4;
+pub const STRIKE: u16 = 2;
+pub const GUARD_BLOCK: u16 = 1;
+pub const AGGRO: u32 = 4;
 pub const WIDTH: u32 = 12;
 pub const HEIGHT: u32 = 9;
 pub const MAX_COMMANDS: usize = 4096;
@@ -25,6 +33,7 @@ pub const MAX_TICKS: u64 = 4096;
 const MAX_NPC_BYTES: usize = 16 * 1024 * 1024;
 const DEMO: &[u8] = include_bytes!("player5/settlement.c03");
 const START: Position = Position { x: 0, y: 4 };
+const FOE_START: Position = Position { x: 8, y: 4 };
 const PATCH: Position = Position { x: 9, y: 2 };
 const SHRINE: Position = Position { x: 3, y: 5 };
 
@@ -55,6 +64,9 @@ pub enum Intent {
     Talk(u32),
     Gather,
     Deliver,
+    Attack,
+    Guard,
+    Wait,
 }
 
 /// Numeric field order is canonical precedence; only actor 21 / producer 1 is admitted.
@@ -83,6 +95,7 @@ pub enum Rejection {
     Empty,
     AlreadyCompleted,
     Overflow,
+    Incapacitated,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -92,6 +105,35 @@ pub enum Outcome {
     Gathered,
     Delivered,
     Rejected(Rejection),
+    Waited,
+    Struck,
+    Guarded,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CombatKind {
+    Hit { amount: u16 },
+    Death,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CombatEvent {
+    pub id: u64,
+    pub tick: u64,
+    pub source: u32,
+    pub target: u32,
+    pub kind: CombatKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Combat {
+    pub player_hp: u16,
+    pub player_alive: bool,
+    pub guard: bool,
+    pub foe: Position,
+    pub foe_hp: u16,
+    pub foe_alive: bool,
+    pub log: Vec<CombatEvent>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -143,6 +185,7 @@ pub struct World {
     next_sequence: u64,
     next_event_id: u64,
     digest: [u8; 32],
+    combat: Option<Combat>,
 }
 
 impl World {
@@ -171,7 +214,27 @@ impl World {
             next_sequence: 0,
             next_event_id: 1,
             digest: initial_digest(),
+            combat: None,
         }
+    }
+
+    /// Revision 2 encounter. The herb settlement bytes stay revision 1.
+    pub fn conflict() -> Self {
+        let mut world = Self::settlement();
+        world.combat = Some(Combat {
+            player_hp: PLAYER_HP,
+            player_alive: true,
+            guard: false,
+            foe: FOE_START,
+            foe_hp: FOE_HP,
+            foe_alive: true,
+            log: Vec::new(),
+        });
+        world
+    }
+
+    pub fn combat(&self) -> Option<&Combat> {
+        self.combat.as_ref()
     }
 
     pub fn tick(&self) -> u64 {
@@ -234,6 +297,10 @@ impl World {
         position == PATCH
             || position == SHRINE
             || (1..=20).any(|id| self.npc_position(id) == Some(position))
+            || self
+                .combat
+                .as_ref()
+                .is_some_and(|combat| combat.foe == position)
     }
 
     pub fn target_position(&self, target: Target) -> Option<Position> {
@@ -334,11 +401,19 @@ impl World {
         if staged.npcs.domain_checkpoint_bytes().len() > MAX_NPC_BYTES {
             return Err(Error::Capacity);
         }
+        staged.resolve_hostile()?;
         *self = staged;
         Ok(events)
     }
 
     fn apply(&mut self, intent: Intent) -> Outcome {
+        if self
+            .combat
+            .as_ref()
+            .is_some_and(|combat| !combat.player_alive)
+        {
+            return Outcome::Rejected(Rejection::Incapacitated);
+        }
         let result = match intent {
             Intent::Move(direction) => self.move_player(direction),
             Intent::Talk(id) => {
@@ -378,6 +453,15 @@ impl World {
                     })
                 }
             }
+            Intent::Attack => self.strike_foe(),
+            Intent::Guard => self.raise_guard(),
+            Intent::Wait => {
+                if self.combat.is_none() {
+                    Err(Rejection::UnknownTarget)
+                } else {
+                    Ok(Outcome::Waited)
+                }
+            }
         };
         result.unwrap_or_else(Outcome::Rejected)
     }
@@ -408,6 +492,104 @@ impl World {
             .ok_or(Rejection::Overflow)?;
         self.herbs[from].quantity = debit;
         self.herbs[to].quantity = credit;
+        Ok(())
+    }
+
+    fn strike_foe(&mut self) -> Result<Outcome, Rejection> {
+        let Some(combat) = self.combat.as_ref() else {
+            return Err(Rejection::UnknownTarget);
+        };
+        if !combat.foe_alive {
+            return Err(Rejection::UnknownTarget);
+        }
+        if !adjacent(self.position, combat.foe) {
+            return Err(Rejection::OutOfRange);
+        }
+        let left = combat.foe_hp.saturating_sub(STRIKE);
+        let tick = self.tick();
+        self.combat.as_mut().unwrap().foe_hp = left;
+        self.emit(tick, PLAYER_ID, FOE_ID, CombatKind::Hit { amount: STRIKE })
+            .map_err(|_| Rejection::Overflow)?;
+        if left == 0 {
+            self.combat.as_mut().unwrap().foe_alive = false;
+            self.emit(tick, PLAYER_ID, FOE_ID, CombatKind::Death)
+                .map_err(|_| Rejection::Overflow)?;
+        }
+        Ok(Outcome::Struck)
+    }
+
+    fn raise_guard(&mut self) -> Result<Outcome, Rejection> {
+        let Some(combat) = self.combat.as_mut() else {
+            return Err(Rejection::UnknownTarget);
+        };
+        combat.guard = true;
+        Ok(Outcome::Guarded)
+    }
+
+    /// NPC drive and the player intent have already happened for this tick.
+    pub(super) fn resolve_hostile(&mut self) -> Result<(), Error> {
+        let Some(combat) = self.combat.as_ref() else {
+            return Ok(());
+        };
+        if combat.player_alive && combat.foe_alive {
+            let player = self.position;
+            let foe = combat.foe;
+            let guard = combat.guard;
+            if adjacent(player, foe) {
+                let amount = STRIKE.saturating_sub(if guard { GUARD_BLOCK } else { 0 });
+                let left = combat.player_hp.saturating_sub(amount);
+                let tick = self.tick();
+                self.combat.as_mut().unwrap().player_hp = left;
+                self.emit(tick, FOE_ID, PLAYER_ID, CombatKind::Hit { amount })?;
+                if left == 0 {
+                    self.combat.as_mut().unwrap().player_alive = false;
+                    self.emit(tick, FOE_ID, PLAYER_ID, CombatKind::Death)?;
+                }
+            } else if manhattan(player, foe) <= AGGRO {
+                self.step_foe(player);
+            }
+        }
+        if let Some(combat) = self.combat.as_mut() {
+            combat.guard = false;
+        }
+        Ok(())
+    }
+
+    fn step_foe(&mut self, player: Position) {
+        let foe = self.combat.as_ref().unwrap().foe;
+        let here = manhattan(foe, player);
+        for direction in [
+            Direction::North,
+            Direction::East,
+            Direction::South,
+            Direction::West,
+        ] {
+            let Some(dest) = moved(foe, direction) else {
+                continue;
+            };
+            if dest.x >= WIDTH || dest.y >= HEIGHT || dest == player || !walkable(dest) {
+                continue;
+            }
+            if self.occupied(dest) || manhattan(dest, player) >= here {
+                continue;
+            }
+            self.combat.as_mut().unwrap().foe = dest;
+            break;
+        }
+    }
+
+    fn emit(&mut self, tick: u64, source: u32, target: u32, kind: CombatKind) -> Result<(), Error> {
+        let id = self.next_event_id;
+        self.next_event_id = id.checked_add(1).ok_or(Error::Capacity)?;
+        let event = CombatEvent {
+            id,
+            tick,
+            source,
+            target,
+            kind,
+        };
+        self.digest = extend_combat(self.digest, &event);
+        self.combat.as_mut().unwrap().log.push(event);
         Ok(())
     }
 }
@@ -457,4 +639,25 @@ fn extend_digest(previous: [u8; 32], event: Event) -> [u8; 32] {
     codec::put_key(&mut bytes, event.key);
     codec::put_outcome(&mut bytes, event.outcome);
     sha256(&bytes)
+}
+
+fn extend_combat(previous: [u8; 32], event: &CombatEvent) -> [u8; 32] {
+    let mut bytes = b"SH:C08:COMBAT:v1".to_vec();
+    bytes.extend(previous);
+    bytes.extend(event.id.to_le_bytes());
+    bytes.extend(event.tick.to_le_bytes());
+    bytes.extend(event.source.to_le_bytes());
+    bytes.extend(event.target.to_le_bytes());
+    match event.kind {
+        CombatKind::Hit { amount } => {
+            bytes.push(1);
+            bytes.extend(amount.to_le_bytes());
+        }
+        CombatKind::Death => bytes.push(2),
+    }
+    sha256(&bytes)
+}
+
+fn manhattan(a: Position, b: Position) -> u32 {
+    a.x.abs_diff(b.x) + a.y.abs_diff(b.y)
 }
