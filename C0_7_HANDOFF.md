@@ -1,6 +1,6 @@
 # C0.7 handoff
 
-**Verdict:** Implemented and verified on `feat/c07-shrine-supply`. Not independently accepted. Not merged by this pass.
+**Verdict:** Contract audit PASS in `C0_7_FINAL_AUDIT.md` for `56ccb51f6a3ee69bd29e5a35d63b62b9e4976042`. That review is not a second reader. Not merged by this pass.
 
 **Branch:** `feat/c07-shrine-supply`  
 **Base:** `e4598385291abd2e87133c97aa03ca49e91e1a1d`  
