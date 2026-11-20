@@ -1,0 +1,247 @@
+
+$ pwd 
+/workspace/scratch/95acbe1bd23c/sealed-heaven-c0.1
+
+$ uname -srm 
+Linux 6.18.57 x86_64
+
+$ rustc -vV 
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+binary: rustc
+commit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a
+commit-date: 2026-11-09
+host: x86_64-unknown-linux-gnu
+release: 1.100.0
+LLVM version: 23.1.5
+
+$ cargo -V 
+cargo 1.100.0 (3acc79c0c 2026-11-05)
+
+$ bash -c test\ -z\ \"\$\{DISPLAY+x\}\$\{WAYLAND_DISPLAY+x\}\$\{XAUTHORITY+x\}\$\{MIR_SOCKET+x\}\"\ \&\&\ \!\ compgen\ -G\ \"/dev/dri/\*\"\ \>/dev/null\ \&\&\ \!\ compgen\ -G\ \"/dev/nvidia\*\"\ \>/dev/null\ \&\&\ printf\ \"No\ display\ environment\ variables\ or\ GPU\ device\ nodes\ exposed.\\n\" 
+No display environment variables or GPU device nodes exposed.
+
+$ sha256sum Cargo.lock 
+176e4bb5d145739c101c10296ce9f97d4a24917381be057e74134e0ba1779d75  Cargo.lock
+
+$ cargo fetch --locked --offline 
+
+$ cargo fmt --all --check 
+
+$ cargo check -p sealed_sim --locked --offline 
+    Checking typenum v1.20.1
+   Compiling zerocopy v0.8.63
+    Checking const-oid v0.10.3
+    Checking cpufeatures v0.3.1
+    Checking cfg-if v1.0.5
+    Checking rand_core v0.10.1
+    Checking hybrid-array v0.4.15
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+    Checking digest v0.11.3
+    Checking sha2 v0.11.1
+    Checking ppv-lite86 v0.2.21
+    Checking rand_chacha v0.10.0
+    Checking sealed_sim v0.1.0 (/workspace/scratch/95acbe1bd23c/sealed-heaven-c0.1)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.69s
+
+$ cargo clippy -p sealed_sim --all-targets --locked --offline -- -D warnings 
+    Checking sealed_sim v0.1.0 (/workspace/scratch/95acbe1bd23c/sealed-heaven-c0.1)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+
+$ cargo test -p sealed_sim --locked --offline -- --test-threads=1 --nocapture 
+   Compiling typenum v1.20.1
+   Compiling const-oid v0.10.3
+   Compiling rand_core v0.10.1
+   Compiling cfg-if v1.0.5
+   Compiling cpufeatures v0.3.1
+   Compiling zerocopy v0.8.63
+   Compiling hybrid-array v0.4.15
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling digest v0.11.3
+   Compiling sha2 v0.11.1
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.10.0
+   Compiling sealed_sim v0.1.0 (/workspace/scratch/95acbe1bd23c/sealed-heaven-c0.1)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.95s
+     Running unittests src/lib.rs (/workspace/scratch/95acbe1bd23c/.c01-tools/verified-target/debug/build/sealed_sim/8563795fa81f5dcc/out/sealed_sim-8563795fa81f5dcc)
+
+running 14 tests
+test tests::c01_t01_clock_pending_and_pause ... ok
+test tests::c01_t01_empty_steps_only_advance_the_clock ... ok
+test tests::c01_t02_commit_revalidates_contention_and_disabled_actors ... ok
+test tests::c01_t02_orders_numeric_producer_before_sequence ... ok
+test tests::c01_t03_conflicts_roll_back_in_any_input_order ... ok
+test tests::c01_t03_deduplicates_admitted_and_resubmitted_commands ... ok
+test tests::c01_t03_preflight_selects_boundary_key_and_diagnostic_in_order ... ok
+test tests::c01_t03_tick_cursor_and_ordinal_overflow_roll_back ... ok
+test tests::c01_t04_checkpoint_and_event_chain_golden_vectors ... checkpoint.initial.sha256=1d59cf7c1c215a314981cbbf210f4feada221adc4cbca620ac5d89dc9920224b
+checkpoint.pending.sha256=80f5c7a13e262cf5991a10d5298d47f1c186e3b3e564fd0ecc899ca34f29884e
+checkpoint.contention.sha256=e02c6e47e0ebfc387c32d679edb13cf988285ccc51f603ace8e698556814b16c
+event.1.bytes=010000000000000002000000000000000100000001000000000000000000000001
+event.2.bytes=02000000000000000200000000000000020000000100000000000000000000000202
+event.contention.digest=54fabd2a30f91a021e8593391702c18e09e7ff407f0158ea5b532f86ac39acba
+checkpoint.probe.sha256=83a113fff7d020df2714e0f4ca48bd892e19b1ac92c2fad5ab6b361d4d13daf8
+event.probe.digest=3b0ee130dab2cc1d830bda3c2e544bf63b6beb02a9ab4b3b09a73650f32f62a9
+ok
+test tests::c01_t04_checkpoint_covers_each_mutable_field_group ... ok
+test tests::c01_t04_named_rng_golden_vectors_and_stream_isolation ... rng.seed=100/stream=1/ordinal=0 words=11915b32,9dcfed71
+rng.seed=100/stream=2/ordinal=0 words=a498660b,ddb1465b
+rng.seed=100/stream=1/ordinal=1 words=df3be1d5,b7742291
+rng.seed=101/stream=1/ordinal=0 words=71ac287c,ca155226
+ok
+test tests::c01_t04_queue_encoding_uses_numeric_order_independent_of_insertion ... ok
+test tests::c01_t05_replay_matches_every_checkpoint_and_concatenated_event_stream ... ok
+test tests::c01_t05_seed_101_smoke ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests sealed_sim
+
+running 1 test
+test src/lib.rs - (line 3) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.21s; merged doctests compilation took 0.20s
+
+$ cargo test -p sealed_sim --release --locked --offline -- --test-threads=1 
+   Compiling typenum v1.20.1
+   Compiling zerocopy v0.8.63
+   Compiling const-oid v0.10.3
+   Compiling rand_core v0.10.1
+   Compiling cfg-if v1.0.5
+   Compiling cpufeatures v0.3.1
+   Compiling hybrid-array v0.4.15
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling digest v0.11.3
+   Compiling sha2 v0.11.1
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.10.0
+   Compiling sealed_sim v0.1.0 (/workspace/scratch/95acbe1bd23c/sealed-heaven-c0.1)
+    Finished `release` profile [optimized] target(s) in 4.82s
+     Running unittests src/lib.rs (/workspace/scratch/95acbe1bd23c/.c01-tools/verified-target/release/build/sealed_sim/373a78801eac3150/out/sealed_sim-373a78801eac3150)
+
+running 14 tests
+test tests::c01_t01_clock_pending_and_pause ... ok
+test tests::c01_t01_empty_steps_only_advance_the_clock ... ok
+test tests::c01_t02_commit_revalidates_contention_and_disabled_actors ... ok
+test tests::c01_t02_orders_numeric_producer_before_sequence ... ok
+test tests::c01_t03_conflicts_roll_back_in_any_input_order ... ok
+test tests::c01_t03_deduplicates_admitted_and_resubmitted_commands ... ok
+test tests::c01_t03_preflight_selects_boundary_key_and_diagnostic_in_order ... ok
+test tests::c01_t03_tick_cursor_and_ordinal_overflow_roll_back ... ok
+test tests::c01_t04_checkpoint_and_event_chain_golden_vectors ... ok
+test tests::c01_t04_checkpoint_covers_each_mutable_field_group ... ok
+test tests::c01_t04_named_rng_golden_vectors_and_stream_isolation ... ok
+test tests::c01_t04_queue_encoding_uses_numeric_order_independent_of_insertion ... ok
+test tests::c01_t05_replay_matches_every_checkpoint_and_concatenated_event_stream ... ok
+test tests::c01_t05_seed_101_smoke ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests sealed_sim
+
+running 1 test
+test src/lib.rs - (line 3) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.19s; merged doctests compilation took 0.18s
+
+$ cargo tree -p sealed_sim --locked --offline -e normal\,build\,dev 
+sealed_sim v0.1.0 (/workspace/scratch/95acbe1bd23c/sealed-heaven-c0.1)
+├── rand_chacha v0.10.0
+│   ├── ppv-lite86 v0.2.21
+│   │   └── zerocopy v0.8.63
+│   └── rand_core v0.10.1
+└── sha2 v0.11.1
+    ├── cfg-if v1.0.5
+    ├── cpufeatures v0.3.1
+    └── digest v0.11.3
+        ├── block-buffer v0.12.1
+        │   └── hybrid-array v0.4.15
+        │       └── typenum v1.20.1
+        ├── const-oid v0.10.3
+        └── crypto-common v0.2.2
+            └── hybrid-array v0.4.15 (*)
+
+$ cargo tree -p sealed_sim --locked --offline -e normal\,build\,dev --target all 
+sealed_sim v0.1.0 (/workspace/scratch/95acbe1bd23c/sealed-heaven-c0.1)
+├── rand_chacha v0.10.0
+│   ├── ppv-lite86 v0.2.21
+│   │   └── zerocopy v0.8.63
+│   │       └── zerocopy-derive v0.8.63 (proc-macro)
+│   │           ├── proc-macro2 v1.0.107
+│   │           │   └── unicode-ident v1.0.27
+│   │           ├── quote v1.0.47
+│   │           │   └── proc-macro2 v1.0.107 (*)
+│   │           └── syn v2.0.119
+│   │               ├── proc-macro2 v1.0.107 (*)
+│   │               ├── quote v1.0.47 (*)
+│   │               └── unicode-ident v1.0.27
+│   └── rand_core v0.10.1
+└── sha2 v0.11.1
+    ├── cfg-if v1.0.5
+    ├── cpufeatures v0.3.1
+    │   └── libc v0.2.191
+    └── digest v0.11.3
+        ├── block-buffer v0.12.1
+        │   └── hybrid-array v0.4.15
+        │       └── typenum v1.20.1
+        ├── const-oid v0.10.3
+        └── crypto-common v0.2.2
+            └── hybrid-array v0.4.15 (*)
+
+$ sha256sum Cargo.lock 
+176e4bb5d145739c101c10296ce9f97d4a24917381be057e74134e0ba1779d75  Cargo.lock
+
+$ python3 - <<'PY'
+from pathlib import Path
+from zipfile import ZipFile
+import hashlib
+import json
+import re
+import subprocess
+
+metadata = json.loads(subprocess.check_output(
+    ['cargo', 'metadata', '--format-version', '1', '--locked', '--offline']
+))
+assert len(metadata['workspace_members']) == 1
+package_id, = metadata['workspace_members']
+package = next(p for p in metadata['packages'] if p['id'] == package_id)
+assert package['name'] == 'sealed_sim'
+target, = package['targets']
+assert target['name'] == 'sealed_sim' and target['kind'] == ['lib']
+assert sorted((d['name'],d['req'],d['kind']) for d in package['dependencies']) == [
+    ('rand_chacha','=0.10.0',None),('sha2','=0.11.1',None),
+]
+expected_graph = set('sealed_sim block-buffer cfg-if const-oid cpufeatures crypto-common digest hybrid-array libc ppv-lite86 proc-macro2 quote rand_chacha rand_core sha2 syn typenum unicode-ident zerocopy zerocopy-derive'.split())
+assert {p['name'] for p in metadata['packages']} == expected_graph
+approved_archive = Path('../c01_reference/sealed heaven/Sealed_Heaven_G0_v0.2-draft (1).zip')
+with ZipFile(approved_archive) as archive:
+    source = archive.read('sealed-heaven-g0-v0.2-draft/docs/C0_1_ACCEPTANCE_TESTS.md')
+    assert source == Path('../sealed-heaven-g0-v0.2-draft/docs/C0_1_ACCEPTANCE_TESTS.md').read_bytes()
+constants = Path('src/tests/golden.rs').read_text()
+document = source.decode()
+published_vectors = re.findall(r'`([a-f0-9]{16,}|0x[a-f0-9]{8})`', document)
+vector_set_from_code = set(re.findall(r'"([a-f0-9]{16,})"|\b(0x[a-f0-9]{8})\b', constants))
+assert all((value,'') in vector_set_from_code or ('',value) in vector_set_from_code for value in published_vectors)
+assert not ({a or b for a,b in vector_set_from_code} - set(published_vectors) -
+            set(document.replace('```text\n','').splitlines()))
+doc_checkpoints = re.findall(r'^\*\*.+?\*\* · (\d+) bytes · SHA-256 `([a-f0-9]+)`\n\n```text\n([a-f0-9\n]+)^```',document,re.M)
+code_checkpoints = re.findall(r'bytes: concat!\(\s*((?:"[a-f0-9]+",\s*)+)\),\s*sha256:\s*"([a-f0-9]+)"',constants)
+assert len(doc_checkpoints) == len(code_checkpoints) == 4
+for (size,expected_hash,doc_bytes),(code_bytes,code_hash) in zip(doc_checkpoints,code_checkpoints):
+    expected_bytes = bytes.fromhex(doc_bytes)
+    assert b''.join(bytes.fromhex(chunk) for chunk in re.findall(r'"([a-f0-9]+)"',code_bytes)) == expected_bytes
+    assert len(expected_bytes) == int(size)
+    assert hashlib.sha256(expected_bytes).hexdigest() == expected_hash == code_hash
+print(f'Cargo metadata: {package["name"]}, one library target, {len(expected_graph)-1} locked dependency packages across all targets.')
+print('Approved acceptance document SHA-256:', hashlib.sha256(source).hexdigest())
+print('All published checkpoint, event, digest and RNG literals match the frozen test source.')
+PY
+Cargo metadata: sealed_sim, one library target, 19 locked dependency packages across all targets.
+Approved acceptance document SHA-256: 7f178b174c0004dd24de4652843e824eb6c3a969ddd3adf3ea7834994b058c48
+All published checkpoint, event, digest and RNG literals match the frozen test source.

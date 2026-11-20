@@ -1,0 +1,16 @@
+{
+  "c07.supply": "Shrine supply",
+  "c07.note": "Actor-owned herbs on the C0.3 ledger. This is not a storehouse room, and it is not the village healer.",
+  "c07.demand": "Demand",
+  "c07.worker": "Hauler",
+  "c07.progress": "Delivery",
+  "c07.carrier": "Carried",
+  "c07.shrine": "At the shrine",
+  "c07.total": "Herb total",
+  "c07.phase.requested": "Requested",
+  "c07.phase.assigned": "Assigned",
+  "c07.phase.progress": "In progress",
+  "c07.phase.completed": "Completed",
+  "c07.phase.rejected": "Rejected",
+  "c07.phase.cancelled": "Cancelled"
+}

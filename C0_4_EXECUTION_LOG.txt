@@ -1,0 +1,54 @@
+C0.4 2026-11-18
+Accepted baseline and remote verified at 14d229bedc308d7e50225122caaec0ce5732a201.
+Clean isolated branch/worktree feat/c04-first-playable created from that baseline.
+Inspected root manifest, frozen public API, fixture codec, S4 mixed twenty-NPC test.
+No public full fixture-3 actor view or twenty-NPC constructor exists.
+Contract uses frozen public restore/drive/checkpoint APIs and read-only projection;
+no frozen source edits or additive API requirements.
+Normative contract and executable acceptance criteria drafted. Review pending.
+Independent contract reviewer PASS (C0_4_CONTRACT_INDEPENDENT_REVIEW.md).
+Reviewer independently ran five root Cargo checks: 82+2 tests debug and release;
+all passed, standalone C03 packer passed. Conditional implementation now effective.
+Contract checkpoint pushed: 858b044c203dcbc8ef9b2b2720865f0113d12c10; remote SHA matched.
+Implemented isolated app, own lock, pinned Bevy 0.17.3 (requires Rust 1.88; unchanged
+Rust 1.100 compatible). All root-lock package versions occur in app lock unchanged.
+Standalone demo pack: 3657 bytes, SHA256
+f6a4be4d54a82e6400c31fd0a4c241c638399a1e1961b23eeddbbe6cba0dddad.
+Initial persistence-test command-target error fixed (target must be boundary+1).
+Headless debug/release tests passed before source review (17 unit + 4 integration).
+Added invalid-live-load/file preservation test: integration count 5.
+Independent source audit found SR-01 ignored running-step discarded elapsed time.
+New regression failed pre-fix; fixed effective-transport classification; regression
+passes and independent re-review confirms 17 unit + 6 integration PASS.
+Native development binary built successfully; actual window and 20 NPC framebuffer
+observed. Initial road Z clipping and default-font missing glyphs corrected with
+camera Z=0 and embedded licensed Noto Sans. Actual corrected native smoke pending.
+No frozen root source/dependency/toolchain/contract/vector change.
+Full verification log/script running; final native/evidence review still open.
+Verifier has passed full frozen root 82+2 debug/release, root fmt/check/clippy,
+both canonical packers, app default fmt/check/Clippy and debug tests 17+3+6.
+Preparing labeled WIP checkpoint while app release verification continues.
+Full app release verification completed: 17 library + 3 desktop + 6 integration
+tests pass, no failures. Full frozen root remains 82+2 per profile, all five
+mandatory Cargo commands PASS; app fmt/check/strict Clippy/debug/release/build
+PASS. Repeated after presentation corrections; final log is complete.
+Final debug executable SHA256:
+302a3b3a3bf09ab67bde09865cf192596045a17a0d0bcbf68b9bcea716c80aa7.
+Native QA helpers corrected to reject minimized images and await PNG completion.
+Guarded target foreground access failed; helper refuses unrelated-window input.
+Keyboard-only attempt observed native startup and actual tick-1 Eat/Executing,
+then timed out during selection; NOT a complete native smoke PASS.
+Partial game-only PNG/JSON/log evidence archived at docs/evidence/c04-native-partial.
+C04-T07 BLOCKED on safe reliable desktop input; final acceptance NOT granted.
+Exact continuation: resolve access or operator checklist in C0_4_NATIVE_INPUT_BLOCKER.md,
+then finish native smoke/running observation and independent final acceptance.
+18 November 2026 continuation: verify.ps1 repeated on 0cc47cd, all recorded exits 0.
+Foreground mouse/keyboard smoke completed against debug SHA-256
+302a3b3a3bf09ab67bde09865cf192596045a17a0d0bcbf68b9bcea716c80aa7.
+49 framebuffer pairs validated at 1424x821. Tick-2 save/load hash
+6f1131bcb9541f94bea374a7a4aba875e3c1149242a3109a333a9ad14a445599 matched, and the
+continued tick-3 hash matched. Reset restored paused tick 0 and the S4 hash.
+Focused sample: 21 ticks in 14.558 seconds. No source defect found.
+Final independent audit PASS. Evidence: docs/evidence/c04-native-acceptance/.
+Acceptance evidence commit ea6d6430b93b94a49ff13ea018b169987ae4e16f was pushed to
+origin/feat/c04-first-playable and matched the fetched remote SHA. Main was not updated.

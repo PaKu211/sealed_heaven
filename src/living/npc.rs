@@ -1,0 +1,555 @@
+use std::cmp::Reverse;
+
+use super::navigation::{distance, in_reach, moved, next_step};
+use super::{
+    ActorId, BREATH_MASTERY, GUARD_BLOCK, IncidentId, KnowledgeSource, PLAYER, Position, Region,
+    STRIKE, World,
+};
+
+const THREAT_MEMORY: u64 = 12;
+const INVESTIGATE_WINDOW: u64 = 24;
+const PURSUIT_LEASH: u32 = 7;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Role {
+    Medic,
+    Watch,
+    Supplier,
+    Traveler,
+    Grower,
+    Courier,
+    Mentor,
+    HallDeputy,
+    RivalEnvoy,
+    HallSteward,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NpcDefinition {
+    pub id: ActorId,
+    pub name: &'static str,
+    pub glyph: char,
+    pub role: Role,
+    pub spawn: Position,
+    pub home: Position,
+    pub route: &'static [Position],
+    pub hp: u16,
+    /// Fatigue at which the actor normally breaks from duty to rest.
+    pub rest_threshold: u8,
+    pub responds_to_attack: bool,
+    pub shares_news: bool,
+    pub report_to: Option<ActorId>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Goal {
+    Idle,
+    Rest,
+    Patrol,
+    TendClinic,
+    CollectHerbs,
+    DeliverHerbs,
+    SeekCare,
+    Treat(ActorId),
+    Investigate(IncidentId),
+    Report {
+        recipient: ActorId,
+        incident: IncidentId,
+    },
+    Retreat,
+    Retaliate,
+    StockGarden,
+    StockMarket,
+    CollectFreight,
+    DeliverFreight,
+    TeachAtHall,
+    Follow(Position),
+    FieldCare,
+    BuyForLodge,
+    PetitionHall,
+    BuyForHall,
+    SupplyHall,
+    RequestRelief,
+    BuyRelief,
+    DeliverRelief,
+    CampRest,
+    SurveyQinghe,
+    BuyLodgeAid,
+    DeliverLodgeAid,
+    NegotiateContract(super::Need),
+    ProcureContract(super::Need),
+    FulfillContract(super::Need),
+    AuditContract(super::Need),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Activity {
+    pub goal: Goal,
+    /// The tick when the current activity began. Preemption starts a new activity.
+    pub since: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Npc {
+    pub definition: &'static NpcDefinition,
+    pub position: Position,
+    pub hp: u16,
+    pub fatigue: u8,
+    pub herbs: u32,
+    /// Personal medical supplies, retained when employment or company changes.
+    pub packed_herbs: u8,
+    pub activity: Activity,
+    pub(super) waypoint: usize,
+    pub(super) last_investigated: Option<IncidentId>,
+}
+
+impl Npc {
+    pub(super) fn new(definition: &'static NpcDefinition) -> Self {
+        Self {
+            definition,
+            position: definition.spawn,
+            hp: definition.hp,
+            fatigue: 0,
+            herbs: 0,
+            packed_herbs: 0,
+            activity: Activity {
+                goal: Goal::Idle,
+                since: 0,
+            },
+            waypoint: 0,
+            last_investigated: None,
+        }
+    }
+
+    pub fn id(&self) -> ActorId {
+        self.definition.id
+    }
+
+    pub fn alive(&self) -> bool {
+        self.hp > 0
+    }
+}
+
+impl World {
+    pub(super) fn advance_npcs(&mut self, guarding: bool) {
+        // All actors plan before anyone moves, claims stock, or attacks. Commit
+        // in ID order and revalidate any effects that compete for shared state.
+        let plans: Vec<_> = self
+            .npcs
+            .values()
+            .filter(|npc| npc.alive())
+            .map(|npc| (npc.id(), self.choose_goal(npc)))
+            .collect();
+        for (id, goal) in plans {
+            if self
+                .traffic()
+                .is_some_and(|traffic| traffic.was_committed(id))
+            {
+                continue;
+            }
+            self.execute_goal(id, goal, guarding);
+            // A committed NPC may have traded, treated or reported without
+            // walking. It still cannot be displaced by a later actor this turn.
+            if let Some(traffic) = self.traffic.as_mut() {
+                traffic.mark_committed(id);
+            }
+        }
+    }
+
+    pub(super) fn choose_goal(&self, npc: &Npc) -> Goal {
+        let id = npc.id();
+        let threat = self.player.alive()
+            && self.perceives(npc.position, self.player.position)
+            && self
+                .social
+                .recent(id, self.tick, THREAT_MEMORY)
+                .any(|(incident, receipt)| {
+                    incident.target == id
+                        && incident.source == PLAYER
+                        && receipt.source == KnowledgeSource::Observed
+                });
+        let retaliation = threat
+            && npc.definition.responds_to_attack
+            && npc.hp > 1
+            && distance(npc.definition.home, self.player.position) <= PURSUIT_LEASH;
+        let care = self.supply.shrine > 0
+            && npc.hp < npc.definition.hp
+            && self.npcs.values().any(|medic| {
+                medic.id() != id
+                    && medic.definition.role == Role::Medic
+                    && (medic.alive()
+                        || (self.original_rules() && !self.perceives(npc.position, medic.position)))
+                    && !self.social.relationship(id, medic.id()).refuses_aid()
+                    && (self.original_rules()
+                        || !self.social.relationship(medic.id(), id).refuses_aid())
+            })
+            && (self.original_rules() || self.can_approach(npc.position, self.scenario.clinic));
+        let patient = (npc.definition.role == Role::Medic && self.supply.shrine > 0)
+            .then(|| {
+                self.npcs
+                    .values()
+                    .filter(|patient| self.can_treat(npc, patient))
+                    .max_by_key(|patient| {
+                        (patient.definition.hp - patient.hp, Reverse(patient.id()))
+                    })
+                    .map(|patient| Goal::Treat(patient.id()))
+            })
+            .flatten();
+        let news = self.report_goal(npc);
+        let disturbance = (npc.definition.role == Role::Watch)
+            .then(|| {
+                self.social
+                    .recent(id, self.tick, INVESTIGATE_WINDOW)
+                    .find(|(incident, _)| {
+                        !incident.retaliation
+                            && incident.source != id
+                            && incident.target != id
+                            && npc.last_investigated.is_none_or(|last| incident.id > last)
+                    })
+                    .map(|(incident, _)| Goal::Investigate(incident.id))
+            })
+            .flatten();
+        let teaches = self.is_hall_teacher(npc);
+        let off_duty = !self.original_rules()
+            && self.is_night()
+            && (teaches
+                || matches!(
+                    npc.definition.role,
+                    Role::Medic | Role::Supplier | Role::Grower
+                ));
+        let resting = off_duty
+            || npc.fatigue >= npc.definition.rest_threshold
+            || (npc.activity.goal == Goal::Rest && npc.fatigue > 0);
+        let duty = match npc.definition.role {
+            Role::Medic => Goal::TendClinic,
+            Role::Supplier if npc.herbs > 0 => Goal::DeliverHerbs,
+            Role::Supplier
+                if self.supply.shrine < self.scenario.shrine_target
+                    && self.supply.source > 0
+                    && (self.company.is_none() || self.west_shortage() > 0) =>
+            {
+                Goal::CollectHerbs
+            }
+            Role::Grower if npc.herbs > 0 => Goal::StockMarket,
+            Role::Grower if self.needs_east_harvest() => Goal::StockGarden,
+            Role::Courier if npc.herbs > 0 => Goal::DeliverFreight,
+            Role::Courier if self.needs_courier_supply() => Goal::CollectFreight,
+            Role::RivalEnvoy
+                if self
+                    .rivalry()
+                    .is_some_and(|rival| rival.at_peace(self.tick)) =>
+            {
+                Goal::Patrol
+            }
+            Role::RivalEnvoy if npc.herbs > 0 => Goal::PetitionHall,
+            Role::RivalEnvoy if self.rival_can_buy() => Goal::BuyForLodge,
+            Role::HallSteward if npc.herbs > 0 => Goal::SupplyHall,
+            Role::HallSteward if self.hall_can_buy() => Goal::BuyForHall,
+            _ if teaches => Goal::TeachAtHall,
+            _ if !npc.definition.route.is_empty() => Goal::Patrol,
+            _ => Goal::Idle,
+        };
+        let expedition = self.company_goal(npc);
+        let expedition_priority = if expedition == Some(Goal::FieldCare) {
+            79
+        } else {
+            40
+        };
+        let faction_goal = self.faction_goal(npc);
+        let contract_goal = self.contract_goal(npc);
+        let audit_goal = self.audit_goal(id);
+        let mission_active = self.relief_goal(npc).is_some()
+            || faction_goal.is_some()
+            || contract_goal.is_some()
+            || audit_goal.is_some();
+        let plans = [
+            (100, retaliation.then_some(Goal::Retaliate)),
+            (100, (threat && !retaliation).then_some(Goal::Retreat)),
+            (
+                96,
+                (mission_active && npc.fatigue >= 36).then_some(Goal::CampRest),
+            ),
+            (95, self.relief_goal(npc)),
+            (94, faction_goal),
+            (95, contract_goal),
+            (91, audit_goal),
+            (
+                86,
+                (care && npc.hp <= npc.definition.hp / 2).then_some(Goal::SeekCare),
+            ),
+            (80, patient),
+            (expedition_priority, expedition),
+            (74, news),
+            (68, disturbance),
+            (54 + u16::from(npc.fatigue), resting.then_some(Goal::Rest)),
+            (52, care.then_some(Goal::SeekCare)),
+            (20, Some(duty)),
+        ];
+        plans
+            .into_iter()
+            .enumerate()
+            .filter_map(|(rank, (score, goal))| goal.map(|goal| (score, Reverse(rank), goal)))
+            .max_by_key(|&(score, rank, _)| (score, rank))
+            .expect("duty is always available")
+            .2
+    }
+
+    fn report_goal(&self, npc: &Npc) -> Option<Goal> {
+        if !npc.definition.shares_news {
+            return None;
+        }
+        let preferred = npc.definition.report_to;
+        let proposal = |peer: &Npc| {
+            let recipient = peer.id();
+            let incident = self.reportable(npc.id(), recipient)?;
+            if self.original_rules() {
+                return (peer.alive() || !self.perceives(npc.position, peer.position)).then_some(
+                    Goal::Report {
+                        recipient,
+                        incident,
+                    },
+                );
+            }
+            (peer.alive()
+                && self.can_approach(npc.position, self.meeting_place(npc.position, peer)))
+            .then_some(Goal::Report {
+                recipient,
+                incident,
+            })
+        };
+        let primary = preferred
+            .and_then(|id| self.npcs.get(&id))
+            .and_then(&proposal);
+        if primary.is_some() || self.original_rules() || preferred.is_none() {
+            return primary;
+        }
+        // `reportable` checks familiarity, trust, receipt and hop rules. A bystander
+        // outside that contact network can never be selected by this fallback.
+        self.npcs
+            .values()
+            .filter(|peer| Some(peer.id()) != preferred && peer.alive())
+            .find_map(proposal)
+    }
+
+    fn meeting_place(&self, observer: Position, peer: &Npc) -> Position {
+        if self.perceives(observer, peer.position) {
+            peer.position
+        } else if peer.definition.role == Role::Medic {
+            self.scenario.clinic
+        } else {
+            peer.definition
+                .route
+                .first()
+                .copied()
+                .unwrap_or(peer.definition.home)
+        }
+    }
+
+    fn can_approach(&self, from: Position, destination: Position) -> bool {
+        in_reach(from, destination)
+            || next_step(self.scenario, from, destination, 1, |cell| {
+                self.walkable(cell) && !self.occupied(cell)
+            })
+            .is_some()
+    }
+
+    fn can_treat(&self, medic: &Npc, patient: &Npc) -> bool {
+        medic.id() != patient.id()
+            && patient.alive()
+            && patient.hp < patient.definition.hp
+            && in_reach(self.scenario.clinic, patient.position)
+            && !self
+                .social
+                .relationship(medic.id(), patient.id())
+                .refuses_aid()
+    }
+
+    fn execute_goal(&mut self, id: ActorId, goal: Goal, guarding: bool) {
+        let npc = self.npcs[&id];
+        let activity = &mut self.npcs.get_mut(&id).expect("planned actor").activity;
+        if activity.goal != goal {
+            *activity = Activity {
+                goal,
+                since: self.tick,
+            };
+        }
+        if goal == Goal::Rest
+            && (npc.position == npc.definition.home || self.companion(id).is_some())
+        {
+            self.npcs.get_mut(&id).expect("planned actor").fatigue = npc.fatigue.saturating_sub(4);
+            return;
+        }
+        let fatigue = npc.fatigue.saturating_add(1).min(40);
+        self.npcs.get_mut(&id).expect("planned actor").fatigue = fatigue;
+        let pos = npc.position;
+        let scenario = self.scenario;
+
+        match goal {
+            Goal::Idle => {}
+            Goal::Rest => self.travel(id, npc.definition.home, 0),
+            Goal::CampRest => {
+                self.npcs.get_mut(&id).expect("camping actor").fatigue =
+                    npc.fatigue.saturating_sub(7);
+            }
+            Goal::Retreat => self.retreat(id),
+            Goal::TendClinic => self.travel(id, scenario.clinic, 0),
+            Goal::SeekCare => self.travel(id, scenario.clinic, 1),
+            Goal::Patrol => {
+                let route = npc.definition.route;
+                let destination = route[npc.waypoint];
+                if pos == destination {
+                    self.npcs.get_mut(&id).expect("planned actor").waypoint =
+                        (npc.waypoint + 1) % route.len();
+                } else {
+                    self.travel(id, destination, 0);
+                }
+            }
+            Goal::CollectHerbs if pos == scenario.patch => {
+                // Commit-time stock and quota check for competing suppliers.
+                let shortage = if self.company.is_some() {
+                    self.west_shortage()
+                } else {
+                    let incoming: u32 = self
+                        .npcs
+                        .values()
+                        .filter(|actor| actor.alive())
+                        .map(|actor| actor.herbs)
+                        .sum();
+                    scenario
+                        .shrine_target
+                        .saturating_sub(self.supply.shrine + incoming)
+                };
+                let quantity = self.supply.source.min(2).min(shortage);
+                self.supply.source -= quantity;
+                self.npcs.get_mut(&id).expect("planned actor").herbs += quantity;
+            }
+            Goal::CollectHerbs => self.travel(id, scenario.patch, 0),
+            Goal::DeliverHerbs if pos == scenario.shrine => {
+                self.supply.shrine += npc.herbs;
+                self.supply.npc_deliveries += npc.herbs;
+                self.npcs.get_mut(&id).expect("planned actor").herbs = 0;
+            }
+            Goal::DeliverHerbs => self.travel(id, scenario.shrine, 0),
+            Goal::Treat(patient) if pos == scenario.clinic => {
+                if self.supply.shrine > 0 && self.can_treat(&npc, &self.npcs[&patient]) {
+                    self.treat(patient);
+                    self.social.aided(id, patient);
+                }
+            }
+            Goal::Treat(_) => self.travel(id, scenario.clinic, 0),
+            Goal::Investigate(incident) => {
+                let site = self
+                    .social
+                    .incident(incident)
+                    .expect("known incident")
+                    .position;
+                if in_reach(pos, site) {
+                    self.npcs
+                        .get_mut(&id)
+                        .expect("planned actor")
+                        .last_investigated = Some(incident);
+                } else {
+                    self.travel(id, site, 1);
+                }
+            }
+            Goal::Report { recipient, .. } => {
+                let peer = &self.npcs[&recipient];
+                // Outside visual range, go to a known work site or home.
+                // A report goal cannot track a moving recipient through a wall.
+                self.travel(id, self.meeting_place(pos, peer), 1);
+            }
+            Goal::Retaliate => {
+                // A lower-ID actor may already have killed the player.
+                if self.player.alive() && in_reach(pos, self.player.position) {
+                    let block = if guarding {
+                        GUARD_BLOCK + (self.breath >= BREATH_MASTERY) as u16
+                    } else {
+                        0
+                    };
+                    self.damage(id, PLAYER, STRIKE - block, true);
+                } else if self.player.alive() {
+                    self.travel(id, self.player.position, 1);
+                }
+            }
+            Goal::StockGarden | Goal::StockMarket | Goal::CollectFreight | Goal::DeliverFreight => {
+                self.work_freight(id, goal);
+            }
+            Goal::Follow(site) => {
+                if let Some(journey) = self.companion(id) {
+                    self.travel(id, site, u32::from(journey.seen_at == self.tick));
+                }
+            }
+            Goal::FieldCare => self.field_care(id),
+            Goal::TeachAtHall => self.travel(id, Region::sites().hall, 0),
+            Goal::BuyForLodge | Goal::PetitionHall => self.rival_work(id, goal),
+            Goal::BuyForHall | Goal::SupplyHall => self.hall_steward_work(id, goal),
+            Goal::RequestRelief | Goal::BuyRelief | Goal::DeliverRelief => {
+                self.work_relief(id, goal);
+            }
+            Goal::SurveyQinghe | Goal::BuyLodgeAid | Goal::DeliverLodgeAid => {
+                self.work_faction_agency(id, goal);
+            }
+            Goal::NegotiateContract(_) | Goal::ProcureContract(_) | Goal::FulfillContract(_) => {
+                self.work_contract(id, goal);
+            }
+            Goal::AuditContract(need) => self.inspect_contract(id, need),
+        }
+    }
+
+    fn work_freight(&mut self, id: ActorId, goal: Goal) {
+        let sites = Region::sites();
+        let (site, loading, grower) = match goal {
+            Goal::StockGarden => (sites.garden, true, true),
+            Goal::StockMarket => (sites.market, false, true),
+            Goal::CollectFreight => (sites.market, true, false),
+            Goal::DeliverFreight => (self.scenario.shrine, false, false),
+            _ => unreachable!("only freight goals reach this handler"),
+        };
+        // A carrier works from an adjacent square, so standing on a trading
+        // tile does not disable the settlement's logistics.
+        if !in_reach(self.npcs[&id].position, site) {
+            self.travel(id, site, 1);
+        } else if loading {
+            self.load_regional_cargo(id, grower);
+        } else {
+            self.unload_regional_cargo(id, grower);
+        }
+    }
+
+    fn retreat(&mut self, id: ActorId) {
+        let npc = &self.npcs[&id];
+        let threat = self.player.position;
+        let current = distance(npc.position, threat);
+        let safer = super::DIRECTIONS
+            .into_iter()
+            .enumerate()
+            .filter_map(|(order, direction)| {
+                moved(npc.position, direction).map(|cell| (order, cell))
+            })
+            .filter(|&(_, cell)| self.walkable(cell) && !self.occupied(cell))
+            .filter(|&(_, cell)| distance(cell, threat) > current || !self.can_see(threat, cell))
+            .max_by_key(|&(order, cell)| {
+                (
+                    !self.can_see(threat, cell),
+                    distance(cell, threat),
+                    Reverse(order),
+                )
+            });
+        if let Some((_, cell)) = safer {
+            self.npcs.get_mut(&id).expect("planned actor").position = cell;
+        }
+    }
+
+    pub(super) fn travel(&mut self, id: ActorId, destination: Position, reach: u32) {
+        if self.traffic.is_some() {
+            self.travel_with_courtesy(id, destination, reach);
+            return;
+        }
+        let position = self.npcs[&id].position;
+        if let Some(next) = next_step(self.scenario, position, destination, reach, |cell| {
+            self.walkable(cell) && !self.occupied(cell)
+        }) {
+            self.npcs.get_mut(&id).expect("planned actor").position = next;
+        }
+    }
+}

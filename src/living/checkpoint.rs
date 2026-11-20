@@ -1,0 +1,1089 @@
+//! Event-sourced checkpoint: scenario fingerprint, one fixed
+//! record per committed turn, complete state digest, and an envelope checksum.
+//! Replay reconstructs the NPC activity, relationships, receipts, queued reports,
+//! effects, combat and stock state through the same canonical entry point.
+
+use crate::encoding::sha256;
+
+use super::{
+    ActorId, Allegiance, AuditFinding, Background, Company, ContractEventKind, ContractMemory,
+    ContractPhase, Contracts, Direction, Duty, FactionAgency, FactionEventKind, FactionPhase, Goal,
+    Intent, Invitation, JourneyEvent, KnowledgeSource, MAX_TICKS, Need, Outcome,
+    PoliticalEventKind, Politics, Position, Region, Rejection, Relief, ReliefEventKind,
+    ReliefPhase, Rivalry, Role, Rules, Scenario, School, SectEventKind, Traffic, TrafficEventKind,
+    World,
+};
+
+const MAGIC: &[u8; 12] = b"SH:C10:WORLD";
+const HEADER: usize = MAGIC.len() + 2 + 32 + 4;
+const INTENT_SIZE: usize = 5;
+const FOOTER: usize = 64;
+pub const MAX_SAVE_BYTES: usize = HEADER + 4 + MAX_TICKS as usize * INTENT_SIZE + FOOTER;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LoadError {
+    LegacyCheckpoint,
+    UnsupportedFormat,
+    UnsupportedRevision(u16),
+    ScenarioMismatch,
+    InvalidEnvelope,
+    ChecksumMismatch,
+    InvalidIntent,
+    StateMismatch,
+}
+
+pub(super) fn encode(world: &World) -> Vec<u8> {
+    let mut out = Wire(MAGIC.to_vec());
+    out.u16(match world.rules {
+        Rules::Original => 1,
+        Rules::Qinghe => 2,
+        Rules::Riverlands => 3,
+        Rules::ReedHall => 4,
+        Rules::RoadCompany => 5,
+        Rules::SectRivalry => 6,
+        Rules::SectPolitics => 7,
+        Rules::TrafficCourtesy => 8,
+        Rules::LivingAgency => 9,
+        Rules::FactionAgency => 10,
+        Rules::InstitutionalAgency => 11,
+        Rules::ContractAccountability => 12,
+    });
+    out.0.extend(scenario_digest(world.scenario, world.rules));
+    out.count(world.journal.len());
+    if let Some(region) = world.region() {
+        out.u32(region.seed);
+    }
+    for &intent in &world.journal {
+        out.intent(intent);
+    }
+    out.0.extend(state_digest(world));
+    out.0.extend(sha256(&out.0));
+    out.0
+}
+
+pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World, LoadError> {
+    if bytes.starts_with(b"SH:C05:STATE") || bytes.starts_with(b"SH:C03:STATE") {
+        return Err(LoadError::LegacyCheckpoint);
+    }
+    if !bytes.starts_with(MAGIC) {
+        return Err(LoadError::UnsupportedFormat);
+    }
+    if !(HEADER + FOOTER..=MAX_SAVE_BYTES).contains(&bytes.len()) {
+        return Err(LoadError::InvalidEnvelope);
+    }
+    let rules = match u16::from_le_bytes(bytes[12..14].try_into().unwrap()) {
+        1 => Rules::Original,
+        2 => Rules::Qinghe,
+        3 => Rules::Riverlands,
+        4 => Rules::ReedHall,
+        5 => Rules::RoadCompany,
+        6 => Rules::SectRivalry,
+        7 => Rules::SectPolitics,
+        8 => Rules::TrafficCourtesy,
+        9 => Rules::LivingAgency,
+        10 => Rules::FactionAgency,
+        11 => Rules::InstitutionalAgency,
+        12 => Rules::ContractAccountability,
+        revision => return Err(LoadError::UnsupportedRevision(revision)),
+    };
+    let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
+    let header = HEADER + if rules.has_region() { 4 } else { 0 };
+    if turns as u64 > MAX_TICKS || header + turns * INTENT_SIZE + FOOTER != bytes.len() {
+        return Err(LoadError::InvalidEnvelope);
+    }
+    let checksum_at = bytes.len() - 32;
+    if sha256(&bytes[..checksum_at]) != bytes[checksum_at..] {
+        return Err(LoadError::ChecksumMismatch);
+    }
+    let seed = rules
+        .has_region()
+        .then(|| u32::from_le_bytes(bytes[HEADER..header].try_into().unwrap()));
+    let scenario = seed.map_or(scenario, |seed| super::qinghe::region(seed, rules));
+    if scenario_digest(scenario, rules) != bytes[14..46] {
+        return Err(LoadError::ScenarioMismatch);
+    }
+
+    let state_at = checksum_at - 32;
+    let journal: Vec<_> = bytes[header..state_at]
+        .as_chunks::<INTENT_SIZE>()
+        .0
+        .iter()
+        .map(|record| read_intent(record, rules))
+        .collect::<Result<_, _>>()?;
+    let mut world = match seed {
+        Some(seed) => World::seeded(seed, rules),
+        None => World::with_rules(scenario, rules),
+    };
+    for intent in journal {
+        world
+            .step(world.tick(), intent)
+            .map_err(|_| LoadError::StateMismatch)?;
+    }
+    if state_digest(&world) != bytes[state_at..checksum_at] {
+        return Err(LoadError::StateMismatch);
+    }
+    Ok(world)
+}
+
+fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
+    let value = u32::from_le_bytes(record[1..].try_into().unwrap());
+    let actor = ActorId::new(value);
+    Ok(match (record[0], value) {
+        (0, 0) => Intent::Wait,
+        (1, 0) => Intent::Move(Direction::North),
+        (1, 1) => Intent::Move(Direction::East),
+        (1, 2) => Intent::Move(Direction::South),
+        (1, 3) => Intent::Move(Direction::West),
+        (2, _) => Intent::Talk(actor),
+        (3, 0) => Intent::Gather,
+        (4, 0) => Intent::Deliver,
+        (5, _) => Intent::Attack(actor),
+        (6, 0) => Intent::Guard,
+        (7, 0) if rules != Rules::Original => Intent::Practice,
+        (8, 0) if rules.has_region() => Intent::ChooseBackground(Background::Wanderer),
+        (8, 1) if rules.has_region() => Intent::ChooseBackground(Background::Herbalist),
+        (8, 2) if rules.has_region() => Intent::ChooseBackground(Background::Peddler),
+        (9, 0) if rules.has_region() => Intent::BuyHerb,
+        (10, 0) if rules.has_region() => Intent::SellHerb,
+        (11, 0) if rules.has_region() => Intent::JoinHall,
+        (12, 0) if rules.has_region() => Intent::Brew,
+        (13, 0) if rules.has_region() => Intent::UseRemedy,
+        (14, 0) if rules.has_school() => Intent::HallDuty,
+        (15, 0) if rules.has_school() => Intent::StudyForm,
+        (16, 0) if rules.has_school() => Intent::CenterQi,
+        (17, _) if rules.has_school() => Intent::ReedStrike(actor),
+        (18, _)
+            if matches!(
+                rules,
+                Rules::RoadCompany
+                    | Rules::SectRivalry
+                    | Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::Invite(actor)
+        }
+        (19, _)
+            if matches!(
+                rules,
+                Rules::RoadCompany
+                    | Rules::SectRivalry
+                    | Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::Provision(actor)
+        }
+        (20, _)
+            if matches!(
+                rules,
+                Rules::RoadCompany
+                    | Rules::SectRivalry
+                    | Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::Part(actor)
+        }
+        (21, 0)
+            if matches!(
+                rules,
+                Rules::SectRivalry
+                    | Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::OfferAccord
+        }
+        (22, 0)
+            if matches!(
+                rules,
+                Rules::SectRivalry
+                    | Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::SupportHall
+        }
+        (23, 0)
+            if matches!(
+                rules,
+                Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::PledgeLodge
+        }
+        (24, 0)
+            if matches!(
+                rules,
+                Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::AidLodge
+        }
+        (25, 0)
+            if matches!(
+                rules,
+                Rules::SectPolitics
+                    | Rules::TrafficCourtesy
+                    | Rules::LivingAgency
+                    | Rules::FactionAgency
+                    | Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+            ) =>
+        {
+            Intent::RenounceLodge
+        }
+        _ => return Err(LoadError::InvalidIntent),
+    })
+}
+
+fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
+    // Bump the rules identifier when changing gameplay semantics. Static map
+    // and NPC definition edits are fingerprinted automatically.
+    let mut out = Wire(match rules {
+        Rules::Original => b"SH:C10:RULES:v1".to_vec(),
+        Rules::Qinghe => b"SH:C10:RULES:v2".to_vec(),
+        Rules::Riverlands => b"SH:C10:RULES:v3".to_vec(),
+        Rules::ReedHall => b"SH:C10:RULES:v4".to_vec(),
+        Rules::RoadCompany => b"SH:C10:RULES:v5".to_vec(),
+        Rules::SectRivalry => b"SH:C10:RULES:v6".to_vec(),
+        Rules::SectPolitics => b"SH:C10:RULES:v7".to_vec(),
+        Rules::TrafficCourtesy => b"SH:C10:RULES:v8".to_vec(),
+        Rules::LivingAgency => b"SH:C10:RULES:v9".to_vec(),
+        Rules::FactionAgency => b"SH:C10:RULES:v10".to_vec(),
+        Rules::InstitutionalAgency => b"SH:C10:RULES:v11".to_vec(),
+        Rules::ContractAccountability => b"SH:C10:RULES:v12".to_vec(),
+    });
+    out.u64(MAX_TICKS);
+    out.string(scenario.name);
+    out.u32(scenario.width);
+    out.u32(scenario.height);
+    for row in scenario.terrain {
+        out.string(row);
+    }
+    for cell in [
+        scenario.entrance,
+        scenario.patch,
+        scenario.shrine,
+        scenario.clinic,
+    ] {
+        out.position(cell);
+    }
+    if rules.has_region() {
+        for site in Region::sites().positions() {
+            out.position(site);
+        }
+    }
+    out.u32(scenario.shrine_target);
+    out.u32(scenario.initial_source);
+    out.u64(scenario.regrow_every);
+    out.count(scenario.npcs.len());
+    for npc in scenario.npcs {
+        out.actor(npc.id);
+        out.string(npc.name);
+        out.u32(u32::from(npc.glyph));
+        out.u8(match npc.role {
+            Role::Medic => 0,
+            Role::Watch => 1,
+            Role::Supplier => 2,
+            Role::Traveler => 3,
+            Role::Grower => 4,
+            Role::Courier => 5,
+            Role::Mentor => 6,
+            Role::HallDeputy => 7,
+            Role::RivalEnvoy => 8,
+            Role::HallSteward => 9,
+        });
+        out.position(npc.spawn);
+        out.position(npc.home);
+        out.count(npc.route.len());
+        for &cell in npc.route {
+            out.position(cell);
+        }
+        out.u16(npc.hp);
+        out.u8(npc.rest_threshold);
+        out.u8(u8::from(npc.responds_to_attack));
+        out.u8(u8::from(npc.shares_news));
+        out.u8(u8::from(npc.report_to.is_some()));
+        if let Some(peer) = npc.report_to {
+            out.actor(peer);
+        }
+    }
+    out.count(scenario.contacts.len());
+    for &(a, b) in scenario.contacts {
+        out.actor(a);
+        out.actor(b);
+    }
+    if matches!(
+        rules,
+        Rules::RoadCompany
+            | Rules::SectRivalry
+            | Rules::SectPolitics
+            | Rules::TrafficCourtesy
+            | Rules::LivingAgency
+            | Rules::FactionAgency
+            | Rules::InstitutionalAgency
+            | Rules::ContractAccountability
+    ) {
+        out.count(scenario.recruits.len());
+        for &(actor, rule) in scenario.recruits {
+            out.actor(actor);
+            out.u8(match rule {
+                Invitation::OpenRoad => 0,
+                Invitation::SchoolMember => 1,
+                Invitation::LodgeMember => 2,
+            });
+        }
+    }
+    sha256(&out.0)
+}
+
+pub(super) fn state_digest(world: &World) -> [u8; 32] {
+    let mut out = Wire(match world.rules {
+        Rules::Original => b"SH:C10:STATE:v1".to_vec(),
+        Rules::Qinghe => b"SH:C10:STATE:v2".to_vec(),
+        Rules::Riverlands => b"SH:C10:STATE:v3".to_vec(),
+        Rules::ReedHall => b"SH:C10:STATE:v4".to_vec(),
+        Rules::RoadCompany => b"SH:C10:STATE:v5".to_vec(),
+        Rules::SectRivalry => b"SH:C10:STATE:v6".to_vec(),
+        Rules::SectPolitics => b"SH:C10:STATE:v7".to_vec(),
+        Rules::TrafficCourtesy => b"SH:C10:STATE:v8".to_vec(),
+        Rules::LivingAgency => b"SH:C10:STATE:v9".to_vec(),
+        Rules::FactionAgency => b"SH:C10:STATE:v10".to_vec(),
+        Rules::InstitutionalAgency => b"SH:C10:STATE:v11".to_vec(),
+        Rules::ContractAccountability => b"SH:C10:STATE:v12".to_vec(),
+    });
+    out.0.extend(scenario_digest(world.scenario, world.rules));
+    out.u64(world.tick);
+    out.position(world.player.position);
+    out.u16(world.player.hp);
+    out.u32(world.player.herbs);
+    if !world.original_rules() {
+        out.u8(world.breath);
+    }
+    if let Some(region) = world.region() {
+        out.region(region);
+    }
+    if let Some(school) = world.school() {
+        out.school(school);
+        if let Some(company) = world.company() {
+            out.u8(u8::from(school.vacancy_incident.is_some()));
+            if let Some(cause) = school.vacancy_incident {
+                out.u32(cause.0);
+            }
+            out.count(school.history.len());
+            for event in &school.history {
+                out.u64(event.at);
+                out.actor(event.former);
+                out.optional_actor(event.successor);
+            }
+            out.company(company);
+        }
+    }
+    if let Some(rivalry) = world.rivalry() {
+        out.rivalry(rivalry);
+    }
+    if let Some(politics) = world.politics() {
+        out.politics(politics);
+    }
+    if let Some(traffic) = world.traffic() {
+        out.traffic(traffic);
+    }
+    if let Some(relief) = world.relief() {
+        out.relief(relief);
+    }
+    if let Some(agency) = world.faction_agency_state() {
+        out.faction_agency(agency);
+    }
+    if let Some(contracts) = world.contracts() {
+        out.contracts(contracts);
+    }
+    if let Some(memory) = world.contract_memory() {
+        out.contract_memory(memory);
+    }
+    for quantity in [
+        world.supply.source,
+        world.supply.shrine,
+        world.supply.npc_deliveries,
+        world.supply.player_deliveries,
+        world.supply.consumed,
+        world.supply.regrown,
+    ] {
+        out.u32(quantity);
+    }
+    out.count(world.npcs.len());
+    for (&id, npc) in &world.npcs {
+        out.actor(id);
+        out.position(npc.position);
+        out.u16(npc.hp);
+        out.u8(npc.fatigue);
+        out.u32(npc.herbs);
+        if matches!(
+            world.rules,
+            Rules::RoadCompany
+                | Rules::SectRivalry
+                | Rules::SectPolitics
+                | Rules::TrafficCourtesy
+                | Rules::LivingAgency
+                | Rules::FactionAgency
+                | Rules::InstitutionalAgency
+                | Rules::ContractAccountability
+        ) {
+            out.u8(npc.packed_herbs);
+        }
+        out.count(npc.waypoint);
+        out.u8(u8::from(npc.last_investigated.is_some()));
+        if let Some(incident) = npc.last_investigated {
+            out.u32(incident.0);
+        }
+        out.goal(npc.activity.goal);
+        out.u64(npc.activity.since);
+    }
+    let social = &world.social;
+    out.count(social.incidents.len());
+    for incident in &social.incidents {
+        out.u32(incident.id.0);
+        out.u64(incident.tick);
+        out.actor(incident.source);
+        out.actor(incident.target);
+        out.position(incident.position);
+        out.u16(incident.damage);
+        out.u8(u8::from(incident.fatal));
+        out.u8(u8::from(incident.retaliation));
+    }
+    out.count(social.relations.len());
+    for (&(actor, other), relation) in &social.relations {
+        out.actor(actor);
+        out.actor(other);
+        out.u8(relation.regard.to_le_bytes()[0]);
+        out.u8(relation.familiarity);
+    }
+    out.count(social.known.len());
+    for (&actor, receipts) in &social.known {
+        out.actor(actor);
+        out.count(receipts.len());
+        for (&incident, receipt) in receipts {
+            out.u32(incident.0);
+            out.u64(receipt.acquired);
+            out.u8(receipt.regard_change.to_le_bytes()[0]);
+            match receipt.source {
+                KnowledgeSource::Observed => out.u8(0),
+                KnowledgeSource::Reported {
+                    sender,
+                    witness,
+                    hops,
+                } => {
+                    out.u8(1);
+                    out.actor(sender);
+                    out.actor(witness);
+                    out.u8(hops);
+                }
+            }
+        }
+    }
+    out.count(social.pending.len());
+    for report in social.pending.values() {
+        out.u32(report.incident.0);
+        out.actor(report.sender);
+        out.actor(report.recipient);
+        out.actor(report.witness);
+        out.u8(report.hops);
+        out.u64(report.sent);
+        out.u64(report.due);
+    }
+    out.count(world.journal.len());
+    for &intent in &world.journal {
+        out.intent(intent);
+    }
+    out.outcome(world.latest);
+    sha256(&out.0)
+}
+
+struct Wire(Vec<u8>);
+
+impl Wire {
+    fn u8(&mut self, value: u8) {
+        self.0.push(value);
+    }
+
+    fn u16(&mut self, value: u16) {
+        self.0.extend(value.to_le_bytes());
+    }
+
+    fn u32(&mut self, value: u32) {
+        self.0.extend(value.to_le_bytes());
+    }
+
+    fn u64(&mut self, value: u64) {
+        self.0.extend(value.to_le_bytes());
+    }
+
+    fn count(&mut self, value: usize) {
+        self.u32(u32::try_from(value).expect("bounded checkpoint field"));
+    }
+
+    fn string(&mut self, value: &str) {
+        self.count(value.len());
+        self.0.extend(value.as_bytes());
+    }
+
+    fn actor(&mut self, value: ActorId) {
+        self.u32(value.get());
+    }
+
+    fn position(&mut self, value: Position) {
+        self.u32(value.x);
+        self.u32(value.y);
+    }
+
+    fn region(&mut self, region: &Region) {
+        self.u32(region.seed);
+        self.u8(region
+            .background
+            .map_or(0, |background| background_code(background) + 1));
+        for value in [
+            region.coins,
+            region.market_coins,
+            region.market_herbs,
+            region.garden_herbs,
+            region.garden_regrown,
+            region.shipped_to_qinghe,
+            region.hall_offerings,
+            region.remedies,
+            region.remedies_used,
+            region.order_remaining,
+        ] {
+            self.u32(value);
+        }
+        self.u8(u8::from(region.enrolled));
+        self.u8(u8::from(region.order_in_transit.is_some()));
+        if let Some((due, amount)) = region.order_in_transit {
+            self.u64(due);
+            self.u32(amount);
+        }
+    }
+
+    fn school(&mut self, school: &School) {
+        self.optional_actor(school.leader);
+        self.u8(match school.duty {
+            Duty::Unassigned => 0,
+            Duty::Carrying => 1,
+            Duty::Delivered => 2,
+            Duty::Reported => 3,
+        });
+        self.u8(u8::from(school.form_learned));
+        self.u8(school.qi);
+        self.u8(u8::from(school.succession.is_some()));
+        if let Some(succession) = school.succession {
+            self.u64(succession.at);
+            self.actor(succession.former);
+            self.optional_actor(succession.successor);
+        }
+    }
+
+    fn company(&mut self, company: &Company) {
+        self.u32(company.herbs_used);
+        self.u8(u8::from(company.journey.is_some()));
+        if let Some(journey) = company.journey {
+            self.actor(journey.actor);
+            self.position(journey.last_seen);
+            self.u64(journey.seen_at);
+        }
+        self.count(company.history.len());
+        for event in &company.history {
+            self.u64(event.at);
+            self.actor(event.actor);
+            self.position(event.place);
+            self.u8(u8::from(event.witnessed));
+            self.u8(match event.kind {
+                JourneyEvent::Joined => 0,
+                JourneyEvent::Dismissed => 1,
+                JourneyEvent::LostContact => 2,
+                JourneyEvent::Distrust => 3,
+                JourneyEvent::Office => 4,
+                JourneyEvent::Fallen => 5,
+                JourneyEvent::PlayerFallen => 6,
+                JourneyEvent::FieldCare => 7,
+            });
+        }
+    }
+
+    fn rivalry(&mut self, rivalry: &Rivalry) {
+        self.u8(rivalry.pressure);
+        for value in [
+            rivalry.lodge_coins,
+            rivalry.market_purchases,
+            rivalry.petitions,
+            rivalry.consumed_herbs,
+            rivalry.accord_offerings,
+            rivalry.hall_patronage,
+        ] {
+            self.u32(value);
+        }
+        self.u64(rivalry.peace_until);
+        self.count(rivalry.history.len());
+        for event in &rivalry.history {
+            self.u64(event.at);
+            self.actor(event.actor);
+            self.position(event.position);
+            self.u8(u8::from(event.witnessed));
+            self.u8(match event.kind {
+                SectEventKind::Purchased => 0,
+                SectEventKind::Petitioned => 1,
+                SectEventKind::Accord => 2,
+                SectEventKind::Patronage => 3,
+            });
+        }
+    }
+
+    fn politics(&mut self, politics: &Politics) {
+        self.u8(match politics.allegiance {
+            Allegiance::Independent => 0,
+            Allegiance::Stonebank => 1,
+        });
+        for value in [
+            politics.hall_coins,
+            politics.hall_purchases,
+            politics.hall_supplies,
+            politics.lodge_oaths,
+            politics.lodge_aid,
+        ] {
+            self.u32(value);
+        }
+        self.u8(politics.hall_favor.to_le_bytes()[0]);
+        self.u8(politics.lodge_favor.to_le_bytes()[0]);
+        self.count(politics.history.len());
+        for event in &politics.history {
+            self.u64(event.at);
+            self.actor(event.actor);
+            self.position(event.position);
+            self.u8(u8::from(event.witnessed));
+            self.u8(match event.kind {
+                PoliticalEventKind::HallPurchase => 0,
+                PoliticalEventKind::HallSupply => 1,
+                PoliticalEventKind::LodgeOath => 2,
+                PoliticalEventKind::LodgeAid => 3,
+                PoliticalEventKind::LodgeRenunciation => 4,
+                PoliticalEventKind::HallPatronage => 5,
+            });
+        }
+    }
+
+    fn traffic(&mut self, traffic: &Traffic) {
+        self.u32(traffic.swaps);
+        self.u32(traffic.approach_steps);
+        self.count(traffic.stalls.len());
+        for (&actor, &stalled) in &traffic.stalls {
+            self.actor(actor);
+            self.u8(stalled);
+        }
+        self.count(traffic.history.len());
+        for event in &traffic.history {
+            self.u64(event.at);
+            self.actor(event.mover);
+            self.actor(event.other);
+            self.position(event.from);
+            self.position(event.to);
+            self.u8(match event.kind {
+                TrafficEventKind::PlayerPass => 0,
+                TrafficEventKind::NpcPass => 1,
+            });
+            self.u8(u8::from(event.witnessed));
+        }
+    }
+
+    fn relief(&mut self, relief: &Relief) {
+        self.u32(relief.requests);
+        self.u32(relief.deliveries);
+        self.u32(relief.failures);
+        self.u64(relief.last_closed);
+        self.u8(u8::from(relief.active.is_some()));
+        if let Some(case) = relief.active {
+            self.u64(case.opened);
+            self.actor(case.messenger);
+            self.actor(case.sponsor);
+            self.u8(match case.phase {
+                ReliefPhase::SeekingSponsor => 0,
+                ReliefPhase::Procuring => 1,
+                ReliefPhase::Delivering => 2,
+            });
+        }
+        self.count(relief.history.len());
+        for event in &relief.history {
+            self.u64(event.at);
+            self.actor(event.actor);
+            self.position(event.position);
+            self.u8(u8::from(event.witnessed));
+            self.u8(match event.kind {
+                ReliefEventKind::Observed => 0,
+                ReliefEventKind::Reported => 1,
+                ReliefEventKind::Purchased => 2,
+                ReliefEventKind::Redirected => 3,
+                ReliefEventKind::Delivered => 4,
+                ReliefEventKind::Withdrawn => 5,
+                ReliefEventKind::Failed => 6,
+            });
+        }
+    }
+
+    fn faction_agency(&mut self, agency: &FactionAgency) {
+        self.u32(agency.surveys);
+        self.u32(agency.lodge_deliveries);
+        self.u32(agency.hall_deliveries);
+        self.u8(agency.public_standing.to_le_bytes()[0]);
+        self.u64(agency.last_closed);
+        self.u8(u8::from(agency.active.is_some()));
+        if let Some(case) = agency.active {
+            self.u64(case.opened);
+            self.actor(case.envoy);
+            self.u8(match case.phase {
+                FactionPhase::Survey => 0,
+                FactionPhase::Procuring => 1,
+                FactionPhase::Delivering => 2,
+            });
+        }
+        self.count(agency.history.len());
+        for event in &agency.history {
+            self.u64(event.at);
+            self.actor(event.actor);
+            self.position(event.position);
+            self.u8(u8::from(event.witnessed));
+            self.u8(match event.kind {
+                FactionEventKind::SurveyClear => 0,
+                FactionEventKind::ShortageSeen => 1,
+                FactionEventKind::Purchased => 2,
+                FactionEventKind::Redirected => 3,
+                FactionEventKind::Delivered => 4,
+                FactionEventKind::HallDelivered => 5,
+                FactionEventKind::Withdrawn => 6,
+                FactionEventKind::Failed => 7,
+            });
+        }
+    }
+
+    fn contracts(&mut self, registry: &Contracts) {
+        self.u32(registry.opened);
+        self.u32(registry.completed);
+        self.u32(registry.failed);
+        for &tick in &registry.last_closed {
+            self.u64(tick);
+        }
+        self.count(registry.active.len());
+        for case in &registry.active {
+            self.u32(case.id);
+            self.need(case.need);
+            self.actor(case.requester);
+            self.u64(case.opened);
+            self.u8(match case.phase {
+                ContractPhase::Soliciting => 0,
+                ContractPhase::Awarding => 1,
+                ContractPhase::Procuring => 2,
+                ContractPhase::Delivering => 3,
+            });
+            self.count(case.next_candidate);
+            self.optional_actor(case.provider);
+            self.count(case.bids.len());
+            for bid in &case.bids {
+                self.actor(bid.provider);
+                self.u32(bid.quoted_coins);
+                self.u8(bid.local_trust.to_le_bytes()[0]);
+            }
+        }
+        self.count(registry.history.len());
+        for event in &registry.history {
+            self.u64(event.at);
+            self.u32(event.case_id);
+            self.need(event.need);
+            self.actor(event.actor);
+            self.position(event.position);
+            self.u8(u8::from(event.witnessed));
+            self.u8(match event.kind {
+                ContractEventKind::Observed => 0,
+                ContractEventKind::Offered => 1,
+                ContractEventKind::Declined => 2,
+                ContractEventKind::Awarded => 3,
+                ContractEventKind::Purchased => 4,
+                ContractEventKind::Redirected => 5,
+                ContractEventKind::Delivered => 6,
+                ContractEventKind::Failed => 7,
+                ContractEventKind::Withdrawn => 8,
+            });
+        }
+    }
+
+    fn contract_memory(&mut self, memory: &ContractMemory) {
+        self.count(memory.receipts.len());
+        for receipt in &memory.receipts {
+            self.u32(receipt.case_id);
+            self.need(receipt.need);
+            self.actor(receipt.requester);
+            self.actor(receipt.provider);
+            self.u64(receipt.opened);
+            self.u64(receipt.closed);
+            self.u8(u8::from(receipt.delivered));
+            self.u8(u8::from(receipt.inspected));
+        }
+        self.count(memory.regard.len());
+        for (&(requester, provider), &score) in &memory.regard {
+            self.actor(requester);
+            self.actor(provider);
+            self.u8(score.to_le_bytes()[0]);
+        }
+        self.count(memory.history.len());
+        for event in &memory.history {
+            self.u64(event.at);
+            self.u32(event.case_id);
+            self.need(event.need);
+            self.actor(event.requester);
+            self.actor(event.provider);
+            self.position(event.site);
+            self.u8(match event.finding {
+                AuditFinding::Delivered => 0,
+                AuditFinding::Unfulfilled => 1,
+            });
+            self.u8(u8::from(event.witnessed));
+        }
+    }
+
+    fn need(&mut self, need: Need) {
+        self.u8(match need {
+            Need::ShrineMedicine => 0,
+            Need::HallOfferings => 1,
+        });
+    }
+
+    fn optional_actor(&mut self, actor: Option<ActorId>) {
+        self.u8(u8::from(actor.is_some()));
+        if let Some(actor) = actor {
+            self.actor(actor);
+        }
+    }
+
+    fn intent(&mut self, intent: Intent) {
+        let (tag, payload) = match intent {
+            Intent::Wait => (0, 0),
+            Intent::Move(Direction::North) => (1, 0),
+            Intent::Move(Direction::East) => (1, 1),
+            Intent::Move(Direction::South) => (1, 2),
+            Intent::Move(Direction::West) => (1, 3),
+            Intent::Talk(id) => (2, id.get()),
+            Intent::Gather => (3, 0),
+            Intent::Deliver => (4, 0),
+            Intent::Attack(id) => (5, id.get()),
+            Intent::Guard => (6, 0),
+            Intent::Practice => (7, 0),
+            Intent::ChooseBackground(background) => (8, u32::from(background_code(background))),
+            Intent::BuyHerb => (9, 0),
+            Intent::SellHerb => (10, 0),
+            Intent::JoinHall => (11, 0),
+            Intent::Brew => (12, 0),
+            Intent::UseRemedy => (13, 0),
+            Intent::HallDuty => (14, 0),
+            Intent::StudyForm => (15, 0),
+            Intent::CenterQi => (16, 0),
+            Intent::ReedStrike(id) => (17, id.get()),
+            Intent::Invite(id) => (18, id.get()),
+            Intent::Provision(id) => (19, id.get()),
+            Intent::Part(id) => (20, id.get()),
+            Intent::OfferAccord => (21, 0),
+            Intent::SupportHall => (22, 0),
+            Intent::PledgeLodge => (23, 0),
+            Intent::AidLodge => (24, 0),
+            Intent::RenounceLodge => (25, 0),
+        };
+        self.u8(tag);
+        self.u32(payload);
+    }
+
+    fn goal(&mut self, goal: Goal) {
+        self.u8(match goal {
+            Goal::Idle => 0,
+            Goal::Rest => 1,
+            Goal::Patrol => 2,
+            Goal::TendClinic => 3,
+            Goal::CollectHerbs => 4,
+            Goal::DeliverHerbs => 5,
+            Goal::SeekCare => 6,
+            Goal::Treat(_) => 7,
+            Goal::Investigate(_) => 8,
+            Goal::Report { .. } => 9,
+            Goal::Retreat => 10,
+            Goal::Retaliate => 11,
+            Goal::StockGarden => 12,
+            Goal::StockMarket => 13,
+            Goal::CollectFreight => 14,
+            Goal::DeliverFreight => 15,
+            Goal::TeachAtHall => 16,
+            Goal::Follow(_) => 17,
+            Goal::FieldCare => 18,
+            Goal::BuyForLodge => 19,
+            Goal::PetitionHall => 20,
+            Goal::BuyForHall => 21,
+            Goal::SupplyHall => 22,
+            Goal::RequestRelief => 23,
+            Goal::BuyRelief => 24,
+            Goal::DeliverRelief => 25,
+            Goal::CampRest => 26,
+            Goal::SurveyQinghe => 27,
+            Goal::BuyLodgeAid => 28,
+            Goal::DeliverLodgeAid => 29,
+            Goal::NegotiateContract(_) => 30,
+            Goal::ProcureContract(_) => 31,
+            Goal::FulfillContract(_) => 32,
+            Goal::AuditContract(_) => 33,
+        });
+        match goal {
+            Goal::Treat(patient) => self.actor(patient),
+            Goal::Follow(site) => self.position(site),
+            Goal::Investigate(incident) => self.u32(incident.0),
+            Goal::Report {
+                recipient,
+                incident,
+            } => {
+                self.actor(recipient);
+                self.u32(incident.0);
+            }
+            Goal::NegotiateContract(need)
+            | Goal::ProcureContract(need)
+            | Goal::FulfillContract(need) => self.need(need),
+            Goal::AuditContract(need) => self.need(need),
+            _ => {}
+        }
+    }
+
+    fn outcome(&mut self, outcome: Option<Outcome>) {
+        self.u8(match outcome {
+            None => 0,
+            Some(Outcome::Waited) => 1,
+            Some(Outcome::Moved) => 2,
+            Some(Outcome::Spoke(_)) => 3,
+            Some(Outcome::Gathered) => 4,
+            Some(Outcome::Delivered) => 5,
+            Some(Outcome::Struck(_)) => 6,
+            Some(Outcome::Guarded) => 7,
+            Some(Outcome::Treated { .. }) => 8,
+            Some(Outcome::Rejected(_)) => 9,
+            Some(Outcome::Contribution { .. }) => 10,
+            Some(Outcome::Practiced { .. }) => 11,
+            Some(Outcome::BackgroundChosen(_)) => 12,
+            Some(Outcome::Traded { .. }) => 13,
+            Some(Outcome::Enrolled) => 14,
+            Some(Outcome::Brewed) => 15,
+            Some(Outcome::UsedRemedy { .. }) => 16,
+            Some(Outcome::GatheredPair) => 17,
+            Some(Outcome::DutyAccepted) => 18,
+            Some(Outcome::DutyDelivered) => 19,
+            Some(Outcome::DutyReported) => 20,
+            Some(Outcome::FormLearned) => 21,
+            Some(Outcome::QiCentered { .. }) => 22,
+            Some(Outcome::FormStruck(_)) => 23,
+            Some(Outcome::JoinedCompany(_)) => 24,
+            Some(Outcome::Provisioned(_)) => 25,
+            Some(Outcome::Parted(_)) => 26,
+            Some(Outcome::LodgeAccord { .. }) => 27,
+            Some(Outcome::HallSupported) => 28,
+            Some(Outcome::LodgePledged) => 29,
+            Some(Outcome::LodgeAided) => 30,
+            Some(Outcome::LodgeRenounced) => 31,
+        });
+        match outcome {
+            Some(
+                Outcome::Spoke(actor)
+                | Outcome::Struck(actor)
+                | Outcome::FormStruck(actor)
+                | Outcome::JoinedCompany(actor)
+                | Outcome::Provisioned(actor)
+                | Outcome::Parted(actor),
+            ) => self.actor(actor),
+            Some(Outcome::Treated { by, healed }) => {
+                self.actor(by);
+                self.u16(healed);
+            }
+            Some(Outcome::Contribution { witnesses }) => self.u8(witnesses),
+            Some(Outcome::Practiced { progress }) => self.u8(progress),
+            Some(Outcome::BackgroundChosen(background)) => self.u8(background_code(background)),
+            Some(Outcome::Traded { bought, coins }) => {
+                self.u8(u8::from(bought));
+                self.u32(coins);
+            }
+            Some(Outcome::UsedRemedy { healed }) => self.u16(healed),
+            Some(Outcome::QiCentered { total }) => self.u8(total),
+            Some(Outcome::LodgeAccord { until }) => self.u64(until),
+            Some(Outcome::Rejected(reason)) => self.u8(match reason {
+                Rejection::Dead => 0,
+                Rejection::Impassable => 1,
+                Rejection::Occupied => 2,
+                Rejection::UnknownActor => 3,
+                Rejection::OutOfReach => 4,
+                Rejection::Refused => 5,
+                Rejection::HealerAway => 6,
+                Rejection::Empty => 7,
+                Rejection::NoCargo => 8,
+                Rejection::PracticeComplete => 9,
+                Rejection::BackgroundLocked => 10,
+                Rejection::MarketClosed => 11,
+                Rejection::NotEnoughCoins => 12,
+                Rejection::HallClosed => 13,
+                Rejection::AlreadyEnrolled => 14,
+                Rejection::PracticeRequired => 15,
+                Rejection::MembershipRequired => 16,
+                Rejection::NoRemedy => 17,
+                Rejection::Uninjured => 18,
+                Rejection::DutyComplete => 19,
+                Rejection::RankRequired => 20,
+                Rejection::FormAlreadyKnown => 21,
+                Rejection::FormRequired => 22,
+                Rejection::QiFull => 23,
+                Rejection::InsufficientQi => 24,
+                Rejection::IntroductionRequired => 25,
+                Rejection::BoundToDuty => 26,
+                Rejection::CompanyFull => 27,
+                Rejection::NotCompanion => 28,
+                Rejection::PackFull => 29,
+                Rejection::SchoolContested => 30,
+                Rejection::OathConflict => 31,
+                Rejection::FactionTrustRequired => 32,
+            }),
+            _ => {}
+        }
+    }
+}
+
+fn background_code(background: Background) -> u8 {
+    match background {
+        Background::Wanderer => 0,
+        Background::Herbalist => 1,
+        Background::Peddler => 2,
+    }
+}

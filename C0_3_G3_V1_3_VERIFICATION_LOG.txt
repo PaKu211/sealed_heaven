@@ -1,0 +1,179 @@
+C0.3 G3 v1.3 FINAL VERIFICATION LOG
+Date: 17 November 2026
+Auditor: independent packer written from docs/C0_3_IMPLEMENTATION_SPEC.md section 3
+Encoder: session-local, not stored in the repository, not the remediation packing log
+Normative version: 1.3-approved
+Implementation authorized: False
+S1 started: False
+Bevy integration started: False
+
+H0_ascii=SH:C03:EVENT-INIT:v1
+H0=ff18f9506b6c610af37f18d81f10090ec125fba0507f9cbf9c927dfa95cc6b3c
+H0_match=True
+
+ENCODING
+integers=unsigned little-endian except i64 two's complement
+lists=u64 count then records, no padding
+tag=SH:C03:STATE u16 revision 1 u32 fixture 3
+content_hash=SHA-256(scenario block)
+blob=body || SHA-256(body)
+scenario=u64 wake; five goals x five i64 weights; five i64 minimums at i64::MIN; recipe_count 1; recipe 1 input def 1 qty 1 output def 2 qty 1 owner kind 3 id 2
+actor_mode_active=1
+shared_wake_interval=4
+m0t07_wake_interval=100
+grid=3x3 row-major center blocked bytes 01 01 01 01 00 01 01 01 01
+sites=1 has_grid 1; 2 has_grid 0; 9 has_grid 0
+edges=(1,2,1,cost 1), (2,1,2,cost 1)
+holders=20 kind 2, 30 kind 4
+event=SHA-256("SH:C03:EVENT:v1" || previous_digest || u64 id || u64 tick || u32 actor || u8 kind || payload)
+
+C03-T01a POST-BOUNDARY
+tick=1 seed=100 wake=4
+cursors next_actor=3 next_record=4 next_transaction=1 next_stock=2 next_event=5
+task1 goal=0 stage=4 due=3 created=0 progress=1 reservation=3 acquired=1 expiry=5 state=1
+task2 goal=0 stage=1 due=0 created=0 progress=0 reservations=none
+stock1 on_hand=1 active=1
+events=4
+digest_1=33dafb9c588fd7299c5742a873e8356e1cbda54998c3d9b2b55a4f89a2311e91
+digest_2=40076c534936ba6eaf9fa061d5b6e3e2f00a79123e92987e036b82ab18735d62
+digest_3=8b04d4b8805008055104ddfde0bfa51810a5f1adcdfed010e9208dfa8b97cf37
+digest_4=5fdbc5707211fbfc309f5ed75e21eaa83ebf3d7307da60cc442a3cd7f8340908
+body_len=1230
+blob_len=1262
+body_sha256=e48ec6e15929152f53c8f6812dcc2f7b08c0588d5e7b9886f0e053e5199cc41d
+blob_sha256=11f9aae46d7f0f04b6c3efead0a25c3086bc56904877d237c0a79ae032a293d9
+blob_published=11f9aae46d7f0f04b6c3efead0a25c3086bc56904877d237c0a79ae032a293d9
+blob_match=True
+goal_substituted_to_1_changes_blob=True
+progress_substituted_to_0_changes_blob=True
+work_rule_winner=4 Executing
+work_rule_loser=2 Queued no event
+promotion_progress_unchanged=True
+restore_walk=pass
+repack_identical=True
+
+M0-T06 POST-BOUNDARY
+tick=1 seed=100 wake=4
+cursors next_actor=21 next_record=41 next_transaction=1 next_stock=105 next_event=46
+winners=1..5 goal=0 stage=4 due=3 created=0 progress=1 reservations=four each
+reservation_ids actor_a=21+4*(a-1) .. 24+4*(a-1) stocks 101,102,103,104 acquired=1 expiry=10
+losers=6..20 goal=0 stage=1 due=0 progress=0 reservations=none
+on_hand 101=5 102=5 103=5 104=5
+active 101=5 102=5 103=5 104=5
+definitions 101=3/class2 102=4/class2 103=1/class1 104=5/class2
+event_count=45
+order=per winner four kind1 then kind7 Reserved; then losers kind2 stock 101 qty 1 reason 4; then winners kind7 Executing
+final_digest=9a6933915fde0ab4ccb2965a16c49278da2b8ca389ef768d22dd24bfce62d76c
+body_len=6721
+blob_len=6753
+body_sha256=bccf8e1adf8bc22623202a58fd5d84b9911d8d1e42959331c692fcc55e3f1ed0
+body_published=bccf8e1adf8bc22623202a58fd5d84b9911d8d1e42959331c692fcc55e3f1ed0
+body_match=True
+blob_sha256=528bc334bc1f081ccbf06c3247ec46909abd6f1073594dfb13ebd7ae16d640c9
+blob_published=528bc334bc1f081ccbf06c3247ec46909abd6f1073594dfb13ebd7ae16d640c9
+blob_match=True
+work_rule_winners=4 Executing
+work_rule_losers=2 Queued no event
+food_debited=False
+restore_walk=pass
+
+M0-T07 INITIAL
+tick=0 seed=100 wake=100 next_wake_tick=100
+cursors next_actor=2 next_record=401 next_transaction=1 next_stock=11 next_event=1
+digest=H0
+actor1 task_id=0
+stock10 def=1 class=1 qty=1 owner_kind=1 owner=1
+tasks=0 reservations=0
+body_len=830
+blob_len=862
+body_sha256=787a40d5eabadfeb9294851ee967dd0a81122fac44f91b04b961f1ced59f6f78
+body_published=787a40d5eabadfeb9294851ee967dd0a81122fac44f91b04b961f1ced59f6f78
+body_match=True
+blob_sha256=bd803a2c4ae4320ce2a1a5ceb49a2941aec48921c4cbc0a60b15c607b62148c3
+blob_published=bd803a2c4ae4320ce2a1a5ceb49a2941aec48921c4cbc0a60b15c607b62148c3
+blob_match=True
+alternate_next_actor_3_match=False
+alternate_wake_4_match=False
+restore_walk=pass
+hop_goals=4,4,4,3,4
+goal0_used_on_hops=False
+
+GOAL 0
+permitted_preinstalled=C03-T01a tasks 1 and 2; M0-T06 tasks 1-20; continuations that cite that packing
+decision_goals=1..5
+decision_winner_0_creates_task=False
+m0t07_replaces_goal=True
+
+PROGRESS_TICKS
+section_6_1_increments=False
+section_8_increments_on_advancing_work_transition=True
+c03t01a_winner_final=1
+c03t01a_loser_final=0
+m0t06_winners_final=1
+m0t06_losers_final=0
+c03t01b_after_reserved_executing_completing=2
+
+NAVIGATION
+grid_0_0_to_2_2_equal_cost=4
+lexicographic_direction_order=north,north,east,east
+directions=north 1, east 2, south 3, west 4
+site1_to_site2=edge 1 cost 1
+site9_reachable=False
+oc_edge=rejected
+
+FINDINGS
+F01=closed
+F02=closed
+F03=closed
+F04=closed
+F05=closed
+F06=closed
+F07=closed
+F08=closed
+F09=closed
+NF01=closed
+NF02=closed
+NF03=closed
+NF04=closed
+NF05=closed
+
+EXIT_COVERAGE
+C03-T01=acceptance sections 3-10
+M0-T06=acceptance section 11 plus section 3 one-unit case
+M0-T07=acceptance section 12
+M0-T08=acceptance section 13
+five_goals=specification section 7 and acceptance section 14
+conservation=specification section 6.2
+navigation=specification section 9 and acceptance section 14
+atomic_rollback=specification sections 6.1, 6.2, 10
+plan_S1_S4_reduces_exit=False
+plan_status_line_still_says_1_1=True
+plan_exit_table_complete=True
+
+COMPATIBILITY
+rustc=1.100.0
+cargo=1.100.0
+Cargo.lock_sha256=176e4bb5d145739c101c10296ce9f97d4a24917381be057e74134e0ba1779d75
+Cargo.lock_match_manifest=True
+ZIP path=D:\projek\sealed\Sealed_Heaven_C0_2_Source.zip
+ZIP_sha256=2804d33a785acb7331a0d82fd1c080bec82d0add348578abb4b1a6807db60a40
+ZIP_match=True
+WITNESS_1_len=566
+WITNESS_1_sha256=35b5104ca23dc7723baffbe76948a044fdda583eb8374604149133986e2f4ac2
+WITNESS_1_match=True
+EVENT3_digest_in_T01_FINAL=True
+EVENT3=1a1cc22bf1041c19845bceb790e6761dad0edaf41cb3eca1f90b0ce06f1875b1
+BEVY_in_Cargo_toml=False
+SH_C03_in_src=False
+bevy_in_src=False
+cargo_test_locked_offline=25 passed, 0 failed; doctests 2 passed, 0 failed
+
+FILE docs/C0_3_IMPLEMENTATION_SPEC.md bytes=34059 sha256=883f866874c53d28df70d8eec903498a68ba7f5727b5fc0160ac5302b01fd106
+FILE docs/C0_3_ACCEPTANCE_TESTS.md bytes=19628 sha256=71bb957af1be328b251adcf5b1de3d55878ce00f116da41077c7b61d33d61502
+FILE docs/C0_3_ARCHITECTURE_REVIEW.md bytes=2489 sha256=e0cedc65917afafb7ecec4995ab177590cab2fc88d8fe4ea4acc359b74a0ad6e
+FILE C0_3_G3_NF_RESOLUTION_MATRIX.md bytes=2740 sha256=3ac78711c5be2fe6c0e36629e4801e56e144973bdc37a3e1d3906d1f6b79e63d
+FILE C0_3_BALANCED_DEVELOPMENT_PLAN.md bytes=4436 sha256=b4760b9a65732075dbe52173ff0ff92ff83fb49ef41d190657d984cf8d9f67fc
+FILE Cargo.toml bytes=246 sha256=d1b7629e5a7ddc9f8920237529fce4d17be016470df88ab3d58317454b801bab
+FILE Cargo.lock bytes=4445 sha256=176e4bb5d145739c101c10296ce9f97d4a24917381be057e74134e0ba1779d75
+
+VERDICT=PASS

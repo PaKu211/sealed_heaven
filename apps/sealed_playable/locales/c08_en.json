@@ -1,0 +1,11 @@
+{
+  "c08.foe": "Hostile",
+  "c08.hp": "HP",
+  "c08.guard": "Guarding",
+  "c08.waited": "Waited one tick",
+  "c08.struck": "Struck the hostile",
+  "c08.guarded": "Raised a guard",
+  "c08.hit": "Hit",
+  "c08.death": "Died",
+  "c08.r_dead": "You cannot act"
+}

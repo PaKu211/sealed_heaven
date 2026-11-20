@@ -1,0 +1,54 @@
+Sealed Heaven C0.2 verification log
+17 November 2026
+Host: x86_64-pc-windows-msvc
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+cargo 1.100.0 (3acc79c0c 2026-11-05)
+commit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a
+
+PHASE 0 — baseline, before C0.2 edits
+Archive: D:\projek\sealed\Sealed_Heaven_C0_1_Source (1).zip
+Archive SHA-256: 9c3b7907845c8cf0ff2e757c9a5d4125a4264ab6977b7513b1300f16aaa51250
+Byte comparison of all 9 archive members to the working tree: MATCH
+Cargo.lock SHA-256: 176e4bb5d145739c101c10296ce9f97d4a24917381be057e74134e0ba1779d75
+
+cargo fmt --all --check
+cargo check --locked
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+  14 unit tests passed, 0 failed, 0 ignored
+  1 doctest passed
+cargo test --release --locked
+  14 unit tests passed, 0 failed, 0 ignored
+  1 doctest passed
+
+PHASE 4 — after C0.2 implementation
+Package directory: sealed-heaven-c0.1
+Commands used the pinned toolchain and --locked --offline.
+
+cargo fmt --all --check
+  exit 0
+cargo clippy --all-targets --locked --offline -- -D warnings
+  exit 0
+cargo clippy --tests --locked --offline -- -D warnings
+  exit 0
+cargo test --locked --offline
+  25 unit tests passed, 0 failed, 0 ignored
+  2 doctests passed (crate root, Simulation::drive)
+cargo test --release --locked --offline
+  25 unit tests passed, 0 failed, 0 ignored
+  2 doctests passed
+cargo tree -p sealed_sim --locked --offline -e normal,build,dev
+  sealed_sim v0.1.0
+  rand_chacha v0.10.0
+  sha2 v0.11.1
+  no Bevy, no serde, no new direct dependency
+
+Post-implementation archive comparison:
+  src/tests/golden.rs MATCH
+  Cargo.lock MATCH
+  rust-toolchain.toml MATCH
+  Cargo.toml DIFF (description text only; version remains 0.1.0)
+
+Golden vectors were not regenerated. C0.2 tests compare domain bytes with the transcribed section 11 literals.
+No test was ignored.
+This log does not certify any target other than x86_64-pc-windows-msvc.

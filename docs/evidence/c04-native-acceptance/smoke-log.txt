@@ -1,0 +1,65 @@
+﻿startup => native-001 tick=0 paused=True selected=1 locale=English hash=f6a4be4d54a82e6400c31fd0a4c241c638399a1e1961b23eeddbbe6cba0dddad digest=ff18f9506b6c610af37f18d81f10090ec125fba0507f9cbf9c927dfa95cc6b3c status=status.ready
+tick1-eat => native-002 tick=1 paused=True selected=1 locale=English hash=0d2d93d7afb543702ff707ee81fe4d44f4b44de9ae2961c2ff18c4ec56175736 digest=a7ff0e7ad6eebb247e1cdedf9795a34d1585a81ee8efe163ae9c81728a14f854 status=status.ready
+mouse-npc-1 => native-003 tick=1 paused=True selected=1 locale=English hash=0d2d93d7afb543702ff707ee81fe4d44f4b44de9ae2961c2ff18c4ec56175736 digest=a7ff0e7ad6eebb247e1cdedf9795a34d1585a81ee8efe163ae9c81728a14f854 status=status.ready
+npc1 Goal: Eat [1] /   Site: 1 · Grid: (0,0)
+mouse-npc-2 => native-004 tick=1 paused=True selected=2 locale=English hash=0d2d93d7afb543702ff707ee81fe4d44f4b44de9ae2961c2ff18c4ec56175736 digest=a7ff0e7ad6eebb247e1cdedf9795a34d1585a81ee8efe163ae9c81728a14f854 status=status.ready
+npc2 Goal: Rest [2] /   Site: 1 · Grid: (0,0)
+mouse-npc-3 => native-005 tick=1 paused=True selected=3 locale=English hash=0d2d93d7afb543702ff707ee81fe4d44f4b44de9ae2961c2ff18c4ec56175736 digest=a7ff0e7ad6eebb247e1cdedf9795a34d1585a81ee8efe163ae9c81728a14f854 status=status.ready
+npc3 Goal: Work [3] /   Site: 1 · Grid: (0,0)
+mouse-npc-4 => native-006 tick=1 paused=True selected=4 locale=English hash=0d2d93d7afb543702ff707ee81fe4d44f4b44de9ae2961c2ff18c4ec56175736 digest=a7ff0e7ad6eebb247e1cdedf9795a34d1585a81ee8efe163ae9c81728a14f854 status=status.ready
+npc4 Goal: Haul [4] /   Site: 1 · Grid: (0,0)
+mouse-npc-5 => native-007 tick=1 paused=True selected=5 locale=English hash=0d2d93d7afb543702ff707ee81fe4d44f4b44de9ae2961c2ff18c4ec56175736 digest=a7ff0e7ad6eebb247e1cdedf9795a34d1585a81ee8efe163ae9c81728a14f854 status=status.ready
+npc5 Goal: Return home [5] /   Site: 1 · Grid: (0,0)
+tab-after-npc5 => native-008 tick=1 paused=True selected=6 locale=English hash=0d2d93d7afb543702ff707ee81fe4d44f4b44de9ae2961c2ff18c4ec56175736 digest=a7ff0e7ad6eebb247e1cdedf9795a34d1585a81ee8efe163ae9c81728a14f854 status=status.ready
+tick2 => native-009 tick=2 paused=True selected=6 locale=English hash=6f1131bcb9541f94bea374a7a4aba875e3c1149242a3109a333a9ad14a445599 digest=933c02eddcbf86e8b668dd874abbb02fda61aa9f3855f316e6a12de963282e33 status=status.ready
+tick2-site   Site: 1 · Grid: (0,0)
+saved-tick2 => native-010 tick=2 paused=True selected=6 locale=English hash=6f1131bcb9541f94bea374a7a4aba875e3c1149242a3109a333a9ad14a445599 digest=933c02eddcbf86e8b668dd874abbb02fda61aa9f3855f316e6a12de963282e33 status=status.saved
+tick3-first => native-011 tick=3 paused=True selected=6 locale=English hash=133c7a921bbd119eaf0df18df932af07fe9251be447e1cccf1f118fb9981ed97 digest=b737fbc00a1a5a9f6fe7b57dec79851a3f69f1450bb4fdd088deabdb56d00cb3 status=status.saved
+loaded-tick2 => native-012 tick=2 paused=True selected=6 locale=English hash=6f1131bcb9541f94bea374a7a4aba875e3c1149242a3109a333a9ad14a445599 digest=933c02eddcbf86e8b668dd874abbb02fda61aa9f3855f316e6a12de963282e33 status=status.loaded
+tick3-replayed => native-013 tick=3 paused=True selected=6 locale=English hash=133c7a921bbd119eaf0df18df932af07fe9251be447e1cccf1f118fb9981ed97 digest=b737fbc00a1a5a9f6fe7b57dec79851a3f69f1450bb4fdd088deabdb56d00cb3 status=status.loaded
+tick4 => native-014 tick=4 paused=True selected=6 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival-npc-1 => native-015 tick=4 paused=True selected=1 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival-npc-2 => native-016 tick=4 paused=True selected=2 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival-npc-3 => native-017 tick=4 paused=True selected=2 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+continue-tick4 => native-018 tick=4 paused=True selected=2 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival-npc-3 => native-019 tick=4 paused=True selected=3 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival npc3   Site: 1 · Grid: (0,0)
+arrival-npc-4 => native-020 tick=4 paused=True selected=4 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival npc4   Site: 2 · Grid: (0,0)
+arrival-npc-5 => native-021 tick=4 paused=True selected=5 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival npc5   Site: 2 · Grid: (0,0)
+hauled-site2-definition7=4
+event-ids=77..144 count=68
+continue-tick4 => native-022 tick=4 paused=True selected=5 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival-npc-3 => native-023 tick=4 paused=True selected=3 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival npc3   Site: 1 · Grid: (0,0)
+arrival-npc-4 => native-024 tick=4 paused=True selected=4 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival npc4   Site: 2 · Grid: (0,0)
+arrival-npc-5 => native-025 tick=4 paused=True selected=5 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+arrival npc5   Site: 2 · Grid: (0,0)
+hauled-site2-definition7=4
+event-ids=77..144 count=68
+event-log-scrolled => native-026 tick=4 paused=True selected=5 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+english-click => native-027 tick=4 paused=True selected=5 locale=English hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+indonesian => native-028 tick=4 paused=True selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+locale-confirmed => native-029 tick=4 paused=True selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+pan-right => native-030 tick=4 paused=True selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+zoom-in => native-031 tick=4 paused=True selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+zoom-q-confirmed => native-032 tick=4 paused=True selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+zoom-e => native-033 tick=4 paused=True selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+camera-reset => native-034 tick=4 paused=True selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+resume-then-pause => native-035 tick=4 paused=False selected=5 locale=Indonesian hash=8faa211de3f29bc79031093ed4bec3a18b241baa088ac38f4bdacae1422c088f digest=b981cefa71e04aca5ef8445414e7b2f37705ee3e6fbaa6af4ed8a8d82c5a1a84 status=status.loaded
+settle => native-037 tick=495 paused=False locale=Indonesian hash=46191c6bd5ed9fd22ee4702a5195dd3327ee9b4f3ccf254199ab6db7cb320849 status=status.loaded
+settle => native-038 tick=500 paused=False locale=Indonesian hash=f5248634e3c6c991b09e7c141cbafa77f9c7cd61b39948ad9d6ba3765dfc8be0 status=status.loaded
+settle-rate-per-second=2.5
+steady-running => native-039 tick=521 paused=False locale=Indonesian hash=18454e6587dffcb06877b43461a6752b01c5746b1e1d56a3c2a06a1418b5507c status=status.loaded
+paused-after-run => native-040 tick=523 paused=False locale=Indonesian hash=861dc1cbb17c11afb1e044f4c55e5bb07b42fd7429729163a689c3c8c809f1ba status=status.loaded
+pause-confirmed => native-042 tick=572 paused=True locale=Indonesian hash=5cbe4012398b85d84bff9962a2e449614e9ad3b9cd9b756f1a16a5a2ed483c97 status=status.loaded
+pause-held => native-043 tick=572 paused=True locale=Indonesian hash=5cbe4012398b85d84bff9962a2e449614e9ad3b9cd9b756f1a16a5a2ed483c97 status=status.loaded
+resumed-for-sample => native-044 tick=572 paused=False locale=Indonesian hash=5cbe4012398b85d84bff9962a2e449614e9ad3b9cd9b756f1a16a5a2ed483c97 status=status.loaded
+sample-end => native-045 tick=593 paused=False locale=Indonesian hash=2437b2d61a9085d7ecadeb01e530f57d462c3c63f8a30cea3e3bfaee873ed6c0 status=status.loaded
+sample-paused => native-046 tick=594 paused=True locale=Indonesian hash=01b52e5f9a24b9869a8564fd8f7af8b0d60d492eb5ad55f9805860f745d2a758 status=status.loaded
+sample-paused-held => native-047 tick=594 paused=True locale=Indonesian hash=01b52e5f9a24b9869a8564fd8f7af8b0d60d492eb5ad55f9805860f745d2a758 status=status.loaded
+reset-demo => native-048 tick=0 paused=True locale=Indonesian hash=f6a4be4d54a82e6400c31fd0a4c241c638399a1e1961b23eeddbbe6cba0dddad status=status.reset
+english-restored => native-049 tick=0 paused=True locale=English hash=f6a4be4d54a82e6400c31fd0a4c241c638399a1e1961b23eeddbbe6cba0dddad status=status.reset
+PASS finish: pause hold, focused 10-second run, pause hold, reset to tick 0, English restored.

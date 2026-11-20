@@ -1,0 +1,18 @@
+﻿. . . ? ? ? ? ? ? ? ? ? ? ? ? ? ? 
+. . ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 
+@ you  * herb patch  + shrine  = clinic  # wall  x fallen  ? unseen
+Y  1 Yao Lian (3,3) - at the clinic
+G  2 Shen Wei (4,5)
+H  3 Lin Su (5,4) - carrying herbs
+Shrine stock 0/5
+Time passed.
+You witnessed no sect events.
+
+wasd move | n wait | f [id] attack | b guard | e [id] talk or request care | i [id] inspect
+g gather | h deliver | v save | o load | r reset | q quit | lang id
+m practice at the shrine (costs 1 herb, mastery improves guard)
+$ market  & garden  ^ hall | buy | sell | join | brew | remedy | help
+duty carry or report | study learn form | center gain Qi | form [id] strike
+invite [id] travel together | pack [id] give a medicinal herb | part [id] | journal
+V envoy | accord (offer 1 herb) | sponsor (Hall member, 1 herb) | factions | factionlog
+
