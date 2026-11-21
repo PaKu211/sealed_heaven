@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, btree_map::Entry};
 
 use super::contract_memory::AuditFinding;
 use super::navigation::in_reach;
-use super::{ActorId, Goal, Need, Position, World};
+use super::{ActorId, Goal, Need, Outcome, PLAYER, Position, Rejection, Rules, World};
 
 const REPORT_DELAY: u64 = 2;
 const MAX_HOPS: u8 = 2;
@@ -196,6 +196,18 @@ impl World {
             },
             witnessed,
         );
+        if self.rules == Rules::PlayerAgency
+            && self.player.alive()
+            && in_reach(self.player.position, event.site)
+            && self.player_sees(event.site)
+        {
+            self.learn_information(
+                PLAYER,
+                event,
+                Provenance::Firsthand { observer: PLAYER },
+                true,
+            );
+        }
     }
 
     pub(super) fn learn_information(
@@ -685,9 +697,15 @@ impl World {
                 .unwrap()
                 .pending
                 .remove(&(report.recipient, report.event));
-            if !self.npcs[&report.recipient].alive() || !self.npcs[&report.sender].alive() {
+            if !self.participant_alive(report.recipient) || !self.participant_alive(report.sender) {
                 continue;
             }
+            let (Some(sender_pos), Some(recipient_pos)) = (
+                self.participant_position(report.sender),
+                self.participant_position(report.recipient),
+            ) else {
+                continue;
+            };
             // Delivery still requires the conversation to have been queued while
             // both were in reach; the delay models travel of the news, not teleport.
             let event = match self
@@ -699,8 +717,7 @@ impl World {
                 None => continue,
             };
             self.social.meet(report.sender, report.recipient);
-            let witnessed = self.player_sees(self.npcs[&report.sender].position)
-                && self.player_sees(self.npcs[&report.recipient].position);
+            let witnessed = self.player_sees(sender_pos) && self.player_sees(recipient_pos);
             self.learn_information(
                 report.recipient,
                 event,
@@ -712,6 +729,203 @@ impl World {
                 witnessed,
             );
         }
+    }
+
+    pub(super) fn examine_site(&mut self) -> Result<Outcome, Rejection> {
+        if self.rules != Rules::PlayerAgency {
+            return Err(Rejection::Refused);
+        }
+        let here = self.player.position;
+        let Some(event) = self.information().and_then(|info| {
+            info.events
+                .iter()
+                .copied()
+                .filter(|event| in_reach(here, event.site) && self.perceives(here, event.site))
+                .filter(|event| player_can_learn(info, event.id))
+                .min_by_key(|event| (event.tick, event.id))
+        }) else {
+            return Err(Rejection::Empty);
+        };
+        // Standing on the evidence is the player's own check, not a retold rumor.
+        self.learn_information(
+            PLAYER,
+            event,
+            Provenance::Reported {
+                sender: PLAYER,
+                origin: event.requester,
+                hops: 1,
+            },
+            true,
+        );
+        Ok(Outcome::Learned(event.id))
+    }
+
+    pub(super) fn ask_witness(&mut self, npc: ActorId) -> Result<Outcome, Rejection> {
+        if self.rules != Rules::PlayerAgency {
+            return Err(Rejection::Refused);
+        }
+        let peer = self
+            .npcs
+            .get(&npc)
+            .filter(|peer| peer.alive())
+            .ok_or(Rejection::UnknownActor)?;
+        let peer_pos = peer.position;
+        self.require_reach(peer_pos)?;
+        let Some(event_id) = self.briefable_for_player(npc) else {
+            return Err(Rejection::Empty);
+        };
+        self.queue_player_report(npc, PLAYER, event_id)?;
+        Ok(Outcome::Briefed {
+            from: npc,
+            event: event_id,
+        })
+    }
+
+    pub(super) fn testify(&mut self, to: ActorId, event_id: EventId) -> Result<Outcome, Rejection> {
+        if self.rules != Rules::PlayerAgency {
+            return Err(Rejection::Refused);
+        }
+        if event_id.0 >= 1 << 24 {
+            return Err(Rejection::Refused);
+        }
+        let peer = self
+            .npcs
+            .get(&to)
+            .filter(|peer| peer.alive())
+            .ok_or(Rejection::UnknownActor)?;
+        let peer_pos = peer.position;
+        self.require_reach(peer_pos)?;
+        let knowledge = self
+            .information()
+            .and_then(|info| info.knowledge(PLAYER, event_id))
+            .ok_or(Rejection::Refused)?;
+        let event = self
+            .information()
+            .and_then(|info| info.event(event_id))
+            .copied()
+            .ok_or(Rejection::Refused)?;
+        let (origin, hops) = testimony_hops(knowledge.provenance);
+        if hops > MAX_HOPS {
+            return Err(Rejection::Refused);
+        }
+        let offered = Provenance::Reported {
+            sender: PLAYER,
+            origin,
+            hops,
+        };
+        if self
+            .information()
+            .and_then(|info| info.knowledge(to, event_id))
+            .is_some_and(|existing| {
+                provenance_rank(offered) >= provenance_rank(existing.provenance)
+            })
+        {
+            return Err(Rejection::Refused);
+        }
+        if self
+            .information()
+            .is_some_and(|info| info.pending.contains_key(&(to, event_id)))
+        {
+            return Err(Rejection::Refused);
+        }
+        self.queue_player_report(PLAYER, to, event.id)?;
+        Ok(Outcome::Testified {
+            to,
+            event: event.id,
+        })
+    }
+
+    fn briefable_for_player(&self, npc: ActorId) -> Option<EventId> {
+        let info = self.information()?;
+        info.known.get(&npc).and_then(|known| {
+            known.iter().rev().find_map(|(&event_id, receipt)| {
+                let event = info.event(event_id)?;
+                if self.tick.saturating_sub(event.tick) > NEWS_LIFETIME {
+                    return None;
+                }
+                if info.pending.contains_key(&(PLAYER, event_id)) {
+                    return None;
+                }
+                let hops = match receipt.provenance {
+                    Provenance::Firsthand { .. } => 1,
+                    Provenance::Reported { hops, .. } => hops.saturating_add(1),
+                };
+                if hops > MAX_HOPS {
+                    return None;
+                }
+                if let Some(existing) = info.knowledge(PLAYER, event_id) {
+                    let offered = Provenance::Reported {
+                        sender: npc,
+                        origin: provenance_origin(receipt.provenance),
+                        hops,
+                    };
+                    if provenance_rank(offered) >= provenance_rank(existing.provenance) {
+                        return None;
+                    }
+                }
+                Some(event_id)
+            })
+        })
+    }
+
+    fn queue_player_report(
+        &mut self,
+        sender: ActorId,
+        recipient: ActorId,
+        event_id: EventId,
+    ) -> Result<(), Rejection> {
+        let receipt = self
+            .information()
+            .and_then(|info| info.knowledge(sender, event_id))
+            .ok_or(Rejection::Refused)?;
+        let (origin, hops) = if sender == PLAYER {
+            testimony_hops(receipt.provenance)
+        } else {
+            (
+                provenance_origin(receipt.provenance),
+                match receipt.provenance {
+                    Provenance::Firsthand { .. } => 1,
+                    Provenance::Reported { hops, .. } => hops.saturating_add(1),
+                },
+            )
+        };
+        if hops > MAX_HOPS {
+            return Err(Rejection::Refused);
+        }
+        let witnessed = self
+            .participant_position(sender)
+            .zip(self.participant_position(recipient))
+            .is_some_and(|(from, to)| self.player_sees(from) && self.player_sees(to));
+        let tick = self.tick;
+        let info = self.information.as_mut().ok_or(Rejection::Refused)?;
+        if info.pending.len() >= PENDING_CAP {
+            return Err(Rejection::Refused);
+        }
+        if let Entry::Vacant(entry) = info.pending.entry((recipient, event_id)) {
+            entry.insert(InfoReport {
+                event: event_id,
+                sender,
+                recipient,
+                origin,
+                hops,
+                sent: tick,
+                due: tick + REPORT_DELAY,
+            });
+            push_history(
+                info,
+                InfoLogEvent {
+                    at: tick,
+                    kind: InfoLogKind::TestimonyQueued,
+                    actor: sender,
+                    other: Some(recipient),
+                    event: event_id,
+                    dispute: None,
+                    phase: None,
+                    witnessed,
+                },
+            );
+        }
+        Ok(())
     }
 
     pub(super) fn investigate_dispute(&mut self, institution: ActorId, dispute_id: u32) {
@@ -809,6 +1023,40 @@ impl World {
 
 fn is_institutional_requester(actor: ActorId) -> bool {
     Need::ALL.iter().any(|need| need.requester() == actor)
+}
+
+fn provenance_origin(provenance: Provenance) -> ActorId {
+    match provenance {
+        Provenance::Firsthand { observer } => observer,
+        Provenance::Reported { origin, .. } => origin,
+    }
+}
+
+/// Personal inspection stays one hop. A rumor the player only heard grows a hop.
+fn testimony_hops(provenance: Provenance) -> (ActorId, u8) {
+    match provenance {
+        Provenance::Firsthand { observer } => (observer, 1),
+        Provenance::Reported {
+            sender,
+            origin,
+            hops: 1,
+        } if sender == PLAYER => (origin, 1),
+        Provenance::Reported { origin, hops, .. } => (origin, hops.saturating_add(1)),
+    }
+}
+
+fn player_can_learn(info: &Information, event: EventId) -> bool {
+    match info.knowledge(PLAYER, event) {
+        None => true,
+        Some(existing) => {
+            let offered = Provenance::Reported {
+                sender: PLAYER,
+                origin: PLAYER,
+                hops: 1,
+            };
+            provenance_rank(offered) < provenance_rank(existing.provenance)
+        }
+    }
 }
 
 /// Lower rank is stronger evidence.

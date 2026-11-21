@@ -34,6 +34,8 @@ fn main() {
         sealed_playable::ascii::run_c20();
     } else if options.iter().any(|arg| arg == "--c21") {
         sealed_playable::ascii::run_c21();
+    } else if options.iter().any(|arg| arg == "--c22") {
+        sealed_playable::ascii::run_c22();
     } else if options.iter().any(|arg| arg == "--debug-world") {
         sealed_playable::ascii::run_developer_view();
     } else {

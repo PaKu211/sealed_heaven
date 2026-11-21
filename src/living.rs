@@ -17,6 +17,8 @@ mod information;
 mod information_tests;
 mod navigation;
 mod npc;
+#[cfg(test)]
+mod player_agency_tests;
 mod politics;
 mod qinghe;
 mod region;
@@ -102,6 +104,15 @@ pub enum Intent {
     PledgeLodge,
     AidLodge,
     RenounceLodge,
+    /// Ask a nearby actor for one institutional finding they know.
+    Ask(ActorId),
+    /// Inspect the player's current tile for evidence that is actually there.
+    Examine,
+    /// Tell one known finding to one actor. The payload packs both identities.
+    Testify {
+        to: ActorId,
+        event: EventId,
+    },
 }
 
 impl Intent {
@@ -194,6 +205,9 @@ pub enum Outcome {
     Struck(ActorId),
     Guarded,
     Treated { by: ActorId, healed: u16 },
+    Learned(EventId),
+    Briefed { from: ActorId, event: EventId },
+    Testified { to: ActorId, event: EventId },
     Rejected(Rejection),
 }
 
@@ -290,6 +304,7 @@ enum Rules {
     InstitutionalAgency,
     ContractAccountability,
     InformationDisputes,
+    PlayerAgency,
 }
 
 impl Rules {
@@ -310,6 +325,7 @@ impl Rules {
                 | Self::InstitutionalAgency
                 | Self::ContractAccountability
                 | Self::InformationDisputes
+                | Self::PlayerAgency
         )
     }
 }
@@ -363,6 +379,10 @@ impl World {
         Self::seeded(seed, Rules::InformationDisputes)
     }
 
+    pub fn player_agency(seed: u32) -> Self {
+        Self::seeded(seed, Rules::PlayerAgency)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -408,7 +428,7 @@ impl World {
             },
             social: {
                 let mut social = Social::new(scenario.contacts);
-                if rules == Rules::InformationDisputes {
+                if matches!(rules, Rules::InformationDisputes | Rules::PlayerAgency) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
                     social.link(ActorId::new(2), ActorId::new(36));
@@ -432,6 +452,7 @@ impl World {
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
+                    | Rules::PlayerAgency
             )
             .then(Company::default),
             rivalry: matches!(
@@ -444,6 +465,7 @@ impl World {
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
+                    | Rules::PlayerAgency
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -455,6 +477,7 @@ impl World {
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
+                    | Rules::PlayerAgency
             )
             .then(Politics::new),
             traffic: matches!(
@@ -465,6 +488,7 @@ impl World {
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
+                    | Rules::PlayerAgency
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -474,14 +498,16 @@ impl World {
                 Rules::InstitutionalAgency
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
+                    | Rules::PlayerAgency
             )
             .then(Contracts::new),
             contract_memory: matches!(
                 rules,
-                Rules::ContractAccountability | Rules::InformationDisputes
+                Rules::ContractAccountability | Rules::InformationDisputes | Rules::PlayerAgency
             )
             .then(ContractMemory::default),
-            information: (rules == Rules::InformationDisputes).then(Information::default),
+            information: matches!(rules, Rules::InformationDisputes | Rules::PlayerAgency)
+                .then(Information::default),
         }
     }
 
@@ -749,6 +775,29 @@ impl World {
             Intent::PledgeLodge => self.pledge_lodge(),
             Intent::AidLodge => self.aid_lodge(),
             Intent::RenounceLodge => self.renounce_lodge(),
+            Intent::Ask(id) => self.ask_witness(id),
+            Intent::Examine => self.examine_site(),
+            Intent::Testify { to, event } => self.testify(to, event),
+        }
+    }
+
+    pub fn is_player_agency(&self) -> bool {
+        self.rules == Rules::PlayerAgency
+    }
+
+    fn participant_alive(&self, id: ActorId) -> bool {
+        if id == PLAYER {
+            self.player.alive()
+        } else {
+            self.npcs.get(&id).is_some_and(|npc| npc.alive())
+        }
+    }
+
+    fn participant_position(&self, id: ActorId) -> Option<Position> {
+        if id == PLAYER {
+            Some(self.player.position)
+        } else {
+            self.npcs.get(&id).map(|npc| npc.position)
         }
     }
 

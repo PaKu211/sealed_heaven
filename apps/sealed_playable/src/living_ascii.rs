@@ -10,6 +10,7 @@ use sealed_sim::living::{
     ActorId, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent, ContractEventKind,
     Direction, DisputePhase, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, InfoLogKind,
     Intent, Invitation, JourneyEvent, LoadError, MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER,
+    Provenance,
     PoliticalEventKind, Position, Region, Rejection, ReliefEventKind, Role, SectEventKind,
     StepError, TrafficEventKind, World,
 };
@@ -36,7 +37,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.information().is_some() {
+        if self.world.is_player_agency() {
+            World::player_agency(seed)
+        } else if self.world.information().is_some() {
             World::information_disputes(seed)
         } else if self.world.contract_memory().is_some() {
             World::contract_accountability(seed)
@@ -64,8 +67,11 @@ impl Session {
         let mut words = lower.split_whitespace();
         let command = words.next().unwrap_or("look");
         let argument = words.next();
+        let second = words.next();
         if words.next().is_some()
+            || (second.is_some() && command != "tell")
             || (argument.is_some()
+                && second.is_none()
                 && !matches!(
                     command,
                     "invite"
@@ -81,6 +87,7 @@ impl Session {
                         | "lang"
                         | "seed"
                         | "background"
+                        | "ask"
                 ))
         {
             self.notice = text(
@@ -115,6 +122,99 @@ impl Session {
             "pledge" => Intent::PledgeLodge,
             "aidlodge" => Intent::AidLodge,
             "renounce" => Intent::RenounceLodge,
+            "examine" => Intent::Examine,
+            "ask" => match self.target(argument) {
+                Ok(id) => Intent::Ask(id),
+                Err(message) => {
+                    self.notice = message.into();
+                    return true;
+                }
+            },
+            "tell" => {
+                let Some(actor) = argument.and_then(|value| value.parse::<u32>().ok()) else {
+                    self.notice = text(
+                        self.locale,
+                        "tell <npc> <event>",
+                        "tell <npc> <peristiwa>",
+                    )
+                    .into();
+                    return true;
+                };
+                let Some(event) = second.and_then(|value| value.parse::<u32>().ok()) else {
+                    self.notice = text(
+                        self.locale,
+                        "tell <npc> <event>",
+                        "tell <npc> <peristiwa>",
+                    )
+                    .into();
+                    return true;
+                };
+                Intent::Testify {
+                    to: ActorId::new(actor),
+                    event: sealed_sim::living::EventId(event),
+                }
+            }
+            "know" => {
+                if !self.world.is_player_agency() {
+                    self.notice = text(
+                        self.locale,
+                        "know is part of the C2.3 campaign.",
+                        "know ada di kampanye C2.3.",
+                    )
+                    .into();
+                    return true;
+                }
+                let lines: Vec<String> = self
+                    .world
+                    .information()
+                    .and_then(|info| info.known.get(&PLAYER))
+                    .map(|known| {
+                        known
+                            .iter()
+                            .filter_map(|(&id, receipt)| {
+                                let event = self.world.information()?.event(id)?;
+                                let how = match receipt.provenance {
+                                    Provenance::Firsthand { .. } => {
+                                        text(self.locale, "witnessed", "disaksikan")
+                                    }
+                                    Provenance::Reported { sender, .. } if sender == PLAYER => {
+                                        text(self.locale, "examined", "diperiksa")
+                                    }
+                                    Provenance::Reported { hops, .. } => text(
+                                        self.locale,
+                                        if hops <= 1 { "heard" } else { "rumor" },
+                                        if hops <= 1 { "didengar" } else { "desas-desus" },
+                                    ),
+                                };
+                                let finding = match event.finding {
+                                    AuditFinding::Delivered => {
+                                        text(self.locale, "delivered", "terkirim")
+                                    }
+                                    AuditFinding::Unfulfilled => {
+                                        text(self.locale, "missed", "gagal")
+                                    }
+                                };
+                                Some(format!(
+                                    "#{id} {finding} {} ({how})",
+                                    actor_name(self.locale, &self.world, event.provider),
+                                    id = id.0
+                                ))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "You know no institutional finding.",
+                        "Kamu belum mengetahui temuan lembaga.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
             "background" => {
                 let background = match argument {
                     Some("wanderer") => Background::Wanderer,
@@ -144,7 +244,13 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.information().is_some() {
+                self.notice = if self.world.is_player_agency() {
+                    text(
+                        self.locale,
+                        "C2.3: You can witness, examine a site, ask someone what they know, or tell a specific finding to someone beside you. examine, ask [id], tell [id] [event], and know. Gossip you only heard does not carry the same weight as evidence you checked. --c22 keeps C2.2; --c21 keeps C2.1; --c20 keeps C2.0.",
+                        "C2.3: Kamu dapat menyaksikan, memeriksa lokasi, bertanya apa yang diketahui seseorang, atau menyampaikan temuan tertentu kepada orang di sampingmu. examine, ask [id], tell [id] [event], dan know. Gosip yang hanya kamu dengar tidak sekuat bukti yang kamu periksa. --c22 untuk C2.2; --c21 untuk C2.1; --c20 untuk C2.0.",
+                    )
+                } else if self.world.information().is_some() {
                     text(
                         self.locale,
                         "C2.2: Audit findings travel only by face-to-face testimony with provenance. Credible reports can open institutional disputes that change later contract awards, including suspension. Use contractlog, accountlog and infolog. --c21 keeps C2.1; --c20 keeps C2.0.",
@@ -1225,6 +1331,16 @@ impl Session {
                 )
             );
         }
+        if world.is_player_agency() {
+            let _ = writeln!(
+                out,
+                "{}",
+                tr(
+                    "know lists what you know | examine this tile | ask [id] | tell [id] [event]",
+                    "know daftar pengetahuan | examine petak ini | ask [id] | tell [id] [peristiwa]",
+                )
+            );
+        }
         out
     }
 
@@ -1853,6 +1969,29 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
             "You renounced Stonebank at Reed Hall.",
             "Kamu melepas sumpah Batu Tepi di Balai Alang-alang.",
         ),
+        Outcome::Learned(event) => {
+            return format!(
+                "{} #{}.",
+                tr("You examined evidence", "Kamu memeriksa bukti"),
+                event.0
+            );
+        }
+        Outcome::Briefed { from, event } => {
+            return format!(
+                "{} {} #{}.",
+                actor_name(locale, world, from),
+                tr("will tell you about finding", "akan menyampaikan temuan"),
+                event.0
+            );
+        }
+        Outcome::Testified { to, event } => {
+            return format!(
+                "{} {} #{}.",
+                tr("You offered finding", "Kamu menyampaikan temuan"),
+                event.0,
+                actor_name(locale, world, to)
+            );
+        }
         Outcome::QiCentered { total } => return format!("Qi {total}/{MAX_QI}."),
         Outcome::FormStruck(id) => {
             return format!(
@@ -2041,7 +2180,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 13);
+    run_campaign(debug_world, 14);
+}
+
+pub(crate) fn run_c22() {
+    run_campaign(false, 13);
 }
 
 pub(crate) fn run_c21() {
@@ -2086,7 +2229,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         10 => "checkpoint.c19",
         11 => "checkpoint.c20",
         12 => "checkpoint.c21",
-        _ => "checkpoint.c22",
+        13 => "checkpoint.c22",
+        _ => "checkpoint.c23",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2098,7 +2242,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         10 => World::faction_agency(0),
         11 => World::institutional_agency(0),
         12 => World::contract_accountability(0),
-        _ => World::information_disputes(0),
+        13 => World::information_disputes(0),
+        _ => World::player_agency(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -2657,5 +2802,50 @@ mod tests {
             u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
             8
         );
+    }
+
+    #[test]
+    fn c23_know_is_read_only_in_both_languages() {
+        let mut session = Session::new(PathBuf::from("unused"));
+        session.world = World::player_agency(0);
+        let before = session.world.checkpoint();
+        session.input("know");
+        assert!(session.notice.contains("You know no institutional finding"));
+        session.input("lang id");
+        session.input("know");
+        assert!(session.notice.contains("belum mengetahui temuan lembaga"));
+        session.input("help");
+        assert!(session.notice.contains("C2.3"));
+        assert_eq!(session.world.checkpoint(), before);
+        assert_eq!(session.world.tick(), 0);
+    }
+
+    #[test]
+    fn c23_public_commands_examine_and_can_withhold() {
+        let mut session = Session::new(PathBuf::from("unused"));
+        session.world = World::player_agency(0);
+        let tick = session.world.tick();
+        session.input("examine");
+        let view = session.frame();
+        assert!(
+            view.contains("supply is empty") || view.contains("examined evidence"),
+            "frame was: {view}"
+        );
+        assert!(session.world.tick() > tick);
+        session.input("tell 33 0");
+        let view = session.frame();
+        assert!(
+            view.contains("within one tile")
+                || view.contains("refuses")
+                || view.contains("unavailable")
+                || view.contains("offered finding"),
+            "frame was: {view}"
+        );
+        let after = session.world.checkpoint();
+        session.input("know");
+        session.input("lang id");
+        session.input("know");
+        assert!(session.notice.contains("belum mengetahui"));
+        assert_eq!(session.world.checkpoint(), after);
     }
 }

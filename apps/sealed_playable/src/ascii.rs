@@ -59,6 +59,10 @@ pub fn run_c21() {
     crate::living_ascii::run_c21();
 }
 
+pub fn run_c22() {
+    crate::living_ascii::run_c22();
+}
+
 #[cfg(feature = "desktop")]
 pub fn run_regional_window() {
     crate::living_pixel::run();
