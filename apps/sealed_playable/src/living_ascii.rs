@@ -1537,6 +1537,7 @@ impl Session {
             DisputePhase::Confirmed => text(self.locale, "confirmed", "dikonfirmasi"),
             DisputePhase::Refuted => text(self.locale, "refuted", "dibantah"),
             DisputePhase::Suspended => text(self.locale, "suspended", "ditangguhkan"),
+            DisputePhase::Restored => text(self.locale, "restored", "dipulihkan"),
         });
         let tick = event.at.to_string();
         let id = event.event.0.to_string();

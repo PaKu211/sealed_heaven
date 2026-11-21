@@ -192,7 +192,7 @@ fn repeated_testimony_does_not_multiply_dispute_effects() {
 }
 
 #[test]
-fn conflicting_delivery_testimony_can_refute_an_open_dispute() {
+fn conflicting_delivery_testimony_restores_trust_without_erasing_failure() {
     let mut world = World::information_disputes(0);
     fail_and_audit(&mut world, Need::ShrineMedicine, LODGE);
     let shrine = world.scenario.shrine;
@@ -239,12 +239,16 @@ fn conflicting_delivery_testimony_can_refute_an_open_dispute() {
         },
         false,
     );
+    let failure = world.information().unwrap().events[0];
+    assert_eq!(failure.finding, AuditFinding::Unfulfilled);
     assert!(world.information().unwrap().disputes.iter().any(|dispute| {
         dispute.institution == MENTOR
             && dispute.subject == LODGE
-            && dispute.phase == DisputePhase::Refuted
+            && dispute.event == failure.id
+            && dispute.phase == DisputePhase::Restored
     }));
     assert_eq!(world.dispute_bid_delta(MENTOR, LODGE), 0);
+    assert!(!world.provider_suspended(MENTOR, LODGE));
 }
 
 #[test]
@@ -697,6 +701,179 @@ fn hop_two_allegations_are_remembered_without_opening_disputes() {
     assert!(world.information().unwrap().disputes.is_empty());
     assert_eq!(world.dispute_bid_delta(MENTOR, HALL), 0);
     assert!(!world.provider_suspended(MENTOR, HALL));
+}
+
+#[test]
+fn later_hop_one_testimony_upgrades_hop_two_knowledge_and_opens_one_dispute() {
+    let mut world = World::information_disputes(0);
+    let shrine = world.scenario.shrine;
+    let event = InfoEvent {
+        id: EventId(0),
+        tick: world.tick,
+        case_id: 1,
+        need: Need::ShrineMedicine,
+        requester: WATCH,
+        provider: HALL,
+        finding: AuditFinding::Unfulfilled,
+        site: shrine,
+    };
+    world.information.as_mut().unwrap().events.push(event);
+    world.learn_information(
+        MENTOR,
+        event,
+        Provenance::Reported {
+            sender: ActorId::new(32),
+            origin: WATCH,
+            hops: 2,
+        },
+        false,
+    );
+    world.learn_information(
+        MENTOR,
+        event,
+        Provenance::Reported {
+            sender: WATCH,
+            origin: WATCH,
+            hops: 1,
+        },
+        false,
+    );
+    let knowledge = world
+        .information()
+        .unwrap()
+        .knowledge(MENTOR, event.id)
+        .unwrap();
+    assert_eq!(
+        knowledge.provenance,
+        Provenance::Reported {
+            sender: WATCH,
+            origin: WATCH,
+            hops: 1
+        }
+    );
+    assert_eq!(
+        world
+            .information()
+            .unwrap()
+            .disputes
+            .iter()
+            .filter(|dispute| dispute.institution == MENTOR && dispute.subject == HALL)
+            .count(),
+        1
+    );
+    assert_eq!(world.dispute_bid_delta(MENTOR, HALL), -2);
+}
+
+#[test]
+fn later_successful_delivery_restores_trust_without_erasing_failure_history() {
+    let mut world = World::information_disputes(0);
+    fail_and_audit(&mut world, Need::ShrineMedicine, HALL);
+    assert!(world.provider_suspended(WATCH, HALL));
+    let failure_id = world.information().unwrap().events[0].id;
+    let success = InfoEvent {
+        id: EventId(1),
+        tick: world.tick,
+        case_id: 99,
+        need: Need::ShrineMedicine,
+        requester: WATCH,
+        provider: HALL,
+        finding: AuditFinding::Delivered,
+        site: world.scenario.shrine,
+    };
+    world.information.as_mut().unwrap().events.push(success);
+    world.learn_information(
+        WATCH,
+        success,
+        Provenance::Firsthand { observer: WATCH },
+        false,
+    );
+    let failure = *world.information().unwrap().event(failure_id).unwrap();
+    assert_eq!(failure.finding, AuditFinding::Unfulfilled);
+    assert!(
+        world.information().unwrap().disputes.iter().any(|dispute| {
+            dispute.event == failure_id && dispute.phase == DisputePhase::Restored
+        })
+    );
+    assert!(!world.provider_suspended(WATCH, HALL));
+    assert_eq!(world.dispute_bid_delta(WATCH, HALL), 0);
+}
+
+#[test]
+fn aged_suspension_restores_after_review_period_without_refuting_the_case() {
+    let mut world = World::information_disputes(0);
+    fail_and_audit(&mut world, Need::ShrineMedicine, HALL);
+    let failure_id = world.information().unwrap().events[0].id;
+    let since = world
+        .information()
+        .unwrap()
+        .disputes
+        .iter()
+        .find(|dispute| dispute.event == failure_id)
+        .unwrap()
+        .resolved_at
+        .unwrap();
+    world.tick = since + 960;
+    world.advance_information_recovery();
+    assert!(
+        world.information().unwrap().disputes.iter().any(|dispute| {
+            dispute.event == failure_id && dispute.phase == DisputePhase::Restored
+        })
+    );
+    assert_eq!(
+        world
+            .information()
+            .unwrap()
+            .event(failure_id)
+            .unwrap()
+            .finding,
+        AuditFinding::Unfulfilled
+    );
+    assert!(!world.provider_suspended(WATCH, HALL));
+}
+
+#[test]
+fn full_event_ledger_recycles_settled_slots_instead_of_ignoring_new_findings() {
+    let mut world = World::information_disputes(0);
+    let shrine = world.scenario.shrine;
+    for case_id in 1..=96 {
+        let event = InfoEvent {
+            id: EventId(case_id - 1),
+            tick: u64::from(case_id),
+            case_id,
+            need: Need::ShrineMedicine,
+            requester: WATCH,
+            provider: HALL,
+            finding: AuditFinding::Delivered,
+            site: shrine,
+        };
+        world.information.as_mut().unwrap().events.push(event);
+        world.learn_information(
+            WATCH,
+            event,
+            Provenance::Firsthand { observer: WATCH },
+            false,
+        );
+    }
+    assert_eq!(world.information().unwrap().events.len(), 96);
+    world.record_audit_information(
+        200,
+        Need::ShrineMedicine,
+        WATCH,
+        LODGE,
+        AuditFinding::Unfulfilled,
+        shrine,
+        false,
+    );
+    assert_eq!(world.information().unwrap().events.len(), 96);
+    assert!(
+        world
+            .information()
+            .unwrap()
+            .events
+            .iter()
+            .any(|event| event.case_id == 200 && event.finding == AuditFinding::Unfulfilled)
+    );
+    assert!(world.provider_suspended(WATCH, LODGE));
 }
 
 #[test]

@@ -630,6 +630,7 @@ impl World {
         // 1. Arriving information is available to all decisions on this tick.
         self.deliver_reports();
         self.deliver_info_reports();
+        self.advance_information_recovery();
         self.regrow();
         self.advance_region();
         // 2. Apply the player's action and capture observation at the point of contact.

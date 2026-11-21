@@ -957,6 +957,7 @@ impl Wire {
                 DisputePhase::Confirmed => 2,
                 DisputePhase::Refuted => 3,
                 DisputePhase::Suspended => 4,
+                DisputePhase::Restored => 5,
             });
             self.u8(u8::from(dispute.resolved_at.is_some()));
             if let Some(at) = dispute.resolved_at {
@@ -987,6 +988,7 @@ impl Wire {
                     DisputePhase::Confirmed => 2,
                     DisputePhase::Refuted => 3,
                     DisputePhase::Suspended => 4,
+                    DisputePhase::Restored => 5,
                 });
             }
             self.u8(u8::from(event.witnessed));

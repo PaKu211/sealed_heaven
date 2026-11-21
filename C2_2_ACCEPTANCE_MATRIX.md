@@ -24,6 +24,10 @@
 | 20 | Player-facing visibility restrictions | witnessed-only history + ASCII privacy + absent-player history test | Implemented + tested |
 | 21 | Hop-2 allegation does not open disputes | `hop_two_allegations_are_remembered_without_opening_disputes` | Implemented + tested |
 | 22 | `--c21` / rev 12 has no information ledger | `revision_twelve_audits_never_create_information_or_suspension` + ASCII c21 flag test | Implemented + tested |
+| 23 | Later success restores trust without erasing failure | `later_successful_delivery_restores_trust_without_erasing_failure_history` | C2.2.1 tested |
+| 24 | Hop-2 upgrades to hop-1 without duplicate disputes | `later_hop_one_testimony_upgrades_hop_two_knowledge_and_opens_one_dispute` | C2.2.1 tested |
+| 25 | Timed suspension recovery | `aged_suspension_restores_after_review_period_without_refuting_the_case` | C2.2.1 tested |
+| 26 | Event ledger recycles settled slots | `full_event_ledger_recycles_settled_slots_instead_of_ignoring_new_findings` | C2.2.1 tested |
 
 ## Verification labels
 

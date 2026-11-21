@@ -18,6 +18,8 @@ const PENDING_CAP: usize = 64;
 const DISPUTE_CAP: usize = 32;
 const HISTORY_CAP: usize = 160;
 const KNOWLEDGE_PER_ACTOR: usize = 48;
+/// Suspended suppliers may be reconsidered after this many ticks.
+const SUSPENSION_DURATION: u64 = 960;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct EventId(pub u32);
@@ -68,8 +70,12 @@ pub enum DisputePhase {
     Open,
     Investigating,
     Confirmed,
+    /// The specific allegation about an event was disproven.
     Refuted,
     Suspended,
+    /// Trust restored after later performance or elapsed review. The original
+    /// failure event remains on record.
+    Restored,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -151,26 +157,34 @@ impl World {
         if self.information.is_none() {
             return;
         }
-        let id = EventId(self.information.as_ref().unwrap().events.len() as u32);
-        let event = InfoEvent {
-            id,
-            tick: self.tick,
-            case_id,
-            need,
-            requester,
-            provider,
-            finding,
-            site,
-        };
-        {
+        let event = {
             let info = self.information.as_mut().unwrap();
-            // Event identities are index-stable. When the ledger is full, refuse
-            // new findings rather than renumbering or silently rewriting history.
-            if info.events.len() >= EVENT_CAP {
+            let id = if info.events.len() < EVENT_CAP {
+                EventId(info.events.len() as u32)
+            } else if let Some(slot) = recyclable_event_slot(info) {
+                purge_event_references(info, EventId(slot as u32));
+                EventId(slot as u32)
+            } else {
+                // Every slot is still contested; skip rather than erase live disputes.
                 return;
+            };
+            let event = InfoEvent {
+                id,
+                tick: self.tick,
+                case_id,
+                need,
+                requester,
+                provider,
+                finding,
+                site,
+            };
+            if (id.0 as usize) < info.events.len() {
+                info.events[id.0 as usize] = event;
+            } else {
+                info.events.push(event);
             }
-            info.events.push(event);
-        }
+            event
+        };
         self.learn_information(
             requester,
             event,
@@ -193,22 +207,35 @@ impl World {
                 return;
             };
             info.pending.remove(&(actor, event.id));
-            if info.knowledge(actor, event.id).is_some() {
-                return;
+            if let Some(existing) = info.knowledge(actor, event.id) {
+                if provenance_rank(provenance) >= provenance_rank(existing.provenance) {
+                    // Equal or weaker repeats never multiply consequences.
+                    return;
+                }
+                // Stronger evidence upgrades the receipt in place.
+                let known = info.known.entry(actor).or_default();
+                known.insert(
+                    event.id,
+                    InfoKnowledge {
+                        acquired: self.tick,
+                        provenance,
+                    },
+                );
+            } else {
+                let known = info.known.entry(actor).or_default();
+                if known.len() == KNOWLEDGE_PER_ACTOR
+                    && let Some((&oldest, _)) = known.iter().next()
+                {
+                    known.remove(&oldest);
+                }
+                known.insert(
+                    event.id,
+                    InfoKnowledge {
+                        acquired: self.tick,
+                        provenance,
+                    },
+                );
             }
-            let known = info.known.entry(actor).or_default();
-            if known.len() == KNOWLEDGE_PER_ACTOR
-                && let Some((&oldest, _)) = known.iter().next()
-            {
-                known.remove(&oldest);
-            }
-            known.insert(
-                event.id,
-                InfoKnowledge {
-                    acquired: self.tick,
-                    provenance,
-                },
-            );
             let other = match provenance {
                 Provenance::Firsthand { observer } => Some(observer),
                 Provenance::Reported { sender, .. } => Some(sender),
@@ -244,7 +271,9 @@ impl World {
                 self.open_or_reinforce_dispute(actor, event, provenance);
             }
             AuditFinding::Delivered => {
-                self.refute_disputes_with_delivery(actor, event, provenance);
+                // Later success restores cooperation; it does not erase that an
+                // earlier case failed.
+                self.restore_trust_after_delivery(actor, event, provenance);
             }
         }
     }
@@ -255,6 +284,12 @@ impl World {
         event: InfoEvent,
         provenance: Provenance,
     ) {
+        let wanted = match provenance {
+            Provenance::Firsthand { .. } => DisputePhase::Suspended,
+            Provenance::Reported { hops: 1, .. } => DisputePhase::Open,
+            // Hop-2+ allegations remain knowledge until stronger evidence arrives.
+            Provenance::Reported { .. } => return,
+        };
         let Some(info) = self.information.as_mut() else {
             return;
         };
@@ -263,8 +298,27 @@ impl World {
             .iter_mut()
             .find(|dispute| dispute.institution == institution && dispute.event == event.id)
         {
-            // Repeated delivery of the same finding never multiplies effects.
-            let _ = existing;
+            if phase_rank(wanted) <= phase_rank(existing.phase) {
+                return;
+            }
+            existing.phase = wanted;
+            if wanted == DisputePhase::Suspended {
+                existing.resolved_at = Some(self.tick);
+            }
+            let id = existing.id;
+            push_history(
+                info,
+                InfoLogEvent {
+                    at: self.tick,
+                    kind: InfoLogKind::DisputeUpdated,
+                    actor: institution,
+                    other: Some(event.provider),
+                    event: event.id,
+                    dispute: Some(id),
+                    phase: Some(wanted),
+                    witnessed: false,
+                },
+            );
             return;
         }
         if info.disputes.iter().any(|dispute| {
@@ -285,7 +339,7 @@ impl World {
             if let Some(index) = info.disputes.iter().position(|dispute| {
                 matches!(
                     dispute.phase,
-                    DisputePhase::Confirmed | DisputePhase::Refuted | DisputePhase::Suspended
+                    DisputePhase::Refuted | DisputePhase::Restored | DisputePhase::Confirmed
                 )
             }) {
                 info.disputes.remove(index);
@@ -293,13 +347,6 @@ impl World {
                 return;
             }
         }
-        let phase = match provenance {
-            Provenance::Firsthand { .. } => DisputePhase::Suspended,
-            Provenance::Reported { hops: 1, .. } => DisputePhase::Open,
-            // Hop-2+ allegations remain as knowledge only. They do not open
-            // institutional disputes until a stronger report arrives.
-            Provenance::Reported { .. } => return,
-        };
         info.next_dispute += 1;
         let id = info.next_dispute;
         let dispute = Dispute {
@@ -309,8 +356,8 @@ impl World {
             subject: event.provider,
             event: event.id,
             need: event.need,
-            phase,
-            resolved_at: matches!(phase, DisputePhase::Suspended).then_some(self.tick),
+            phase: wanted,
+            resolved_at: matches!(wanted, DisputePhase::Suspended).then_some(self.tick),
         };
         info.disputes.push(dispute);
         push_history(
@@ -322,13 +369,13 @@ impl World {
                 other: Some(event.provider),
                 event: event.id,
                 dispute: Some(id),
-                phase: Some(phase),
+                phase: Some(wanted),
                 witnessed: false,
             },
         );
     }
 
-    fn refute_disputes_with_delivery(
+    fn restore_trust_after_delivery(
         &mut self,
         institution: ActorId,
         event: InfoEvent,
@@ -351,10 +398,14 @@ impl World {
                 && dispute.need == event.need
                 && matches!(
                     dispute.phase,
-                    DisputePhase::Open | DisputePhase::Investigating | DisputePhase::Suspended
+                    DisputePhase::Open
+                        | DisputePhase::Investigating
+                        | DisputePhase::Confirmed
+                        | DisputePhase::Suspended
                 )
             {
-                dispute.phase = DisputePhase::Refuted;
+                // Keep the original failure event identity; mark recovery only.
+                dispute.phase = DisputePhase::Restored;
                 dispute.resolved_at = Some(self.tick);
                 updates.push((dispute.id, dispute.event));
             }
@@ -369,7 +420,50 @@ impl World {
                     other: Some(event.provider),
                     event: event_id,
                     dispute: Some(dispute_id),
-                    phase: Some(DisputePhase::Refuted),
+                    phase: Some(DisputePhase::Restored),
+                    witnessed: false,
+                },
+            );
+        }
+    }
+
+    /// Time-based reconsideration of suspensions that have aged out.
+    pub(super) fn advance_information_recovery(&mut self) {
+        let Some(info) = self.information.as_mut() else {
+            return;
+        };
+        let tick = self.tick;
+        let mut updates = Vec::new();
+        for dispute in &mut info.disputes {
+            if dispute.phase != DisputePhase::Suspended {
+                continue;
+            }
+            let Some(since) = dispute.resolved_at else {
+                continue;
+            };
+            if tick.saturating_sub(since) < SUSPENSION_DURATION {
+                continue;
+            }
+            dispute.phase = DisputePhase::Restored;
+            dispute.resolved_at = Some(tick);
+            updates.push((
+                dispute.id,
+                dispute.event,
+                dispute.institution,
+                dispute.subject,
+            ));
+        }
+        for (dispute_id, event_id, institution, subject) in updates {
+            push_history(
+                info,
+                InfoLogEvent {
+                    at: tick,
+                    kind: InfoLogKind::DisputeUpdated,
+                    actor: institution,
+                    other: Some(subject),
+                    event: event_id,
+                    dispute: Some(dispute_id),
+                    phase: Some(DisputePhase::Restored),
                     witnessed: false,
                 },
             );
@@ -389,7 +483,7 @@ impl World {
                         DisputePhase::Investigating => -3,
                         DisputePhase::Confirmed => -5,
                         DisputePhase::Suspended => -8,
-                        DisputePhase::Refuted => 0,
+                        DisputePhase::Refuted | DisputePhase::Restored => 0,
                     })
                     .min()
                     .unwrap_or(0)
@@ -472,9 +566,7 @@ impl World {
                 if self.tick.saturating_sub(event.tick) > NEWS_LIFETIME {
                     return None;
                 }
-                if info.knowledge(recipient, event_id).is_some()
-                    || info.pending.contains_key(&(recipient, event_id))
-                {
+                if info.pending.contains_key(&(recipient, event_id)) {
                     return None;
                 }
                 let hops = match receipt.provenance {
@@ -483,6 +575,20 @@ impl World {
                 };
                 if hops > MAX_HOPS {
                     return None;
+                }
+                let offered = Provenance::Reported {
+                    sender,
+                    origin: match receipt.provenance {
+                        Provenance::Firsthand { observer } => observer,
+                        Provenance::Reported { origin, .. } => origin,
+                    },
+                    hops,
+                };
+                if let Some(existing) = info.knowledge(recipient, event_id) {
+                    // Allow delivery only when it would upgrade the recipient.
+                    if provenance_rank(offered) >= provenance_rank(existing.provenance) {
+                        return None;
+                    }
                 }
                 Some(event_id)
             })
@@ -674,7 +780,10 @@ impl World {
             entry.phase = final_phase;
             if matches!(
                 final_phase,
-                DisputePhase::Confirmed | DisputePhase::Suspended | DisputePhase::Refuted
+                DisputePhase::Confirmed
+                    | DisputePhase::Suspended
+                    | DisputePhase::Refuted
+                    | DisputePhase::Restored
             ) {
                 entry.resolved_at = Some(self.tick);
             }
@@ -697,6 +806,59 @@ impl World {
 
 fn is_institutional_requester(actor: ActorId) -> bool {
     Need::ALL.iter().any(|need| need.requester() == actor)
+}
+
+/// Lower rank is stronger evidence.
+fn provenance_rank(provenance: Provenance) -> u8 {
+    match provenance {
+        Provenance::Firsthand { .. } => 0,
+        Provenance::Reported { hops: 1, .. } => 1,
+        Provenance::Reported { .. } => 2,
+    }
+}
+
+/// Higher rank is a more severe active dispute state.
+fn phase_rank(phase: DisputePhase) -> u8 {
+    match phase {
+        DisputePhase::Refuted | DisputePhase::Restored => 0,
+        DisputePhase::Open => 1,
+        DisputePhase::Investigating => 2,
+        DisputePhase::Confirmed => 3,
+        DisputePhase::Suspended => 4,
+    }
+}
+
+fn event_is_hot(info: &Information, event: EventId) -> bool {
+    info.pending.keys().any(|&(recipient, id)| {
+        let _ = recipient;
+        id == event
+    }) || info.disputes.iter().any(|dispute| {
+        dispute.event == event
+            && matches!(
+                dispute.phase,
+                DisputePhase::Open
+                    | DisputePhase::Investigating
+                    | DisputePhase::Confirmed
+                    | DisputePhase::Suspended
+            )
+    })
+}
+
+fn recyclable_event_slot(info: &Information) -> Option<usize> {
+    info.events
+        .iter()
+        .enumerate()
+        .filter(|(index, entry)| entry.id.0 as usize == *index && !event_is_hot(info, entry.id))
+        .min_by_key(|(_, entry)| (entry.tick, entry.id))
+        .map(|(index, _)| index)
+}
+
+fn purge_event_references(info: &mut Information, event: EventId) {
+    for receipts in info.known.values_mut() {
+        receipts.remove(&event);
+    }
+    info.pending.retain(|&(_, id), _| id != event);
+    info.disputes.retain(|dispute| dispute.event != event);
 }
 
 fn push_history(info: &mut Information, event: InfoLogEvent) {

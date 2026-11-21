@@ -9,7 +9,7 @@ The supplied Windows ZIP archive was not present in this environment; the author
 
 | Gate | Result |
 | --- | --- |
-| `cargo test --lib living::` | **126 passed** |
+| `cargo test --lib living::` | **130 passed** (after C2.2.1 remediation) |
 | `cargo test --manifest-path apps/sealed_playable/Cargo.toml --no-default-features --lib` | **48 passed** |
 | Full playable `--no-default-features` | **79 passed** (48 lib + 6 adapters + 9 agency + 3 clock + 9 supply + 2 conflict + 2 memory) |
 | `cargo fmt --all -- --check` | clean |
@@ -79,10 +79,14 @@ cargo run --manifest-path apps/sealed_playable/Cargo.toml --bin sealed_agency --
 - `lang en` | `lang id`
 - `seed <n>` before the first turn; `v`/`o`/`r` save/load/reset
 
+## C2.2.1 remediation
+
+See `C2_2_1_REMEDIATION.md`. Checkpoint revision stays **13**. Later deliveries **restore** cooperation without rewriting failure events; hop-2 knowledge can upgrade; suspensions age out; settled event slots recycle.
+
 ## Known limits
 
 - Testimony currently carries **contract audit findings**, not arbitrary combat rumors or forged papers.
-- Investigation confirms hop-1 reports at the event site; hop-2 allegations are remembered but do not open disputes by themselves.
-- Event ledger refuses new findings at capacity (96) without renumbering stable `EventId`s.
+- Investigation confirms hop-1 reports at the event site; hop-2 allegations are remembered until stronger evidence arrives.
+- If every event slot is still hot (active dispute/pending), new findings may still wait.
 - Event-sourced restore replays the intent journal; ad-hoc test mutations outside `step()` are covered by digest membership tests, not by forged journals.
 - Human play feel and long bottleneck navigation still need a Windows play session. Windows gates were not run in this environment.

@@ -24,7 +24,7 @@ $env:SEALED_ASCII_COMMANDS = "accountlog;q"
 cargo run --manifest-path apps/sealed_playable/Cargo.toml --bin sealed_agency --no-default-features -- --c21
 ```
 
-Expected living count: **126** tests.  
+Expected living count: **130** tests (C2.2.1).  
 Expected playable `--lib` count: **48** tests.  
 Expected full playable `--no-default-features` (lib+integration crates listed in the audit report): **79** tests.
 

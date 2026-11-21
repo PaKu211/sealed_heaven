@@ -20,7 +20,7 @@ cargo clippy --manifest-path apps/sealed_playable/Cargo.toml --no-default-featur
 
 | Command | Result |
 | --- | --- |
-| `cargo test --lib living::` | **126 passed** |
+| `cargo test --lib living::` | **130 passed** (C2.2.1) |
 | playable `--no-default-features` `--lib` | **48 passed** |
 | playable adapters | **6 passed** |
 | playable agency (`tests` c05) | **9 passed** |
