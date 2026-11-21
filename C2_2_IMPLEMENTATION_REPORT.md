@@ -2,6 +2,8 @@
 
 ## Delivery status
 
+**Implementation commit:** `7d92ad3f2173875ed630ca13e967d63db2da9e5f`
+
 **Implemented and verified on Linux (cloud) against the C2.1 baseline commit `7694ce2`.**  
 The supplied Windows ZIP archive was not present in this environment; the authoritative Git tip `feat/c21-institutional-accountability` @ `7694ce2` was used instead.
 

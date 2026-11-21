@@ -2,6 +2,7 @@
 
 ## Environment
 
+- Implementation commit: `7d92ad3f2173875ed630ca13e967d63db2da9e5f`
 - Host: Linux cloud agent
 - rustc: 1.100.0
 - Baseline: Git commit `7694ce2` (`feat/c21-institutional-accountability`)
