@@ -1,6 +1,6 @@
 # C2.3 verification
 
-Host: Linux, rustc 1.100.0. Worktree `/root/sealed_heaven_c22`. Branch `feat/c23-player-agency`. Parent `4f7bdd69d36856daa55d789997ca0351a5235952`. Commands were run with `HOME=/root` except the banner smoke, which used `HOME=/tmp/c23_smoke` so it would not write a save under the user profile.
+Host: Linux, rustc 1.100.0. Worktree `/root/sealed_heaven_c22`. Branch `feat/c23-player-agency`. Parent `4f7bdd69d36856daa55d789997ca0351a5235952`. Implementation commit `8d24c89d44c9cbfe0a7f639d57e41864ab8c1e61`. Commands were run with `HOME=/root` except the banner smoke, which used `HOME=/tmp/c23_smoke` so it would not write a save under the user profile.
 
 ```text
 cargo fmt --all -- --check
