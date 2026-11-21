@@ -432,10 +432,12 @@ impl World {
             .bids
             .iter()
             .filter(|bid| !occupied.contains(&bid.provider))
+            .filter(|bid| !self.provider_suspended(case.requester, bid.provider))
             .max_by_key(|bid| {
                 (
                     i16::from(bid.local_trust)
-                        + i16::from(self.contract_regard(case.requester, bid.provider)),
+                        + i16::from(self.contract_regard(case.requester, bid.provider))
+                        + self.dispute_bid_delta(case.requester, bid.provider),
                     Reverse(bid.quoted_coins),
                     bid.provider == HALL,
                     Reverse(bid.provider),

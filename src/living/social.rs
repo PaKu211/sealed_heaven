@@ -63,7 +63,7 @@ impl Relationship {
         self.regard < 0
     }
 
-    fn trusts_news(self) -> bool {
+    pub(super) fn trusts_news(self) -> bool {
         self.familiarity > 0 && self.regard >= 0
     }
 }
@@ -120,6 +120,13 @@ impl Social {
             let relation = self.relations.entry(pair).or_default();
             relation.familiarity = relation.familiarity.saturating_add(1).min(8);
         }
+    }
+
+    /// Establish a trusted news link used by institutional briefing networks.
+    pub(super) fn link(&mut self, a: ActorId, b: ActorId) {
+        self.meet(a, b);
+        self.adjust(a, b, 1);
+        self.adjust(b, a, 1);
     }
 
     pub(super) fn aided(&mut self, helper: ActorId, patient: ActorId) {

@@ -7,11 +7,11 @@ use crate::encoding::sha256;
 
 use super::{
     ActorId, Allegiance, AuditFinding, Background, Company, ContractEventKind, ContractMemory,
-    ContractPhase, Contracts, Direction, Duty, FactionAgency, FactionEventKind, FactionPhase, Goal,
-    Intent, Invitation, JourneyEvent, KnowledgeSource, MAX_TICKS, Need, Outcome,
-    PoliticalEventKind, Politics, Position, Region, Rejection, Relief, ReliefEventKind,
-    ReliefPhase, Rivalry, Role, Rules, Scenario, School, SectEventKind, Traffic, TrafficEventKind,
-    World,
+    ContractPhase, Contracts, Direction, DisputePhase, Duty, FactionAgency, FactionEventKind,
+    FactionPhase, Goal, InfoLogKind, Information, Intent, Invitation, JourneyEvent,
+    KnowledgeSource, MAX_TICKS, Need, Outcome, PoliticalEventKind, Politics, Position, Provenance,
+    Region, Rejection, Relief, ReliefEventKind, ReliefPhase, Rivalry, Role, Rules, Scenario,
+    School, SectEventKind, Traffic, TrafficEventKind, World,
 };
 
 const MAGIC: &[u8; 12] = b"SH:C10:WORLD";
@@ -47,6 +47,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::FactionAgency => 10,
         Rules::InstitutionalAgency => 11,
         Rules::ContractAccountability => 12,
+        Rules::InformationDisputes => 13,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -84,6 +85,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         10 => Rules::FactionAgency,
         11 => Rules::InstitutionalAgency,
         12 => Rules::ContractAccountability,
+        13 => Rules::InformationDisputes,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -163,6 +165,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::Invite(actor)
@@ -178,6 +181,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::Provision(actor)
@@ -193,6 +197,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::Part(actor)
@@ -207,6 +212,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::OfferAccord
@@ -221,6 +227,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::SupportHall
@@ -234,6 +241,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::PledgeLodge
@@ -247,6 +255,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::AidLodge
@@ -260,6 +269,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             ) =>
         {
             Intent::RenounceLodge
@@ -284,6 +294,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::FactionAgency => b"SH:C10:RULES:v10".to_vec(),
         Rules::InstitutionalAgency => b"SH:C10:RULES:v11".to_vec(),
         Rules::ContractAccountability => b"SH:C10:RULES:v12".to_vec(),
+        Rules::InformationDisputes => b"SH:C10:RULES:v13".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -355,6 +366,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::FactionAgency
             | Rules::InstitutionalAgency
             | Rules::ContractAccountability
+            | Rules::InformationDisputes
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -383,6 +395,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::FactionAgency => b"SH:C10:STATE:v10".to_vec(),
         Rules::InstitutionalAgency => b"SH:C10:STATE:v11".to_vec(),
         Rules::ContractAccountability => b"SH:C10:STATE:v12".to_vec(),
+        Rules::InformationDisputes => b"SH:C10:STATE:v13".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -432,6 +445,9 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     if let Some(memory) = world.contract_memory() {
         out.contract_memory(memory);
     }
+    if let Some(information) = world.information() {
+        out.information(information);
+    }
     for quantity in [
         world.supply.source,
         world.supply.shrine,
@@ -459,6 +475,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::FactionAgency
                 | Rules::InstitutionalAgency
                 | Rules::ContractAccountability
+                | Rules::InformationDisputes
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -876,6 +893,107 @@ impl Wire {
         }
     }
 
+    fn information(&mut self, information: &Information) {
+        self.count(information.events.len());
+        for event in &information.events {
+            self.u32(event.id.0);
+            self.u64(event.tick);
+            self.u32(event.case_id);
+            self.need(event.need);
+            self.actor(event.requester);
+            self.actor(event.provider);
+            self.u8(match event.finding {
+                AuditFinding::Delivered => 0,
+                AuditFinding::Unfulfilled => 1,
+            });
+            self.position(event.site);
+        }
+        self.count(information.known.len());
+        for (&actor, receipts) in &information.known {
+            self.actor(actor);
+            self.count(receipts.len());
+            for (&event, receipt) in receipts {
+                self.u32(event.0);
+                self.u64(receipt.acquired);
+                match receipt.provenance {
+                    Provenance::Firsthand { observer } => {
+                        self.u8(0);
+                        self.actor(observer);
+                    }
+                    Provenance::Reported {
+                        sender,
+                        origin,
+                        hops,
+                    } => {
+                        self.u8(1);
+                        self.actor(sender);
+                        self.actor(origin);
+                        self.u8(hops);
+                    }
+                }
+            }
+        }
+        self.count(information.pending.len());
+        for report in information.pending.values() {
+            self.u32(report.event.0);
+            self.actor(report.sender);
+            self.actor(report.recipient);
+            self.actor(report.origin);
+            self.u8(report.hops);
+            self.u64(report.sent);
+            self.u64(report.due);
+        }
+        self.count(information.disputes.len());
+        for dispute in &information.disputes {
+            self.u32(dispute.id);
+            self.u64(dispute.opened);
+            self.actor(dispute.institution);
+            self.actor(dispute.subject);
+            self.u32(dispute.event.0);
+            self.need(dispute.need);
+            self.u8(match dispute.phase {
+                DisputePhase::Open => 0,
+                DisputePhase::Investigating => 1,
+                DisputePhase::Confirmed => 2,
+                DisputePhase::Refuted => 3,
+                DisputePhase::Suspended => 4,
+            });
+            self.u8(u8::from(dispute.resolved_at.is_some()));
+            if let Some(at) = dispute.resolved_at {
+                self.u64(at);
+            }
+        }
+        self.count(information.history.len());
+        for event in &information.history {
+            self.u64(event.at);
+            self.u8(match event.kind {
+                InfoLogKind::Learned => 0,
+                InfoLogKind::DisputeOpened => 1,
+                InfoLogKind::DisputeUpdated => 2,
+                InfoLogKind::TestimonyQueued => 3,
+            });
+            self.actor(event.actor);
+            self.optional_actor(event.other);
+            self.u32(event.event.0);
+            self.u8(u8::from(event.dispute.is_some()));
+            if let Some(id) = event.dispute {
+                self.u32(id);
+            }
+            self.u8(u8::from(event.phase.is_some()));
+            if let Some(phase) = event.phase {
+                self.u8(match phase {
+                    DisputePhase::Open => 0,
+                    DisputePhase::Investigating => 1,
+                    DisputePhase::Confirmed => 2,
+                    DisputePhase::Refuted => 3,
+                    DisputePhase::Suspended => 4,
+                });
+            }
+            self.u8(u8::from(event.witnessed));
+        }
+        self.u32(information.next_dispute);
+    }
+
     fn need(&mut self, need: Need) {
         self.u8(match need {
             Need::ShrineMedicine => 0,
@@ -962,6 +1080,8 @@ impl Wire {
             Goal::ProcureContract(_) => 31,
             Goal::FulfillContract(_) => 32,
             Goal::AuditContract(_) => 33,
+            Goal::DeliverTestimony { .. } => 34,
+            Goal::InvestigateDispute(_) => 35,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),
@@ -978,6 +1098,11 @@ impl Wire {
             | Goal::ProcureContract(need)
             | Goal::FulfillContract(need) => self.need(need),
             Goal::AuditContract(need) => self.need(need),
+            Goal::DeliverTestimony { recipient, event } => {
+                self.actor(recipient);
+                self.u32(event.0);
+            }
+            Goal::InvestigateDispute(id) => self.u32(id),
             _ => {}
         }
     }

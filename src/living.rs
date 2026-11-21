@@ -12,6 +12,9 @@ mod contracts_tests;
 mod faction_agency;
 #[cfg(test)]
 mod faction_agency_tests;
+mod information;
+#[cfg(test)]
+mod information_tests;
 mod navigation;
 mod npc;
 mod politics;
@@ -39,6 +42,10 @@ pub use contracts::{
 };
 pub use faction_agency::{
     FactionAgency, FactionCase, FactionEvent, FactionEventKind, FactionPhase,
+};
+pub use information::{
+    Dispute, DisputePhase, EventId, InfoEvent, InfoKnowledge, InfoLogEvent, InfoLogKind,
+    InfoReport, Information, Provenance,
 };
 pub use npc::{Activity, Goal, Npc, NpcDefinition, Role};
 pub use politics::{Allegiance, PoliticalEvent, PoliticalEventKind, Politics};
@@ -265,6 +272,7 @@ pub struct World {
     faction_agency: Option<FactionAgency>,
     contracts: Option<Contracts>,
     contract_memory: Option<ContractMemory>,
+    information: Option<Information>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -281,6 +289,7 @@ enum Rules {
     FactionAgency,
     InstitutionalAgency,
     ContractAccountability,
+    InformationDisputes,
 }
 
 impl Rules {
@@ -300,6 +309,7 @@ impl Rules {
                 | Self::FactionAgency
                 | Self::InstitutionalAgency
                 | Self::ContractAccountability
+                | Self::InformationDisputes
         )
     }
 }
@@ -349,6 +359,10 @@ impl World {
         Self::seeded(seed, Rules::ContractAccountability)
     }
 
+    pub fn information_disputes(seed: u32) -> Self {
+        Self::seeded(seed, Rules::InformationDisputes)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -392,7 +406,15 @@ impl World {
                 consumed: 0,
                 regrown: 0,
             },
-            social: Social::new(scenario.contacts),
+            social: {
+                let mut social = Social::new(scenario.contacts);
+                if rules == Rules::InformationDisputes {
+                    // Watch, Mentor and Hall steward can brief each other in person.
+                    social.link(ActorId::new(2), ActorId::new(33));
+                    social.link(ActorId::new(2), ActorId::new(36));
+                }
+                social
+            },
             journal: Vec::new(),
             latest: None,
             rules,
@@ -409,6 +431,7 @@ impl World {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             )
             .then(Company::default),
             rivalry: matches!(
@@ -420,6 +443,7 @@ impl World {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -430,6 +454,7 @@ impl World {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             )
             .then(Politics::new),
             traffic: matches!(
@@ -439,16 +464,24 @@ impl World {
                     | Rules::FactionAgency
                     | Rules::InstitutionalAgency
                     | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
             faction_agency: (rules == Rules::FactionAgency).then(FactionAgency::new),
             contracts: matches!(
                 rules,
-                Rules::InstitutionalAgency | Rules::ContractAccountability
+                Rules::InstitutionalAgency
+                    | Rules::ContractAccountability
+                    | Rules::InformationDisputes
             )
             .then(Contracts::new),
-            contract_memory: (rules == Rules::ContractAccountability).then(ContractMemory::default),
+            contract_memory: matches!(
+                rules,
+                Rules::ContractAccountability | Rules::InformationDisputes
+            )
+            .then(ContractMemory::default),
+            information: (rules == Rules::InformationDisputes).then(Information::default),
         }
     }
 
@@ -596,6 +629,7 @@ impl World {
         }
         // 1. Arriving information is available to all decisions on this tick.
         self.deliver_reports();
+        self.deliver_info_reports();
         self.regrow();
         self.advance_region();
         // 2. Apply the player's action and capture observation at the point of contact.
@@ -613,6 +647,7 @@ impl World {
         // 4. Queue new conversations from the committed positions.
         self.observe_player_death();
         self.queue_reports();
+        self.queue_info_reports();
         if let Some(traffic) = self.traffic.as_mut() {
             traffic.finish_tick();
         }

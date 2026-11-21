@@ -80,6 +80,11 @@ pub enum Goal {
     ProcureContract(super::Need),
     FulfillContract(super::Need),
     AuditContract(super::Need),
+    DeliverTestimony {
+        recipient: ActorId,
+        event: super::EventId,
+    },
+    InvestigateDispute(u32),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -196,6 +201,8 @@ impl World {
             })
             .flatten();
         let news = self.report_goal(npc);
+        let testimony = self.testimony_goal(npc);
+        let dispute_goal = self.dispute_goal(id);
         let disturbance = (npc.definition.role == Role::Watch)
             .then(|| {
                 self.social
@@ -261,7 +268,8 @@ impl World {
         let mission_active = self.relief_goal(npc).is_some()
             || faction_goal.is_some()
             || contract_goal.is_some()
-            || audit_goal.is_some();
+            || audit_goal.is_some()
+            || dispute_goal.is_some();
         let plans = [
             (100, retaliation.then_some(Goal::Retaliate)),
             (100, (threat && !retaliation).then_some(Goal::Retreat)),
@@ -273,12 +281,14 @@ impl World {
             (94, faction_goal),
             (95, contract_goal),
             (91, audit_goal),
+            (88, dispute_goal),
             (
                 86,
                 (care && npc.hp <= npc.definition.hp / 2).then_some(Goal::SeekCare),
             ),
             (80, patient),
             (expedition_priority, expedition),
+            (76, testimony),
             (74, news),
             (68, disturbance),
             (54 + u16::from(npc.fatigue), resting.then_some(Goal::Rest)),
@@ -331,7 +341,7 @@ impl World {
             .find_map(proposal)
     }
 
-    fn meeting_place(&self, observer: Position, peer: &Npc) -> Position {
+    pub(super) fn meeting_place(&self, observer: Position, peer: &Npc) -> Position {
         if self.perceives(observer, peer.position) {
             peer.position
         } else if peer.definition.role == Role::Medic {
@@ -345,7 +355,7 @@ impl World {
         }
     }
 
-    fn can_approach(&self, from: Position, destination: Position) -> bool {
+    pub(super) fn can_approach(&self, from: Position, destination: Position) -> bool {
         in_reach(from, destination)
             || next_step(self.scenario, from, destination, 1, |cell| {
                 self.walkable(cell) && !self.occupied(cell)
@@ -493,6 +503,21 @@ impl World {
                 self.work_contract(id, goal);
             }
             Goal::AuditContract(need) => self.inspect_contract(id, need),
+            Goal::DeliverTestimony { recipient, event } => {
+                let meeting = self
+                    .npcs
+                    .get(&recipient)
+                    .map(|peer| self.meeting_place(pos, peer));
+                if let Some(destination) = meeting {
+                    if in_reach(pos, destination) {
+                        // Face-to-face presence queues the delayed institutional report.
+                    } else {
+                        self.travel(id, destination, 1);
+                    }
+                }
+                let _ = event;
+            }
+            Goal::InvestigateDispute(dispute_id) => self.investigate_dispute(id, dispute_id),
         }
     }
 

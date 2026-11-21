@@ -8,10 +8,10 @@ use std::{
 
 use sealed_sim::living::{
     ActorId, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent, ContractEventKind,
-    Direction, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, Intent, Invitation,
-    JourneyEvent, LoadError, MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER, PoliticalEventKind,
-    Position, Region, Rejection, ReliefEventKind, Role, SectEventKind, StepError, TrafficEventKind,
-    World,
+    Direction, DisputePhase, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, InfoLogKind,
+    Intent, Invitation, JourneyEvent, LoadError, MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER,
+    PoliticalEventKind, Position, Region, Rejection, ReliefEventKind, Role, SectEventKind,
+    StepError, TrafficEventKind, World,
 };
 
 use crate::{clock, locale::Locale, persistence};
@@ -27,7 +27,7 @@ pub(crate) struct Session {
 impl Session {
     pub(crate) fn new(save_path: PathBuf) -> Self {
         Self {
-            world: World::contract_accountability(0),
+            world: World::information_disputes(0),
             save_path,
             notice: String::new(),
             locale: Locale::default(),
@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.contract_memory().is_some() {
+        if self.world.information().is_some() {
+            World::information_disputes(seed)
+        } else if self.world.contract_memory().is_some() {
             World::contract_accountability(seed)
         } else if self.world.contracts().is_some() {
             World::institutional_agency(seed)
@@ -142,7 +144,13 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.contract_memory().is_some() {
+                self.notice = if self.world.information().is_some() {
+                    text(
+                        self.locale,
+                        "C2.2: Audit findings travel only by face-to-face testimony with provenance. Credible reports can open institutional disputes that change later contract awards, including suspension. Use contractlog, accountlog and infolog. --c21 keeps C2.1; --c20 keeps C2.0.",
+                        "C2.2: Temuan audit hanya menyebar lewat kesaksian tatap muka dengan asal-usul. Laporan kredibel dapat membuka sengketa lembaga yang mengubah kontrak berikutnya, termasuk penangguhan. Gunakan contractlog, accountlog dan infolog. --c21 untuk C2.1; --c20 untuk C2.0.",
+                    )
+                } else if self.world.contract_memory().is_some() {
                     text(
                         self.locale,
                         "C2.1: Institutions inspect their own delivery sites before judging past providers. Confirmed deliveries earn local trust; missed deadlines reduce it. Those memories influence later in-person bids, never remote knowledge. Use contractlog and accountlog. --c20 keeps the original contract campaign.",
@@ -382,6 +390,28 @@ impl Session {
                         self.locale,
                         "No witnessed contract audits.",
                         "Belum ada pemeriksaan kontrak yang kamu saksikan.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
+            "infolog" => {
+                let lines: Vec<_> = self
+                    .world
+                    .information()
+                    .into_iter()
+                    .flat_map(|info| info.history.iter().rev())
+                    .filter(|event| event.witnessed)
+                    .take(8)
+                    .map(|event| self.info_line(event))
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "No witnessed institutional information.",
+                        "Belum ada informasi lembaga yang kamu saksikan.",
                     )
                     .into()
                 } else {
@@ -1045,6 +1075,17 @@ impl Session {
                 let _ = writeln!(out, "{}", self.account_line(event));
             }
         }
+        if let Some(information) = world.information() {
+            for event in information
+                .history
+                .iter()
+                .rev()
+                .take_while(|event| event.at == world.tick())
+                .filter(|event| event.witnessed)
+            {
+                let _ = writeln!(out, "{}", self.info_line(event));
+            }
+        }
         if !self.notice.is_empty() {
             let _ = writeln!(out, "{}", self.notice);
         }
@@ -1171,6 +1212,16 @@ impl Session {
                 tr(
                     "accountlog: witnessed site audits and provider reliability learned in person",
                     "accountlog: pemeriksaan lokasi dan keandalan penyedia yang terlihat langsung",
+                )
+            );
+        }
+        if world.information().is_some() {
+            let _ = writeln!(
+                out,
+                "{}",
+                tr(
+                    "infolog: witnessed testimony and institutional disputes you were present for",
+                    "infolog: kesaksian dan sengketa lembaga yang kamu saksikan langsung",
                 )
             );
         }
@@ -1474,6 +1525,63 @@ impl Session {
         )
     }
 
+    fn info_line(&self, event: &sealed_sim::living::InfoLogEvent) -> String {
+        let actor = actor_name(self.locale, &self.world, event.actor);
+        let other = event
+            .other
+            .map(|id| actor_name(self.locale, &self.world, id))
+            .unwrap_or_else(|| text(self.locale, "someone", "seseorang"));
+        let phase = event.phase.map(|phase| match phase {
+            DisputePhase::Open => text(self.locale, "opened", "dibuka"),
+            DisputePhase::Investigating => text(self.locale, "investigating", "diselidiki"),
+            DisputePhase::Confirmed => text(self.locale, "confirmed", "dikonfirmasi"),
+            DisputePhase::Refuted => text(self.locale, "refuted", "dibantah"),
+            DisputePhase::Suspended => text(self.locale, "suspended", "ditangguhkan"),
+        });
+        let tick = event.at.to_string();
+        let id = event.event.0.to_string();
+        match event.kind {
+            InfoLogKind::Learned => text(
+                self.locale,
+                "t{tick} · {actor} learned institutional finding #{id}.",
+                "t{tick} · {actor} mempelajari temuan lembaga #{id}.",
+            )
+            .replace("{tick}", &tick)
+            .replace("{actor}", actor)
+            .replace("{id}", &id),
+            InfoLogKind::DisputeOpened => text(
+                self.locale,
+                "t{tick} · {actor} {verb} a dispute about {other}.",
+                "t{tick} · {actor} {verb} sengketa tentang {other}.",
+            )
+            .replace("{tick}", &tick)
+            .replace("{actor}", actor)
+            .replace("{verb}", phase.unwrap_or(text(self.locale, "opened", "dibuka")))
+            .replace("{other}", other),
+            InfoLogKind::DisputeUpdated => text(
+                self.locale,
+                "t{tick} · {actor} marked the dispute about {other} as {status}.",
+                "t{tick} · {actor} menandai sengketa tentang {other} sebagai {status}.",
+            )
+            .replace("{tick}", &tick)
+            .replace("{actor}", actor)
+            .replace("{other}", other)
+            .replace(
+                "{status}",
+                phase.unwrap_or(text(self.locale, "updated", "diperbarui")),
+            ),
+            InfoLogKind::TestimonyQueued => text(
+                self.locale,
+                "t{tick} · {actor} began briefing {other} about finding #{id}.",
+                "t{tick} · {actor} mulai memberi tahu {other} tentang temuan #{id}.",
+            )
+            .replace("{tick}", &tick)
+            .replace("{actor}", actor)
+            .replace("{other}", other)
+            .replace("{id}", &id),
+        }
+    }
+
     pub(crate) fn duty_hint(&self) -> Option<&'static str> {
         let tr = |en, id| text(self.locale, en, id);
         match self.world.school()?.duty {
@@ -1665,6 +1773,14 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::AuditContract(_) => (
             "inspecting the delivery site",
             "memeriksa lokasi pengiriman",
+        ),
+        Goal::DeliverTestimony { .. } => (
+            "carrying institutional testimony",
+            "membawa kesaksian lembaga",
+        ),
+        Goal::InvestigateDispute(_) => (
+            "investigating an institutional dispute",
+            "menyelidiki sengketa lembaga",
         ),
     };
     text(locale, en, id)
@@ -1924,7 +2040,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 12);
+    run_campaign(debug_world, 13);
+}
+
+pub(crate) fn run_c21() {
+    run_campaign(false, 12);
 }
 
 pub(crate) fn run_c14() {
@@ -1964,7 +2084,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         9 => "checkpoint.c18",
         10 => "checkpoint.c19",
         11 => "checkpoint.c20",
-        _ => "checkpoint.c21",
+        12 => "checkpoint.c21",
+        _ => "checkpoint.c22",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -1975,7 +2096,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         9 => World::living_agency(0),
         10 => World::faction_agency(0),
         11 => World::institutional_agency(0),
-        _ => World::contract_accountability(0),
+        12 => World::contract_accountability(0),
+        _ => World::information_disputes(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -2416,7 +2538,9 @@ mod tests {
     #[test]
     fn c21_accountlog_is_witness_only_localized_and_read_only() {
         let mut session = Session::new(PathBuf::from("unused"));
+        session.world = World::contract_accountability(0);
         assert!(session.world.contract_memory().is_some());
+        assert!(session.world.information().is_none());
         let before = session.world.checkpoint();
         session.input("accountlog");
         assert!(session.notice.contains("No witnessed contract audits"));
@@ -2427,8 +2551,50 @@ mod tests {
     }
 
     #[test]
+    fn c22_infolog_is_witness_only_localized_and_read_only() {
+        let mut session = Session::new(PathBuf::from("unused"));
+        assert!(session.world.information().is_some());
+        let before = session.world.checkpoint();
+        session.input("infolog");
+        assert!(session.notice.contains("No witnessed institutional information"));
+        session.input("lang id");
+        session.input("infolog");
+        assert!(session.notice.contains("Belum ada informasi lembaga"));
+        assert_eq!(session.world.checkpoint(), before);
+    }
+
+    #[test]
+    fn c21_campaign_flag_stays_on_revision_twelve_without_information() {
+        let mut session = Session::new(PathBuf::from("unused"));
+        session.world = World::contract_accountability(0);
+        assert!(session.world.information().is_none());
+        assert!(session.world.contract_memory().is_some());
+        assert_eq!(
+            u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
+            12
+        );
+        session.input("help");
+        assert!(session.notice.contains("C2.1"));
+        assert!(!session.notice.contains("C2.2"));
+        session.input("infolog");
+        assert!(session.notice.contains("No witnessed institutional information"));
+        assert!(session.world.information().is_none());
+        session.input("accountlog");
+        assert!(session.notice.contains("No witnessed contract audits"));
+        let before = session.world.checkpoint();
+        session.input("lang id");
+        session.input("infolog");
+        assert_eq!(
+            &session.world.checkpoint()[..before.len().min(session.world.checkpoint().len())],
+            &before[..before.len().min(session.world.checkpoint().len())]
+        );
+        assert_eq!(session.world.checkpoint(), before);
+    }
+
+    #[test]
     fn c21_seeding_reset_and_c20_legacy_keep_distinct_save_revisions() {
         let mut current = Session::new(PathBuf::from("unused"));
+        current.world = World::contract_accountability(0);
         current.input("seed 1");
         assert_eq!(
             u16::from_le_bytes(current.world.checkpoint()[12..14].try_into().unwrap()),
@@ -2436,6 +2602,7 @@ mod tests {
         );
         current.input("reset");
         assert!(current.world.contract_memory().is_some());
+        assert!(current.world.information().is_none());
         assert_eq!(current.world.region().unwrap().seed, 1);
         let mut previous = Session::new(PathBuf::from("unused"));
         previous.world = World::institutional_agency(0);
@@ -2449,6 +2616,32 @@ mod tests {
         );
         previous.input("accountlog");
         assert!(previous.notice.contains("No witnessed contract audits"));
+    }
+
+    #[test]
+    fn c22_seeding_reset_and_c21_legacy_keep_distinct_save_revisions() {
+        let mut current = Session::new(PathBuf::from("unused"));
+        current.input("seed 1");
+        assert_eq!(
+            u16::from_le_bytes(current.world.checkpoint()[12..14].try_into().unwrap()),
+            13
+        );
+        current.input("reset");
+        assert!(current.world.information().is_some());
+        assert!(current.world.contract_memory().is_some());
+        assert_eq!(current.world.region().unwrap().seed, 1);
+        let mut previous = Session::new(PathBuf::from("unused"));
+        previous.world = World::contract_accountability(0);
+        previous.input("seed 1");
+        previous.input("reset");
+        assert!(previous.world.contract_memory().is_some());
+        assert!(previous.world.information().is_none());
+        assert_eq!(
+            u16::from_le_bytes(previous.world.checkpoint()[12..14].try_into().unwrap()),
+            12
+        );
+        previous.input("infolog");
+        assert!(previous.notice.contains("No witnessed institutional information"));
     }
 
     #[test]

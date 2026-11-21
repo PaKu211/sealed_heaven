@@ -154,5 +154,14 @@ impl World {
             finding,
             witnessed,
         });
+        self.record_audit_information(
+            receipt.case_id,
+            receipt.need,
+            requester,
+            receipt.provider,
+            finding,
+            site,
+            witnessed,
+        );
     }
 }
