@@ -994,6 +994,7 @@ impl Wire {
             self.u8(u8::from(event.witnessed));
         }
         self.u32(information.next_dispute);
+        self.u32(information.next_event);
     }
 
     fn need(&mut self, need: Need) {

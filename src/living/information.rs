@@ -118,11 +118,13 @@ pub struct Information {
     pub disputes: Vec<Dispute>,
     pub history: Vec<InfoLogEvent>,
     pub next_dispute: u32,
+    /// High-water identity. Storage slots may be reused; this counter is not.
+    pub next_event: u32,
 }
 
 impl Information {
     pub fn event(&self, id: EventId) -> Option<&InfoEvent> {
-        self.events.get(id.0 as usize)
+        self.events.iter().find(|event| event.id == id)
     }
 
     pub fn knowledge(&self, actor: ActorId, event: EventId) -> Option<InfoKnowledge> {
@@ -159,13 +161,18 @@ impl World {
         }
         let event = {
             let info = self.information.as_mut().unwrap();
-            let id = if info.events.len() < EVENT_CAP {
-                EventId(info.events.len() as u32)
-            } else if let Some(slot) = recyclable_event_slot(info) {
-                purge_event_references(info, EventId(slot as u32));
-                EventId(slot as u32)
-            } else {
-                // Every slot is still contested; skip rather than erase live disputes.
+            if info.events.len() == EVENT_CAP {
+                let Some(slot) = recyclable_event_slot(info) else {
+                    // Every stored finding is still contested; skip rather than erase it.
+                    return;
+                };
+                let retired = info.events[slot].id;
+                // Drop operational copies only. History keeps the retired id, and
+                // that id is never issued again.
+                purge_event_references(info, retired);
+                info.events.remove(slot);
+            }
+            let Some(id) = take_event_id(info) else {
                 return;
             };
             let event = InfoEvent {
@@ -178,11 +185,7 @@ impl World {
                 finding,
                 site,
             };
-            if (id.0 as usize) < info.events.len() {
-                info.events[id.0 as usize] = event;
-            } else {
-                info.events.push(event);
-            }
+            info.events.push(event);
             event
         };
         self.learn_information(
@@ -844,11 +847,23 @@ fn event_is_hot(info: &Information, event: EventId) -> bool {
     })
 }
 
+fn take_event_id(info: &mut Information) -> Option<EventId> {
+    let occupied = info
+        .events
+        .iter()
+        .map(|event| event.id.0.saturating_add(1))
+        .max()
+        .unwrap_or(0);
+    let id = info.next_event.max(occupied);
+    info.next_event = id.checked_add(1)?;
+    Some(EventId(id))
+}
+
 fn recyclable_event_slot(info: &Information) -> Option<usize> {
     info.events
         .iter()
         .enumerate()
-        .filter(|(index, entry)| entry.id.0 as usize == *index && !event_is_hot(info, entry.id))
+        .filter(|(_, entry)| !event_is_hot(info, entry.id))
         .min_by_key(|(_, entry)| (entry.tick, entry.id))
         .map(|(index, _)| index)
 }

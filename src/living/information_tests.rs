@@ -581,6 +581,28 @@ fn stepped_campaign_save_load_keeps_information_ledger() {
 }
 
 #[test]
+fn next_event_counter_is_in_the_digest_and_replay_reconstructs_it() {
+    for seed in [0, 1] {
+        let mut live = World::information_disputes(seed);
+        for _ in 0..40 {
+            wait(&mut live);
+        }
+        let counter = live.information().unwrap().next_event;
+        let digest = live.state_digest();
+        let bytes = live.checkpoint();
+        let restored = World::restore(&bytes).unwrap();
+        assert_eq!(restored.information().unwrap().next_event, counter);
+        assert_eq!(restored.state_digest(), digest);
+        assert_eq!(restored, live);
+
+        let mut forged = live.clone();
+        forged.information.as_mut().unwrap().next_event = counter.saturating_add(9);
+        assert_ne!(forged.state_digest(), digest);
+        assert!(World::restore(&forged.checkpoint()).is_err());
+    }
+}
+
+#[test]
 fn v13_replays_canonical_worlds_and_keeps_v12_campaign_exact() {
     for seed in [0, 1] {
         let mut current = World::information_disputes(seed);
@@ -855,6 +877,19 @@ fn full_event_ledger_recycles_settled_slots_instead_of_ignoring_new_findings() {
         );
     }
     assert_eq!(world.information().unwrap().events.len(), 96);
+    let retired = EventId(0);
+    let retired_logs: Vec<_> = world
+        .information()
+        .unwrap()
+        .history
+        .iter()
+        .copied()
+        .filter(|event| event.event == retired)
+        .collect();
+    assert!(
+        !retired_logs.is_empty(),
+        "the first finding must already be in the log"
+    );
     world.record_audit_information(
         200,
         Need::ShrineMedicine,
@@ -874,6 +909,184 @@ fn full_event_ledger_recycles_settled_slots_instead_of_ignoring_new_findings() {
             .any(|event| event.case_id == 200 && event.finding == AuditFinding::Unfulfilled)
     );
     assert!(world.provider_suspended(WATCH, LODGE));
+    let info = world.information().unwrap();
+    let fresh = info
+        .events
+        .iter()
+        .find(|event| event.case_id == 200)
+        .unwrap();
+    assert_eq!(fresh.id, EventId(96));
+    assert!(info.event(retired).is_none());
+    assert!(info.events.iter().all(|event| event.id != retired));
+    let retained: Vec<_> = info
+        .history
+        .iter()
+        .copied()
+        .filter(|event| event.event == retired)
+        .collect();
+    assert_eq!(retained, retired_logs);
+    assert_eq!(info.next_event, 97);
+}
+
+#[test]
+fn event_ids_stay_unique_past_the_storage_cap_and_history_keeps_its_meaning() {
+    let mut world = World::information_disputes(0);
+    let shrine = world.scenario.shrine;
+    let mut issued = std::collections::BTreeMap::new();
+    for case_id in 1..=220 {
+        world.tick = u64::from(case_id);
+        world.record_audit_information(
+            case_id,
+            Need::ShrineMedicine,
+            WATCH,
+            HALL,
+            AuditFinding::Delivered,
+            shrine,
+            false,
+        );
+        let id = world
+            .information()
+            .unwrap()
+            .events
+            .iter()
+            .find(|event| event.case_id == case_id)
+            .map(|event| event.id)
+            .expect("a settled slot is released for the new finding");
+        assert!(
+            issued.insert(id, case_id).is_none(),
+            "event id {} was issued twice",
+            id.0
+        );
+    }
+    assert!(issued.len() > 96);
+    let info = world.information().unwrap();
+    assert_eq!(info.events.len(), 96);
+    for event in &info.events {
+        assert_eq!(issued.get(&event.id).copied(), Some(event.case_id));
+    }
+    for log in &info.history {
+        let case_id = issued[&log.event];
+        if let Some(stored) = info.event(log.event) {
+            assert_eq!(stored.case_id, case_id);
+            assert_eq!(stored.finding, AuditFinding::Delivered);
+        } else {
+            assert!(info.events.iter().all(|event| event.id != log.event));
+        }
+    }
+    assert_eq!(info.next_event, 220);
+}
+
+#[test]
+fn hot_findings_are_not_dropped_when_settled_slots_are_released() {
+    let mut world = World::information_disputes(0);
+    fail_and_audit(&mut world, Need::ShrineMedicine, HALL);
+    let protected = world.information().unwrap().events[0];
+    assert!(world.provider_suspended(WATCH, HALL));
+    let shrine = world.scenario.shrine;
+    for case_id in 2..=160 {
+        world.tick += 1;
+        world.record_audit_information(
+            case_id,
+            Need::HallOfferings,
+            MENTOR,
+            LODGE,
+            AuditFinding::Delivered,
+            shrine,
+            false,
+        );
+    }
+    let info = world.information().unwrap();
+    let kept = info
+        .event(protected.id)
+        .expect("active dispute stays stored");
+    assert_eq!(kept.case_id, protected.case_id);
+    assert_eq!(kept.finding, AuditFinding::Unfulfilled);
+    assert!(info.disputes.iter().any(|dispute| {
+        dispute.event == protected.id && dispute.phase == DisputePhase::Suspended
+    }));
+    assert!(
+        info.events
+            .iter()
+            .all(|event| event.id != EventId(info.next_event))
+    );
+    let mut seen = Vec::new();
+    for event in &info.events {
+        assert!(!seen.contains(&event.id));
+        seen.push(event.id);
+    }
+}
+
+#[test]
+fn cleanup_cycles_save_and_load_without_reissuing_event_ids() {
+    fn release_settled(world: &mut World, wave: u32) {
+        let shrine = world.scenario.shrine;
+        for step in 0..40u32 {
+            let case_id = wave * 40 + step + 1;
+            world.tick = u64::from(case_id);
+            world.record_audit_information(
+                case_id,
+                Need::ShrineMedicine,
+                WATCH,
+                HALL,
+                AuditFinding::Delivered,
+                shrine,
+                false,
+            );
+        }
+    }
+    let mut origin = World::information_disputes(4);
+    for _ in 0..40 {
+        wait(&mut origin);
+    }
+    let bytes = origin.checkpoint();
+    let mut loaded = World::restore(&bytes).unwrap();
+    assert_eq!(loaded, origin);
+    assert_eq!(loaded.checkpoint(), bytes);
+
+    let mut meanings = std::collections::BTreeMap::new();
+    for wave in 0..3 {
+        release_settled(&mut origin, wave);
+        release_settled(&mut loaded, wave);
+        assert_eq!(origin, loaded);
+        assert_eq!(origin.checkpoint(), loaded.checkpoint());
+        let saved = origin.checkpoint();
+        assert_eq!(loaded.checkpoint(), saved);
+        let info = origin.information().unwrap();
+        for event in &info.events {
+            match meanings.get(&event.id) {
+                Some(case_id) => assert_eq!(*case_id, event.case_id),
+                None => {
+                    meanings.insert(event.id, event.case_id);
+                }
+            }
+        }
+    }
+    let info = origin.information().unwrap();
+    assert!(info.next_event > 96);
+    assert_eq!(info.events.len(), 96);
+    assert_eq!(loaded.information().unwrap().next_event, info.next_event);
+    let mut seen = Vec::new();
+    for event in &info.events {
+        assert!(!seen.contains(&event.id));
+        assert!(event.id.0 < info.next_event);
+        seen.push(event.id);
+        assert_eq!(meanings[&event.id], event.case_id);
+        let restored = loaded.information().unwrap().event(event.id).unwrap();
+        assert_eq!(restored, event);
+    }
+    for log in &info.history {
+        if let Some(stored) = info.event(log.event) {
+            assert_eq!(meanings[&log.event], stored.case_id);
+        }
+        assert!(
+            loaded
+                .information()
+                .unwrap()
+                .history
+                .iter()
+                .any(|other| other == log)
+        );
+    }
 }
 
 #[test]

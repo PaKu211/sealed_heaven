@@ -81,7 +81,7 @@ cargo run --manifest-path apps/sealed_playable/Cargo.toml --bin sealed_agency --
 
 ## C2.2.1 remediation
 
-See `C2_2_1_REMEDIATION.md`. Checkpoint revision stays **13**. Later deliveries **restore** cooperation without rewriting failure events; hop-2 knowledge can upgrade; suspensions age out; settled event slots recycle.
+See `C2_2_1_REMEDIATION.md`. Checkpoint revision stays **13**. Later deliveries **restore** cooperation without rewriting failure events; hop-2 knowledge can upgrade; suspensions age out; settled events leave storage while `EventId` values keep increasing.
 
 ## Known limits
 

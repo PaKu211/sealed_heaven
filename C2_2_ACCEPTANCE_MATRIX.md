@@ -27,7 +27,7 @@
 | 23 | Later success restores trust without erasing failure | `later_successful_delivery_restores_trust_without_erasing_failure_history` | C2.2.1 tested |
 | 24 | Hop-2 upgrades to hop-1 without duplicate disputes | `later_hop_one_testimony_upgrades_hop_two_knowledge_and_opens_one_dispute` | C2.2.1 tested |
 | 25 | Timed suspension recovery | `aged_suspension_restores_after_review_period_without_refuting_the_case` | C2.2.1 tested |
-| 26 | Event ledger recycles settled slots | `full_event_ledger_recycles_settled_slots_instead_of_ignoring_new_findings` | C2.2.1 tested |
+| 26 | Event ledger releases settled slots without reusing ids | `event_ids_stay_unique_past_the_storage_cap_and_history_keeps_its_meaning` | C2.2.1 tested |
 
 ## Verification labels
 
