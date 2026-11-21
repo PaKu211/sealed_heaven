@@ -3,6 +3,7 @@
 ## Environment
 
 - Branch: `feat/c22-information-rumors-disputes`
+- Verified code tip: `20f7c0ac90f773774b2e63d3018b34ee619cd1fd`
 - Host: Linux cloud agent
 - rustc: 1.100.0
 - Baseline: Git commit `7694ce2` (`feat/c21-institutional-accountability`)
