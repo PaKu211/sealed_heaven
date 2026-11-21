@@ -49,6 +49,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::ContractAccountability => 12,
         Rules::InformationDisputes => 13,
         Rules::PlayerAgency => 14,
+        Rules::Consequences => 15,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -88,6 +89,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         12 => Rules::ContractAccountability,
         13 => Rules::InformationDisputes,
         14 => Rules::PlayerAgency,
+        15 => Rules::Consequences,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -169,6 +171,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::Invite(actor)
@@ -186,6 +189,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::Provision(actor)
@@ -203,6 +207,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::Part(actor)
@@ -219,6 +224,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::OfferAccord
@@ -235,6 +241,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::SupportHall
@@ -250,6 +257,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::PledgeLodge
@@ -265,6 +273,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::AidLodge
@@ -280,16 +289,20 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             ) =>
         {
             Intent::RenounceLodge
         }
-        (26, _) if rules == Rules::PlayerAgency => Intent::Ask(actor),
-        (27, 0) if rules == Rules::PlayerAgency => Intent::Examine,
-        (28, _) if rules == Rules::PlayerAgency => {
+        (26, _) if rules == Rules::PlayerAgency || rules == Rules::Consequences => {
+            Intent::Ask(actor)
+        }
+        (27, 0) if rules == Rules::PlayerAgency || rules == Rules::Consequences => Intent::Examine,
+        (28, _) if rules == Rules::PlayerAgency || rules == Rules::Consequences => {
             let (to, event) = unpack_testimony(value);
             Intent::Testify { to, event }
         }
+        (29, _) if rules == Rules::Consequences => Intent::Take(actor),
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -312,6 +325,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::ContractAccountability => b"SH:C10:RULES:v12".to_vec(),
         Rules::InformationDisputes => b"SH:C10:RULES:v13".to_vec(),
         Rules::PlayerAgency => b"SH:C10:RULES:v14".to_vec(),
+        Rules::Consequences => b"SH:C10:RULES:v15".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -385,6 +399,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::ContractAccountability
             | Rules::InformationDisputes
             | Rules::PlayerAgency
+            | Rules::Consequences
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -415,6 +430,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::ContractAccountability => b"SH:C10:STATE:v12".to_vec(),
         Rules::InformationDisputes => b"SH:C10:STATE:v13".to_vec(),
         Rules::PlayerAgency => b"SH:C10:STATE:v14".to_vec(),
+        Rules::Consequences => b"SH:C10:STATE:v15".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -496,6 +512,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::ContractAccountability
                 | Rules::InformationDisputes
                 | Rules::PlayerAgency
+                | Rules::Consequences
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1065,6 +1082,7 @@ impl Wire {
             Intent::Ask(id) => (26, id.get()),
             Intent::Examine => (27, 0),
             Intent::Testify { to, event } => (28, pack_testimony(to, event)),
+            Intent::Take(id) => (29, id.get()),
         };
         self.u8(tag);
         self.u32(payload);
@@ -1170,6 +1188,7 @@ impl Wire {
             Some(Outcome::Learned(_)) => 32,
             Some(Outcome::Briefed { .. }) => 33,
             Some(Outcome::Testified { .. }) => 34,
+            Some(Outcome::Took { .. }) => 35,
         });
         match outcome {
             Some(
@@ -1199,6 +1218,10 @@ impl Wire {
             | Some(Outcome::Testified { to: from, event }) => {
                 self.actor(from);
                 self.u32(event.0);
+            }
+            Some(Outcome::Took { from, herbs }) => {
+                self.actor(from);
+                self.u32(herbs);
             }
             Some(Outcome::Rejected(reason)) => self.u8(match reason {
                 Rejection::Dead => 0,
@@ -1234,6 +1257,7 @@ impl Wire {
                 Rejection::SchoolContested => 30,
                 Rejection::OathConflict => 31,
                 Rejection::FactionTrustRequired => 32,
+                Rejection::NoEvidence => 33,
             }),
             _ => {}
         }

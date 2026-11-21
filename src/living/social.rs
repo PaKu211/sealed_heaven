@@ -267,6 +267,38 @@ impl World {
         }
     }
 
+    /// A body is robbed where it lies. Only people who can see both the player
+    /// and the body learn who took the cargo. The herbs themselves are already gone.
+    pub(super) fn witness_transfer(&mut self, target: ActorId, position: Position) {
+        let incident = Incident {
+            id: IncidentId(self.social.incidents.len() as u32),
+            tick: self.tick,
+            source: PLAYER,
+            target,
+            position,
+            damage: 0,
+            fatal: false,
+            retaliation: false,
+        };
+        self.social.incidents.push(incident);
+        let watchers: Vec<_> = self
+            .npcs
+            .values()
+            .filter(|npc| npc.alive())
+            .filter(|npc| {
+                self.perceives(npc.position, position)
+                    && self.perceives(npc.position, self.player.position)
+            })
+            .map(|npc| npc.id())
+            .collect();
+        self.social
+            .learn(PLAYER, incident, self.tick, KnowledgeSource::Observed);
+        for actor in watchers {
+            self.social
+                .learn(actor, incident, self.tick, KnowledgeSource::Observed);
+        }
+    }
+
     pub(super) fn reportable(&self, sender: ActorId, recipient: ActorId) -> Option<IncidentId> {
         self.social
             .recent(sender, self.tick, NEWS_LIFETIME)

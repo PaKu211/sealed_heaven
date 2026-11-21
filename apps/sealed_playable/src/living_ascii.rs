@@ -37,7 +37,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.is_player_agency() {
+        if self.world.is_consequences() {
+            World::consequences(seed)
+        } else if self.world.is_player_agency() {
             World::player_agency(seed)
         } else if self.world.information().is_some() {
             World::information_disputes(seed)
@@ -88,6 +90,7 @@ impl Session {
                         | "seed"
                         | "background"
                         | "ask"
+                        | "take"
                 ))
         {
             self.notice = text(
@@ -125,6 +128,13 @@ impl Session {
             "examine" => Intent::Examine,
             "ask" => match self.target(argument) {
                 Ok(id) => Intent::Ask(id),
+                Err(message) => {
+                    self.notice = message.into();
+                    return true;
+                }
+            },
+            "take" => match self.body(argument) {
+                Ok(id) => Intent::Take(id),
                 Err(message) => {
                     self.notice = message.into();
                     return true;
@@ -244,7 +254,13 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.is_player_agency() {
+                self.notice = if self.world.is_consequences() {
+                    text(
+                        self.locale,
+                        "C2.4: A dead carrier's herbs can be taken from the body. People who see you do it remember who you are. People who do not only notice that the cargo is gone. examine, ask, tell, know, and take [id]. --c23 keeps C2.3; --c22 keeps C2.2.",
+                        "C2.4: Herba pada jenazah pengangkut dapat diambil. Orang yang melihatmu mengingat pelakunya. Orang yang tidak melihat hanya mendapati barangnya hilang. examine, ask, tell, know, dan take [id]. --c23 untuk C2.3; --c22 untuk C2.2.",
+                    )
+                } else if self.world.is_player_agency() {
                     text(
                         self.locale,
                         "C2.3: You can witness, examine a site, ask someone what they know, or tell a specific finding to someone beside you. examine, ask [id], tell [id] [event], and know. Gossip you only heard does not carry the same weight as evidence you checked. --c22 keeps C2.2; --c21 keeps C2.1; --c20 keeps C2.0.",
@@ -698,6 +714,21 @@ impl Session {
             };
         }
         true
+    }
+
+    fn body(&self, argument: Option<&str>) -> Result<ActorId, &'static str> {
+        let Some(text) = argument else {
+            return Err(self.target_hint());
+        };
+        let id = text
+            .parse()
+            .map(ActorId::new)
+            .map_err(|_| self.target_hint())?;
+        self.world
+            .npc(id)
+            .filter(|npc| self.world.player_sees(npc.position))
+            .map(|_| id)
+            .ok_or(self.target_hint())
     }
 
     fn target(&self, argument: Option<&str>) -> Result<ActorId, &'static str> {
@@ -1331,7 +1362,16 @@ impl Session {
                 )
             );
         }
-        if world.is_player_agency() {
+        if world.is_consequences() {
+            let _ = writeln!(
+                out,
+                "{}",
+                tr(
+                    "know | examine | ask [id] | tell [id] [event] | take [id] from a body you can see",
+                    "know | examine | ask [id] | tell [id] [peristiwa] | take [id] dari jenazah yang terlihat",
+                )
+            );
+        } else if world.is_player_agency() {
             let _ = writeln!(
                 out,
                 "{}",
@@ -1992,6 +2032,14 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 actor_name(locale, world, to)
             );
         }
+        Outcome::Took { from, herbs } => {
+            return format!(
+                "{} {herbs} {} {}.",
+                tr("You took", "Kamu mengambil"),
+                tr("herbs from", "herba dari"),
+                actor_name(locale, world, from)
+            );
+        }
         Outcome::QiCentered { total } => return format!("Qi {total}/{MAX_QI}."),
         Outcome::FormStruck(id) => {
             return format!(
@@ -2085,6 +2133,10 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
             ),
             Rejection::HealerAway => ("Ask the healer at the clinic.", "Temui tabib di klinik."),
             Rejection::Empty => ("The supply is empty.", "Stok habis."),
+            Rejection::NoEvidence => (
+                "Nothing here records an institutional finding.",
+                "Tidak ada temuan lembaga di petak ini.",
+            ),
             Rejection::NoCargo => ("You need more herbs.", "Herba yang kamu bawa belum cukup."),
             Rejection::PracticeComplete => (
                 "You already mastered this practice.",
@@ -2180,7 +2232,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 14);
+    run_campaign(debug_world, 15);
+}
+
+pub(crate) fn run_c23() {
+    run_campaign(false, 14);
 }
 
 pub(crate) fn run_c22() {
@@ -2230,7 +2286,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         11 => "checkpoint.c20",
         12 => "checkpoint.c21",
         13 => "checkpoint.c22",
-        _ => "checkpoint.c23",
+        14 => "checkpoint.c23",
+        _ => "checkpoint.c24",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2243,7 +2300,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         11 => World::institutional_agency(0),
         12 => World::contract_accountability(0),
         13 => World::information_disputes(0),
-        _ => World::player_agency(0),
+        14 => World::player_agency(0),
+        _ => World::consequences(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -2847,5 +2905,25 @@ mod tests {
         session.input("know");
         assert!(session.notice.contains("belum mengetahui"));
         assert_eq!(session.world.checkpoint(), after);
+    }
+
+    #[test]
+    fn c24_empty_ground_and_a_living_target_are_distinct() {
+        let mut session = Session::new(PathBuf::from("unused"));
+        session.world = World::consequences(0);
+        session.input("examine");
+        assert!(session.frame().contains("institutional finding"));
+        session.input("lang id");
+        session.input("examine");
+        assert!(session.frame().contains("temuan lembaga"));
+        session.input("lang en");
+        session.input("help");
+        assert!(session.notice.contains("C2.4"));
+        let tick = session.world.tick();
+        session.input("take 2");
+        assert!(session.notice.contains("visible NPC"));
+        assert_eq!(session.world.tick(), tick);
+        session.input("know");
+        assert_eq!(session.world.tick(), tick);
     }
 }

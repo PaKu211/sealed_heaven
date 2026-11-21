@@ -3,6 +3,8 @@
 
 mod checkpoint;
 mod company;
+#[cfg(test)]
+mod consequences_tests;
 mod contract_memory;
 #[cfg(test)]
 mod contract_memory_tests;
@@ -113,6 +115,8 @@ pub enum Intent {
         to: ActorId,
         event: EventId,
     },
+    /// Take the herbs a dead carrier is no longer able to deliver.
+    Take(ActorId),
 }
 
 impl Intent {
@@ -171,6 +175,8 @@ pub enum Rejection {
     SchoolContested,
     OathConflict,
     FactionTrustRequired,
+    /// The tile has no institutional finding to examine.
+    NoEvidence,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -180,34 +186,61 @@ pub enum Outcome {
     Spoke(ActorId),
     Gathered,
     Delivered,
-    Contribution { witnesses: u8 },
-    Practiced { progress: u8 },
+    Contribution {
+        witnesses: u8,
+    },
+    Practiced {
+        progress: u8,
+    },
     BackgroundChosen(Background),
-    Traded { bought: bool, coins: u32 },
+    Traded {
+        bought: bool,
+        coins: u32,
+    },
     Enrolled,
     Brewed,
-    UsedRemedy { healed: u16 },
+    UsedRemedy {
+        healed: u16,
+    },
     GatheredPair,
     DutyAccepted,
     DutyDelivered,
     DutyReported,
     FormLearned,
-    QiCentered { total: u8 },
+    QiCentered {
+        total: u8,
+    },
     FormStruck(ActorId),
     JoinedCompany(ActorId),
     Provisioned(ActorId),
     Parted(ActorId),
-    LodgeAccord { until: u64 },
+    LodgeAccord {
+        until: u64,
+    },
     HallSupported,
     LodgePledged,
     LodgeAided,
     LodgeRenounced,
     Struck(ActorId),
     Guarded,
-    Treated { by: ActorId, healed: u16 },
+    Treated {
+        by: ActorId,
+        healed: u16,
+    },
     Learned(EventId),
-    Briefed { from: ActorId, event: EventId },
-    Testified { to: ActorId, event: EventId },
+    Briefed {
+        from: ActorId,
+        event: EventId,
+    },
+    Testified {
+        to: ActorId,
+        event: EventId,
+    },
+    /// Herbs moved from a corpse onto the player. Nothing was created.
+    Took {
+        from: ActorId,
+        herbs: u32,
+    },
     Rejected(Rejection),
 }
 
@@ -305,6 +338,7 @@ enum Rules {
     ContractAccountability,
     InformationDisputes,
     PlayerAgency,
+    Consequences,
 }
 
 impl Rules {
@@ -326,6 +360,7 @@ impl Rules {
                 | Self::ContractAccountability
                 | Self::InformationDisputes
                 | Self::PlayerAgency
+                | Self::Consequences
         )
     }
 }
@@ -383,6 +418,10 @@ impl World {
         Self::seeded(seed, Rules::PlayerAgency)
     }
 
+    pub fn consequences(seed: u32) -> Self {
+        Self::seeded(seed, Rules::Consequences)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -428,7 +467,10 @@ impl World {
             },
             social: {
                 let mut social = Social::new(scenario.contacts);
-                if matches!(rules, Rules::InformationDisputes | Rules::PlayerAgency) {
+                if matches!(
+                    rules,
+                    Rules::InformationDisputes | Rules::PlayerAgency | Rules::Consequences
+                ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
                     social.link(ActorId::new(2), ActorId::new(36));
@@ -453,6 +495,7 @@ impl World {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             )
             .then(Company::default),
             rivalry: matches!(
@@ -466,6 +509,7 @@ impl World {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -478,6 +522,7 @@ impl World {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             )
             .then(Politics::new),
             traffic: matches!(
@@ -489,6 +534,7 @@ impl World {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -499,15 +545,22 @@ impl World {
                     | Rules::ContractAccountability
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
+                    | Rules::Consequences
             )
             .then(Contracts::new),
             contract_memory: matches!(
                 rules,
-                Rules::ContractAccountability | Rules::InformationDisputes | Rules::PlayerAgency
+                Rules::ContractAccountability
+                    | Rules::InformationDisputes
+                    | Rules::PlayerAgency
+                    | Rules::Consequences
             )
             .then(ContractMemory::default),
-            information: matches!(rules, Rules::InformationDisputes | Rules::PlayerAgency)
-                .then(Information::default),
+            information: matches!(
+                rules,
+                Rules::InformationDisputes | Rules::PlayerAgency | Rules::Consequences
+            )
+            .then(Information::default),
         }
     }
 
@@ -778,11 +831,47 @@ impl World {
             Intent::Ask(id) => self.ask_witness(id),
             Intent::Examine => self.examine_site(),
             Intent::Testify { to, event } => self.testify(to, event),
+            Intent::Take(id) => self.take_cargo(id),
         }
     }
 
     pub fn is_player_agency(&self) -> bool {
-        self.rules == Rules::PlayerAgency
+        matches!(self.rules, Rules::PlayerAgency | Rules::Consequences)
+    }
+
+    pub fn is_consequences(&self) -> bool {
+        self.rules == Rules::Consequences
+    }
+
+    fn grants_player_agency(&self) -> bool {
+        self.is_player_agency()
+    }
+
+    fn take_cargo(&mut self, id: ActorId) -> Result<Outcome, Rejection> {
+        if !self.is_consequences() {
+            return Err(Rejection::Refused);
+        }
+        if !self.player.alive() {
+            return Err(Rejection::Dead);
+        }
+        let npc = self.npcs.get(&id).ok_or(Rejection::UnknownActor)?;
+        if npc.alive() {
+            return Err(Rejection::Refused);
+        }
+        let position = npc.position;
+        self.require_reach(position)?;
+        let herbs = npc.herbs;
+        if herbs == 0 {
+            return Err(Rejection::Empty);
+        }
+        self.player
+            .herbs
+            .checked_add(herbs)
+            .ok_or(Rejection::PackFull)?;
+        self.npcs.get_mut(&id).expect("known corpse").herbs = 0;
+        self.player.herbs += herbs;
+        self.witness_transfer(id, position);
+        Ok(Outcome::Took { from: id, herbs })
     }
 
     fn participant_alive(&self, id: ActorId) -> bool {

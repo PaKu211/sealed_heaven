@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, btree_map::Entry};
 
 use super::contract_memory::AuditFinding;
 use super::navigation::in_reach;
-use super::{ActorId, Goal, Need, Outcome, PLAYER, Position, Rejection, Rules, World};
+use super::{ActorId, Goal, Need, Outcome, PLAYER, Position, Rejection, World};
 
 const REPORT_DELAY: u64 = 2;
 const MAX_HOPS: u8 = 2;
@@ -196,7 +196,7 @@ impl World {
             },
             witnessed,
         );
-        if self.rules == Rules::PlayerAgency
+        if self.grants_player_agency()
             && self.player.alive()
             && in_reach(self.player.position, event.site)
             && self.player_sees(event.site)
@@ -732,7 +732,7 @@ impl World {
     }
 
     pub(super) fn examine_site(&mut self) -> Result<Outcome, Rejection> {
-        if self.rules != Rules::PlayerAgency {
+        if !self.grants_player_agency() {
             return Err(Rejection::Refused);
         }
         let here = self.player.position;
@@ -744,7 +744,11 @@ impl World {
                 .filter(|event| player_can_learn(info, event.id))
                 .min_by_key(|event| (event.tick, event.id))
         }) else {
-            return Err(Rejection::Empty);
+            return Err(if self.is_consequences() {
+                Rejection::NoEvidence
+            } else {
+                Rejection::Empty
+            });
         };
         // Standing on the evidence is the player's own check, not a retold rumor.
         self.learn_information(
@@ -761,7 +765,7 @@ impl World {
     }
 
     pub(super) fn ask_witness(&mut self, npc: ActorId) -> Result<Outcome, Rejection> {
-        if self.rules != Rules::PlayerAgency {
+        if !self.grants_player_agency() {
             return Err(Rejection::Refused);
         }
         let peer = self
@@ -782,7 +786,7 @@ impl World {
     }
 
     pub(super) fn testify(&mut self, to: ActorId, event_id: EventId) -> Result<Outcome, Rejection> {
-        if self.rules != Rules::PlayerAgency {
+        if !self.grants_player_agency() {
             return Err(Rejection::Refused);
         }
         if event_id.0 >= 1 << 24 {
