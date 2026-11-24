@@ -57,7 +57,10 @@ pub use region::{Background, MarketQuote, Region, RegionSites};
 pub use relief::{Relief, ReliefCase, ReliefEvent, ReliefEventKind, ReliefPhase};
 pub use rivalry::{Rivalry, SectEvent, SectEventKind};
 pub use school::{Duty, FORM_QI_COST, HallRank, MAX_QI, School, Succession};
-pub use social::{Incident, IncidentId, Knowledge, KnowledgeSource, Relationship, Report, Social};
+pub use social::{
+    BodyDiscovery, BodyReport, Incident, IncidentId, Knowledge, KnowledgeSource, Relationship,
+    Report, Social,
+};
 pub use traffic::{Traffic, TrafficEvent, TrafficEventKind};
 
 pub const MAX_TICKS: u64 = 65_536;
@@ -339,6 +342,7 @@ enum Rules {
     InformationDisputes,
     PlayerAgency,
     Consequences,
+    ViolenceLogistics,
 }
 
 impl Rules {
@@ -361,6 +365,7 @@ impl Rules {
                 | Self::InformationDisputes
                 | Self::PlayerAgency
                 | Self::Consequences
+                | Self::ViolenceLogistics
         )
     }
 }
@@ -422,6 +427,10 @@ impl World {
         Self::seeded(seed, Rules::Consequences)
     }
 
+    pub fn violence_logistics(seed: u32) -> Self {
+        Self::seeded(seed, Rules::ViolenceLogistics)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -469,7 +478,10 @@ impl World {
                 let mut social = Social::new(scenario.contacts);
                 if matches!(
                     rules,
-                    Rules::InformationDisputes | Rules::PlayerAgency | Rules::Consequences
+                    Rules::InformationDisputes
+                        | Rules::PlayerAgency
+                        | Rules::Consequences
+                        | Rules::ViolenceLogistics
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -496,6 +508,7 @@ impl World {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             )
             .then(Company::default),
             rivalry: matches!(
@@ -510,6 +523,7 @@ impl World {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -523,6 +537,7 @@ impl World {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             )
             .then(Politics::new),
             traffic: matches!(
@@ -535,6 +550,7 @@ impl World {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -546,6 +562,7 @@ impl World {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -554,11 +571,15 @@ impl World {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             )
             .then(ContractMemory::default),
             information: matches!(
                 rules,
-                Rules::InformationDisputes | Rules::PlayerAgency | Rules::Consequences
+                Rules::InformationDisputes
+                    | Rules::PlayerAgency
+                    | Rules::Consequences
+                    | Rules::ViolenceLogistics
             )
             .then(Information::default),
         }
@@ -708,6 +729,7 @@ impl World {
         }
         // 1. Arriving information is available to all decisions on this tick.
         self.deliver_reports();
+        self.deliver_body_reports();
         self.deliver_info_reports();
         self.advance_information_recovery();
         self.regrow();
@@ -724,6 +746,8 @@ impl World {
         self.update_journey();
         // 3. Decide from one snapshot; resolve movement, work and combat by actor ID.
         self.advance_npcs(intent == Intent::Guard && outcome == Outcome::Guarded);
+        self.observe_bodies();
+        self.queue_body_reports();
         // 4. Queue new conversations from the committed positions.
         self.observe_player_death();
         self.queue_reports();
@@ -836,11 +860,18 @@ impl World {
     }
 
     pub fn is_player_agency(&self) -> bool {
-        matches!(self.rules, Rules::PlayerAgency | Rules::Consequences)
+        matches!(
+            self.rules,
+            Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+        )
     }
 
     pub fn is_consequences(&self) -> bool {
-        self.rules == Rules::Consequences
+        matches!(self.rules, Rules::Consequences | Rules::ViolenceLogistics)
+    }
+
+    pub fn is_violence_logistics(&self) -> bool {
+        self.rules == Rules::ViolenceLogistics
     }
 
     fn grants_player_agency(&self) -> bool {

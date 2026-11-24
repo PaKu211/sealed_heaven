@@ -50,6 +50,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::InformationDisputes => 13,
         Rules::PlayerAgency => 14,
         Rules::Consequences => 15,
+        Rules::ViolenceLogistics => 16,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -90,6 +91,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         13 => Rules::InformationDisputes,
         14 => Rules::PlayerAgency,
         15 => Rules::Consequences,
+        16 => Rules::ViolenceLogistics,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -172,6 +174,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::Invite(actor)
@@ -190,6 +193,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::Provision(actor)
@@ -208,6 +212,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::Part(actor)
@@ -225,6 +230,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::OfferAccord
@@ -242,6 +248,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::SupportHall
@@ -258,6 +265,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::PledgeLodge
@@ -274,6 +282,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::AidLodge
@@ -290,19 +299,39 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::InformationDisputes
                     | Rules::PlayerAgency
                     | Rules::Consequences
+                    | Rules::ViolenceLogistics
             ) =>
         {
             Intent::RenounceLodge
         }
-        (26, _) if rules == Rules::PlayerAgency || rules == Rules::Consequences => {
+        (26, _)
+            if matches!(
+                rules,
+                Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+            ) =>
+        {
             Intent::Ask(actor)
         }
-        (27, 0) if rules == Rules::PlayerAgency || rules == Rules::Consequences => Intent::Examine,
-        (28, _) if rules == Rules::PlayerAgency || rules == Rules::Consequences => {
+        (27, 0)
+            if matches!(
+                rules,
+                Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+            ) =>
+        {
+            Intent::Examine
+        }
+        (28, _)
+            if matches!(
+                rules,
+                Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+            ) =>
+        {
             let (to, event) = unpack_testimony(value);
             Intent::Testify { to, event }
         }
-        (29, _) if rules == Rules::Consequences => Intent::Take(actor),
+        (29, _) if matches!(rules, Rules::Consequences | Rules::ViolenceLogistics) => {
+            Intent::Take(actor)
+        }
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -326,6 +355,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::InformationDisputes => b"SH:C10:RULES:v13".to_vec(),
         Rules::PlayerAgency => b"SH:C10:RULES:v14".to_vec(),
         Rules::Consequences => b"SH:C10:RULES:v15".to_vec(),
+        Rules::ViolenceLogistics => b"SH:C10:RULES:v16".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -400,6 +430,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::InformationDisputes
             | Rules::PlayerAgency
             | Rules::Consequences
+            | Rules::ViolenceLogistics
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -431,6 +462,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::InformationDisputes => b"SH:C10:STATE:v13".to_vec(),
         Rules::PlayerAgency => b"SH:C10:STATE:v14".to_vec(),
         Rules::Consequences => b"SH:C10:STATE:v15".to_vec(),
+        Rules::ViolenceLogistics => b"SH:C10:STATE:v16".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -513,6 +545,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::InformationDisputes
                 | Rules::PlayerAgency
                 | Rules::Consequences
+                | Rules::ViolenceLogistics
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -575,6 +608,35 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         out.u8(report.hops);
         out.u64(report.sent);
         out.u64(report.due);
+    }
+    if world.rules == Rules::ViolenceLogistics {
+        out.count(social.discoveries.len());
+        for discovery in social.discoveries.values() {
+            out.actor(discovery.observer);
+            out.actor(discovery.body);
+            out.u64(discovery.at);
+            out.optional_actor(discovery.nearby);
+            match discovery.source {
+                KnowledgeSource::Observed => out.u8(0),
+                KnowledgeSource::Reported {
+                    sender,
+                    witness,
+                    hops,
+                } => {
+                    out.u8(1);
+                    out.actor(sender);
+                    out.actor(witness);
+                    out.u8(hops);
+                }
+            }
+        }
+        out.count(social.body_reports.len());
+        for report in social.body_reports.values() {
+            out.actor(report.sender);
+            out.actor(report.recipient);
+            out.actor(report.body);
+            out.u64(report.due);
+        }
     }
     out.count(world.journal.len());
     for &intent in &world.journal {

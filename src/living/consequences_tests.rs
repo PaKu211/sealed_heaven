@@ -149,3 +149,212 @@ fn matching_thefts_agree_and_a_clean_campaign_replays() {
         assert!(clean.information().is_some());
     }
 }
+
+#[test]
+fn public_road_ambush_delays_freight_and_causes_a_local_contract_and_physical_news() {
+    let mut world = World::violence_logistics(0);
+    let mut peaceful = world.clone();
+    for _ in 0..14 {
+        assert_eq!(
+            world
+                .step(world.tick(), Intent::Move(Direction::East))
+                .unwrap(),
+            Outcome::Moved
+        );
+        peaceful
+            .step(peaceful.tick(), Intent::Move(Direction::East))
+            .unwrap();
+    }
+    let courier = ActorId::new(32);
+    let watch = ActorId::new(2);
+    assert_eq!(world.npc(courier).unwrap().herbs, 1);
+    for action in [
+        Intent::Wait,
+        Intent::Attack(courier),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::South),
+        Intent::Attack(courier),
+        Intent::Attack(courier),
+    ] {
+        assert!(!matches!(
+            world.step(world.tick(), action).unwrap(),
+            Outcome::Rejected(_)
+        ));
+        wait(&mut peaceful);
+    }
+    assert_eq!(world.tick(), 26);
+    assert!(!world.npc(courier).unwrap().alive());
+    assert_eq!(world.npc(courier).unwrap().herbs, 1);
+    assert_eq!(world.player().hp, 2);
+    assert_eq!(world.social().incidents().last().unwrap().id, IncidentId(4));
+    assert_eq!(world.social().knowledge(watch, IncidentId(4)), None);
+    assert_eq!(herb_total(&world), herb_total(&peaceful));
+    let saved = world.checkpoint();
+    assert_eq!(u16::from_le_bytes(saved[12..14].try_into().unwrap()), 16);
+    let mut resumed = World::restore(&saved).unwrap();
+    assert_eq!(resumed, world);
+    for _ in 26..180 {
+        wait(&mut world);
+        wait(&mut resumed);
+        wait(&mut peaceful);
+        assert_eq!(resumed.state_digest(), world.state_digest());
+        if matches!(world.tick(), 43 | 68 | 84) {
+            assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+        }
+    }
+    assert_eq!(world.region().unwrap().shipped_to_qinghe, 0);
+    assert!(peaceful.region().unwrap().shipped_to_qinghe > 0);
+    assert!(
+        world
+            .contracts()
+            .unwrap()
+            .history
+            .iter()
+            .any(|event| event.need == Need::ShrineMedicine
+                && event.kind == ContractEventKind::Observed)
+    );
+    assert!(
+        !peaceful
+            .contracts()
+            .unwrap()
+            .history
+            .iter()
+            .any(|event| event.need == Need::ShrineMedicine
+                && event.kind == ContractEventKind::Observed)
+    );
+    assert_eq!(world.social().knowledge(watch, IncidentId(4)), None);
+    let watch_discovery = world
+        .social()
+        .discoveries()
+        .find(|event| event.observer == watch && event.body == courier)
+        .unwrap();
+    assert_eq!(watch_discovery.source, KnowledgeSource::Observed);
+    assert_eq!(watch_discovery.nearby, None);
+    let steward_discovery = world
+        .social()
+        .discoveries()
+        .find(|event| event.observer == ActorId::new(36) && event.body == courier)
+        .unwrap();
+    assert!(
+        matches!(steward_discovery.source, KnowledgeSource::Reported { sender, hops: 1, .. } if sender == watch)
+    );
+    let mentor_discovery = world
+        .social()
+        .discoveries()
+        .find(|event| event.observer == ActorId::new(33) && event.body == courier)
+        .unwrap();
+    assert!(matches!(
+        mentor_discovery.source,
+        KnowledgeSource::Reported { hops: 2, .. }
+    ));
+    assert_eq!(
+        world.social().knowledge(ActorId::new(33), IncidentId(4)),
+        None
+    );
+    assert!(
+        world
+            .contracts()
+            .unwrap()
+            .history
+            .iter()
+            .any(|event| event.need == Need::ShrineMedicine
+                && event.kind == ContractEventKind::Delivered)
+    );
+    assert!(
+        world
+            .contract_memory()
+            .unwrap()
+            .history
+            .iter()
+            .any(|audit| audit.need == Need::ShrineMedicine
+                && audit.finding == AuditFinding::Delivered)
+    );
+}
+
+#[test]
+fn old_c24_replays_without_c25_body_reports() {
+    let mut old = World::consequences(0);
+    for _ in 0..100 {
+        wait(&mut old);
+    }
+    let checkpoint = old.checkpoint();
+    assert_eq!(
+        u16::from_le_bytes(checkpoint[12..14].try_into().unwrap()),
+        15
+    );
+    assert_eq!(World::restore(&checkpoint).unwrap(), old);
+    assert_eq!(old.social().discoveries().count(), 0);
+}
+
+#[test]
+fn public_witnessed_violence_is_not_a_corpse_discovery_or_remote_guilt() {
+    let mut world = World::violence_logistics(0);
+    for _ in 0..8 {
+        assert_eq!(
+            world
+                .step(world.tick(), Intent::Move(Direction::East))
+                .unwrap(),
+            Outcome::Moved
+        );
+    }
+    let traveler = ActorId::new(22);
+    for _ in 0..2 {
+        assert_eq!(
+            world.step(world.tick(), Intent::Attack(traveler)).unwrap(),
+            Outcome::Struck(traveler)
+        );
+    }
+    let incident = world
+        .social()
+        .incidents()
+        .iter()
+        .find(|event| event.source == PLAYER && event.target == traveler)
+        .unwrap()
+        .id;
+    assert_eq!(
+        world.social().knowledge(CARRIER, incident).unwrap().source,
+        KnowledgeSource::Observed
+    );
+    assert_eq!(world.social().knowledge(ActorId::new(1), incident), None);
+    for _ in 0..22 {
+        wait(&mut world);
+    }
+    assert!(matches!(
+        world
+            .social()
+            .knowledge(ActorId::new(1), incident)
+            .unwrap()
+            .source,
+        KnowledgeSource::Reported { hops: 1.., .. }
+    ));
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+}
+
+#[test]
+fn finding_a_body_near_the_player_does_not_invent_an_eyewitness() {
+    let mut world = World::violence_logistics(0);
+    let body = ActorId::new(32);
+    let witness = ActorId::new(33);
+    // This test isolates the classification boundary; the road-ambush test
+    // above proves that actual corpses are reachable via public commands.
+    let site = world.npc(body).unwrap().position;
+    world.npcs.get_mut(&body).unwrap().hp = 0;
+    world.npcs.get_mut(&witness).unwrap().position = site;
+    world.player.position = site;
+    wait(&mut world);
+    let discovery = world
+        .social()
+        .discoveries()
+        .find(|discovery| discovery.observer == witness && discovery.body == body)
+        .unwrap();
+    assert_eq!(discovery.nearby, Some(PLAYER));
+    assert_eq!(discovery.source, KnowledgeSource::Observed);
+    assert!(world.social().incidents().is_empty());
+    assert_eq!(world.social().relationship(witness, PLAYER).regard, 0);
+}

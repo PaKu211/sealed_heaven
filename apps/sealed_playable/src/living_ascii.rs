@@ -10,9 +10,8 @@ use sealed_sim::living::{
     ActorId, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent, ContractEventKind,
     Direction, DisputePhase, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, InfoLogKind,
     Intent, Invitation, JourneyEvent, LoadError, MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER,
-    Provenance,
-    PoliticalEventKind, Position, Region, Rejection, ReliefEventKind, Role, SectEventKind,
-    StepError, TrafficEventKind, World,
+    PoliticalEventKind, Position, Provenance, Region, Rejection, ReliefEventKind, Role,
+    SectEventKind, StepError, TrafficEventKind, World,
 };
 
 use crate::{clock, locale::Locale, persistence};
@@ -37,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.is_consequences() {
+        if self.world.is_violence_logistics() {
+            World::violence_logistics(seed)
+        } else if self.world.is_consequences() {
             World::consequences(seed)
         } else if self.world.is_player_agency() {
             World::player_agency(seed)
@@ -142,21 +143,13 @@ impl Session {
             },
             "tell" => {
                 let Some(actor) = argument.and_then(|value| value.parse::<u32>().ok()) else {
-                    self.notice = text(
-                        self.locale,
-                        "tell <npc> <event>",
-                        "tell <npc> <peristiwa>",
-                    )
-                    .into();
+                    self.notice =
+                        text(self.locale, "tell <npc> <event>", "tell <npc> <peristiwa>").into();
                     return true;
                 };
                 let Some(event) = second.and_then(|value| value.parse::<u32>().ok()) else {
-                    self.notice = text(
-                        self.locale,
-                        "tell <npc> <event>",
-                        "tell <npc> <peristiwa>",
-                    )
-                    .into();
+                    self.notice =
+                        text(self.locale, "tell <npc> <event>", "tell <npc> <peristiwa>").into();
                     return true;
                 };
                 Intent::Testify {
@@ -225,6 +218,41 @@ impl Session {
                 };
                 return true;
             }
+            "bodies" => {
+                if !self.world.is_violence_logistics() {
+                    self.notice = text(self.locale, "Only in C2.5.", "Hanya di C2.5.").into();
+                    return true;
+                }
+                let lines: Vec<_> = self
+                    .world
+                    .social()
+                    .discoveries()
+                    .filter(|discovery| discovery.observer == PLAYER)
+                    .map(|discovery| {
+                        format!(
+                            "t{} {} ({})",
+                            discovery.at,
+                            actor_name(self.locale, &self.world, discovery.body),
+                            text(
+                                self.locale,
+                                "cause unknown unless you witnessed it",
+                                "penyebab tidak diketahui kecuali kamu menyaksikannya"
+                            )
+                        )
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "You have discovered no bodies.",
+                        "Kamu belum menemukan jenazah.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
             "background" => {
                 let background = match argument {
                     Some("wanderer") => Background::Wanderer,
@@ -254,7 +282,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.is_consequences() {
+                self.notice = if self.world.is_violence_logistics() {
+                    text(self.locale,
+                        "C2.5: attack <id> a living courier or contract provider; carried herbs remain on the body. take <id> recovers them. bodies shows only corpses you discovered, not the killer. Witnesses identify attackers; nearby strangers only have a lead. contractlog, accountlog, infolog, know track consequences. --c24 keeps C2.4.",
+                        "C2.5: attack <id> kurir atau pengantar kontrak; herba tetap di jenazah. take <id> mengambilnya. bodies hanya menunjukkan jenazah yang ditemukan, bukan pembunuhnya. Saksi mengenali penyerang; orang dekat hanya punya petunjuk. contractlog, accountlog, infolog, know mencatat akibat. --c24 untuk C2.4.")
+                } else if self.world.is_consequences() {
                     text(
                         self.locale,
                         "C2.4: A dead carrier's herbs can be taken from the body. People who see you do it remember who you are. People who do not only notice that the cargo is gone. examine, ask, tell, know, and take [id]. --c23 keeps C2.3; --c22 keeps C2.2.",
@@ -1128,20 +1160,31 @@ impl Session {
             .filter(|event| event.source == PLAYER || event.target == PLAYER)
             .take(3)
         {
-            let _ = writeln!(
-                out,
-                "t{} {} {} {} ({} HP){}",
-                incident.tick,
-                actor_name(self.locale, world, incident.source),
-                tr("hit", "menyerang"),
-                actor_name(self.locale, world, incident.target),
-                incident.damage,
-                if incident.fatal {
-                    tr(" fatal", " fatal")
-                } else {
-                    ""
-                }
-            );
+            if incident.damage == 0 {
+                let _ = writeln!(
+                    out,
+                    "t{} {} {} {}",
+                    incident.tick,
+                    actor_name(self.locale, world, incident.source),
+                    tr("took cargo from", "mengambil muatan dari"),
+                    actor_name(self.locale, world, incident.target),
+                );
+            } else {
+                let _ = writeln!(
+                    out,
+                    "t{} {} {} {} ({} HP){}",
+                    incident.tick,
+                    actor_name(self.locale, world, incident.source),
+                    tr("hit", "menyerang"),
+                    actor_name(self.locale, world, incident.target),
+                    incident.damage,
+                    if incident.fatal {
+                        tr(" fatal", " fatal")
+                    } else {
+                        ""
+                    }
+                );
+            }
         }
         if let Some(company) = world.company() {
             for event in company
@@ -1713,7 +1756,10 @@ impl Session {
             )
             .replace("{tick}", &tick)
             .replace("{actor}", actor)
-            .replace("{verb}", phase.unwrap_or(text(self.locale, "opened", "dibuka")))
+            .replace(
+                "{verb}",
+                phase.unwrap_or(text(self.locale, "opened", "dibuka")),
+            )
             .replace("{other}", other),
             InfoLogKind::DisputeUpdated => text(
                 self.locale,
@@ -2232,7 +2278,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 15);
+    run_campaign(debug_world, 16);
+}
+
+pub(crate) fn run_c24() {
+    run_campaign(false, 15);
 }
 
 pub(crate) fn run_c23() {
@@ -2287,7 +2337,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         12 => "checkpoint.c21",
         13 => "checkpoint.c22",
         14 => "checkpoint.c23",
-        _ => "checkpoint.c24",
+        15 => "checkpoint.c24",
+        _ => "checkpoint.c25",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2301,7 +2352,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         12 => World::contract_accountability(0),
         13 => World::information_disputes(0),
         14 => World::player_agency(0),
-        _ => World::consequences(0),
+        15 => World::consequences(0),
+        _ => World::violence_logistics(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -2760,7 +2812,11 @@ mod tests {
         assert!(session.world.information().is_some());
         let before = session.world.checkpoint();
         session.input("infolog");
-        assert!(session.notice.contains("No witnessed institutional information"));
+        assert!(
+            session
+                .notice
+                .contains("No witnessed institutional information")
+        );
         session.input("lang id");
         session.input("infolog");
         assert!(session.notice.contains("Belum ada informasi lembaga"));
@@ -2781,7 +2837,11 @@ mod tests {
         assert!(session.notice.contains("C2.1"));
         assert!(!session.notice.contains("C2.2"));
         session.input("infolog");
-        assert!(session.notice.contains("No witnessed institutional information"));
+        assert!(
+            session
+                .notice
+                .contains("No witnessed institutional information")
+        );
         assert!(session.world.information().is_none());
         session.input("accountlog");
         assert!(session.notice.contains("No witnessed contract audits"));
@@ -2845,7 +2905,11 @@ mod tests {
             12
         );
         previous.input("infolog");
-        assert!(previous.notice.contains("No witnessed institutional information"));
+        assert!(
+            previous
+                .notice
+                .contains("No witnessed institutional information")
+        );
     }
 
     #[test]
@@ -2925,5 +2989,69 @@ mod tests {
         assert_eq!(session.world.tick(), tick);
         session.input("know");
         assert_eq!(session.world.tick(), tick);
+    }
+
+    #[test]
+    fn c25_ascii_road_ambush_loot_and_save_load_use_only_public_commands() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("road.c25"));
+        session.world = World::violence_logistics(0);
+        for _ in 0..14 {
+            session.input("d");
+            assert_eq!(session.world.latest_outcome(), Some(Outcome::Moved));
+        }
+        for command in [
+            "wait",
+            "attack 32",
+            "w",
+            "d",
+            "d",
+            "w",
+            "w",
+            "d",
+            "d",
+            "s",
+            "attack 32",
+            "attack 32",
+        ] {
+            session.input(command);
+            assert!(
+                !matches!(session.world.latest_outcome(), Some(Outcome::Rejected(_))),
+                "{command}: {}",
+                session.notice
+            );
+        }
+        assert_eq!(session.world.tick(), 26);
+        assert!(!session.world.npc(ActorId::new(32)).unwrap().alive());
+        assert_eq!(session.world.npc(ActorId::new(32)).unwrap().herbs, 1);
+        let tick = session.world.tick();
+        session.input("bodies");
+        assert!(session.notice.contains("Bao Jun"));
+        assert_eq!(session.world.tick(), tick);
+        session.input("take 32");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::Took {
+                from: ActorId::new(32),
+                herbs: 1,
+            })
+        );
+        let view = session.frame();
+        assert!(view.contains("t27 You took cargo from Bao Jun"));
+        assert!(!view.contains("t27 You hit Bao Jun (0 HP)"));
+        assert_eq!(session.world.npc(ActorId::new(32)).unwrap().herbs, 0);
+        session.input("save");
+        let saved = session.world.checkpoint();
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), saved);
+        session.input("seed 1");
+        assert_eq!(
+            u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
+            16
+        );
+        session.input("help");
+        assert!(session.notice.contains("C2.5"));
+        assert_eq!(session.world.checkpoint(), saved);
     }
 }

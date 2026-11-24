@@ -40,6 +40,25 @@ pub struct Knowledge {
     pub regard_change: i8,
 }
 
+/// Seeing a body does not identify its killer. Someone found nearby is a
+/// lead, not a witnessed assailant or an allegation that can be reported as fact.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BodyDiscovery {
+    pub observer: ActorId,
+    pub body: ActorId,
+    pub at: u64,
+    pub nearby: Option<ActorId>,
+    pub source: KnowledgeSource,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BodyReport {
+    pub sender: ActorId,
+    pub recipient: ActorId,
+    pub body: ActorId,
+    pub due: u64,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Report {
     pub incident: IncidentId,
@@ -74,6 +93,8 @@ pub struct Social {
     pub(super) known: BTreeMap<ActorId, BTreeMap<IncidentId, Knowledge>>,
     pub(super) relations: BTreeMap<(ActorId, ActorId), Relationship>,
     pub(super) pending: BTreeMap<(ActorId, IncidentId), Report>,
+    pub(super) discoveries: BTreeMap<(ActorId, ActorId), BodyDiscovery>,
+    pub(super) body_reports: BTreeMap<(ActorId, ActorId), BodyReport>,
 }
 
 impl Social {
@@ -83,6 +104,8 @@ impl Social {
             known: BTreeMap::new(),
             relations: BTreeMap::new(),
             pending: BTreeMap::new(),
+            discoveries: BTreeMap::new(),
+            body_reports: BTreeMap::new(),
         };
         for &(a, b) in contacts {
             social.meet(a, b);
@@ -113,6 +136,14 @@ impl Social {
 
     pub fn pending_reports(&self) -> impl ExactSizeIterator<Item = &Report> {
         self.pending.values()
+    }
+
+    pub fn discoveries(&self) -> impl Iterator<Item = &BodyDiscovery> {
+        self.discoveries.values()
+    }
+
+    pub fn pending_body_reports(&self) -> impl Iterator<Item = &BodyReport> {
+        self.body_reports.values()
     }
 
     pub(super) fn meet(&mut self, a: ActorId, b: ActorId) {
@@ -207,6 +238,154 @@ impl Social {
 }
 
 impl World {
+    pub(super) fn observe_bodies(&mut self) {
+        if self.rules != super::Rules::ViolenceLogistics {
+            return;
+        }
+        let bodies: Vec<_> = self
+            .npcs
+            .values()
+            .filter(|npc| !npc.alive())
+            .map(|npc| (npc.id(), npc.position))
+            .collect();
+        let observers: Vec<_> = self
+            .npcs
+            .values()
+            .filter(|npc| npc.alive())
+            .map(|npc| (npc.id(), npc.position))
+            .chain(
+                self.player
+                    .alive()
+                    .then_some((PLAYER, self.player.position)),
+            )
+            .collect();
+        for (body, position) in bodies {
+            for (observer, location) in &observers {
+                if *observer == body
+                    || self.social.discoveries.contains_key(&(*observer, body))
+                    || !self.perceives(*location, position)
+                {
+                    continue;
+                }
+                // Even if a witness saw the killing, this independent body
+                // observation cannot confer that knowledge on anyone else.
+                let nearby = (*observer != PLAYER
+                    && self.player.alive()
+                    && self.perceives(*location, self.player.position)
+                    && in_reach(self.player.position, position))
+                .then_some(PLAYER);
+                self.social.discoveries.insert(
+                    (*observer, body),
+                    BodyDiscovery {
+                        observer: *observer,
+                        body,
+                        at: self.tick,
+                        nearby,
+                        source: KnowledgeSource::Observed,
+                    },
+                );
+            }
+        }
+    }
+
+    pub(super) fn deliver_body_reports(&mut self) {
+        if self.rules != super::Rules::ViolenceLogistics {
+            return;
+        }
+        let due: Vec<_> = self
+            .social
+            .body_reports
+            .iter()
+            .filter(|(_, report)| report.due <= self.tick)
+            .map(|(&key, &report)| (key, report))
+            .collect();
+        for (key, report) in due {
+            self.social.body_reports.remove(&key);
+            if !self.participant_alive(report.sender)
+                || !self.participant_alive(report.recipient)
+                || self.social.discoveries.contains_key(&key)
+            {
+                continue;
+            }
+            let Some(receipt) = self
+                .social
+                .discoveries
+                .get(&(report.sender, report.body))
+                .copied()
+            else {
+                continue;
+            };
+            let (witness, hops) = match receipt.source {
+                KnowledgeSource::Observed => (report.sender, 1),
+                KnowledgeSource::Reported { witness, hops, .. } => (witness, hops + 1),
+            };
+            self.social.discoveries.insert(
+                key,
+                BodyDiscovery {
+                    observer: report.recipient,
+                    body: report.body,
+                    at: self.tick,
+                    nearby: None,
+                    source: KnowledgeSource::Reported {
+                        sender: report.sender,
+                        witness,
+                        hops,
+                    },
+                },
+            );
+        }
+    }
+
+    pub(super) fn queue_body_reports(&mut self) {
+        if self.rules != super::Rules::ViolenceLogistics {
+            return;
+        }
+        let known: Vec<_> = self.social.discoveries.values().copied().collect();
+        for receipt in known {
+            let Some(sender) = self.npcs.get(&receipt.observer) else {
+                continue;
+            };
+            if !sender.alive()
+                || !sender.definition.shares_news
+                || matches!(receipt.source, KnowledgeSource::Reported { hops: 2.., .. })
+            {
+                continue;
+            }
+            let recipient = self
+                .npcs
+                .values()
+                .filter(|npc| npc.alive() && npc.id() != sender.id())
+                .filter(|npc| in_reach(npc.position, sender.position))
+                .filter(|npc| {
+                    self.social
+                        .relationship(npc.id(), sender.id())
+                        .trusts_news()
+                })
+                .find(|npc| {
+                    !self
+                        .social
+                        .discoveries
+                        .contains_key(&(npc.id(), receipt.body))
+                        && !self
+                            .social
+                            .body_reports
+                            .contains_key(&(npc.id(), receipt.body))
+                })
+                .map(|npc| npc.id());
+            if let Some(recipient) = recipient {
+                self.social.body_reports.insert(
+                    (recipient, receipt.body),
+                    BodyReport {
+                        sender: receipt.observer,
+                        recipient,
+                        body: receipt.body,
+                        due: self.tick + REPORT_DELAY,
+                    },
+                );
+            }
+        }
+    }
+
     /// Both combatants are identified at the strike location. Nearby people must
     /// see both; the victim always knows who landed the blow.
     pub(super) fn damage(

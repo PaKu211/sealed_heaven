@@ -59,7 +59,12 @@ impl Need {
 
     fn triggered(self, world: &World) -> bool {
         match self {
-            Self::ShrineMedicine => world.tick >= FIRST_SHRINE && world.supply.shrine <= 1,
+            Self::ShrineMedicine => {
+                (world.tick >= FIRST_SHRINE && world.supply.shrine <= 1)
+                    || (world.is_violence_logistics()
+                        && world.tick >= 33
+                        && world.supply.shrine <= 2)
+            }
             Self::HallOfferings => {
                 world.tick >= FIRST_HALL
                     && world
