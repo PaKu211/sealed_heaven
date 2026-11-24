@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.is_violence_logistics() {
+        if self.world.is_player_reporting() {
+            World::player_reporting(seed)
+        } else if self.world.is_violence_logistics() {
             World::violence_logistics(seed)
         } else if self.world.is_consequences() {
             World::consequences(seed)
@@ -72,7 +74,7 @@ impl Session {
         let argument = words.next();
         let second = words.next();
         if words.next().is_some()
-            || (second.is_some() && command != "tell")
+            || (second.is_some() && !matches!(command, "tell" | "reportbody"))
             || (argument.is_some()
                 && second.is_none()
                 && !matches!(
@@ -155,6 +157,32 @@ impl Session {
                 Intent::Testify {
                     to: ActorId::new(actor),
                     event: sealed_sim::living::EventId(event),
+                }
+            }
+            "reportbody" => {
+                if !self.world.is_player_reporting() {
+                    self.notice = text(self.locale, "Only in C2.7.", "Hanya di C2.7.").into();
+                    return true;
+                }
+                let Some(body) = second.and_then(|value| value.parse::<u32>().ok()) else {
+                    self.notice = text(
+                        self.locale,
+                        "reportbody <npc> <body>",
+                        "reportbody <npc> <jenazah>",
+                    )
+                    .into();
+                    return true;
+                };
+                let to = match self.target(argument) {
+                    Ok(id) => id,
+                    Err(message) => {
+                        self.notice = message.into();
+                        return true;
+                    }
+                };
+                Intent::ReportBody {
+                    to,
+                    body: ActorId::new(body),
                 }
             }
             "know" => {
@@ -338,7 +366,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.is_violence_logistics() {
+                self.notice = if self.world.is_player_reporting() {
+                    text(self.locale,
+                        "C2.7: Find a body, then reportbody <npc> <body> face-to-face. The listener hears a corpse report after two turns, not a murder accusation. A watchman may travel to confirm it. bodies and crimelog show what you personally know. --c25 keeps C2.5; --c24 keeps C2.4.",
+                        "C2.7: Temukan jenazah, lalu reportbody <npc> <jenazah> secara tatap muka. Penerima mendengar laporan jenazah dua giliran kemudian, bukan tuduhan pembunuhan. Penjaga dapat pergi memeriksanya. bodies dan crimelog mencatat yang kamu ketahui. --c25 untuk C2.5; --c24 untuk C2.4.")
+                } else if self.world.is_violence_logistics() {
                     text(self.locale,
                         "C2.5: attack <id> a living courier or contract provider; carried herbs remain on the body. take <id> recovers them. bodies shows only corpses you discovered, not the killer. crimelog lists only your own actions or learned incidents. Witnesses identify attackers; nearby strangers only have a lead. contractlog, accountlog, infolog, know track consequences. --c24 keeps C2.4.",
                         "C2.5: attack <id> kurir atau pengantar kontrak; herba tetap di jenazah. take <id> mengambilnya. bodies hanya menunjukkan jenazah yang ditemukan, bukan pembunuhnya. crimelog hanya mencatat tindakanmu atau kejadian yang kamu ketahui. Saksi mengenali penyerang; orang dekat hanya punya petunjuk. contractlog, accountlog, infolog, know mencatat akibat. --c24 untuk C2.4.")
@@ -797,6 +829,12 @@ impl Session {
                     self.locale,
                     "The turn is out of date.",
                     "Giliran sudah berubah.",
+                )
+                .into(),
+                StepError::InvalidBodyReport => text(
+                    self.locale,
+                    "Invalid body report or unavailable campaign.",
+                    "Laporan jenazah tidak sah atau kampanye tidak tersedia.",
                 )
                 .into(),
             };
@@ -1975,6 +2013,7 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::SeekCare => ("seeking care", "mencari perawatan"),
         Goal::Treat(_) => ("attending to a patient", "merawat pasien"),
         Goal::Investigate(_) => ("investigating a disturbance", "menyelidiki gangguan"),
+        Goal::InvestigateBody(_) => ("checking a reported body", "memeriksa laporan jenazah"),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
         Goal::Retaliate => ("retaliating", "membalas serangan"),
@@ -2140,6 +2179,15 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 tr("You took", "Kamu mengambil"),
                 tr("herbs from", "herba dari"),
                 actor_name(locale, world, from)
+            );
+        }
+        Outcome::BodyReported { to, body } => {
+            return format!(
+                "{} {} {} {}.",
+                tr("You reported", "Kamu melaporkan"),
+                actor_name(locale, world, body),
+                tr("to", "kepada"),
+                actor_name(locale, world, to)
             );
         }
         Outcome::QiCentered { total } => return format!("Qi {total}/{MAX_QI}."),
@@ -2334,7 +2382,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 16);
+    run_campaign(debug_world, 17);
+}
+
+pub(crate) fn run_c25() {
+    run_campaign(false, 16);
 }
 
 pub(crate) fn run_c24() {
@@ -2394,7 +2446,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         13 => "checkpoint.c22",
         14 => "checkpoint.c23",
         15 => "checkpoint.c24",
-        _ => "checkpoint.c25",
+        16 => "checkpoint.c25",
+        _ => "checkpoint.c27",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2409,7 +2462,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         13 => World::information_disputes(0),
         14 => World::player_agency(0),
         15 => World::consequences(0),
-        _ => World::violence_logistics(0),
+        16 => World::violence_logistics(0),
+        _ => World::player_reporting(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -3144,5 +3198,99 @@ mod tests {
         old.input("crimelog");
         assert!(old.notice.contains("Only in C2.5"));
         assert_eq!(old.world.checkpoint(), before);
+    }
+
+    #[test]
+    fn c27_ascii_corpse_report_reaches_watch_without_inventing_murder_evidence() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("report.c27"));
+        session.world = World::player_reporting(0);
+        let body = ActorId::new(32);
+        let watch = ActorId::new(2);
+        for _ in 0..14 {
+            session.input("d");
+        }
+        for command in [
+            "wait",
+            "attack 32",
+            "w",
+            "d",
+            "d",
+            "w",
+            "w",
+            "d",
+            "d",
+            "s",
+            "attack 32",
+            "attack 32",
+            "s",
+        ] {
+            session.input(command);
+            assert!(
+                !matches!(session.world.latest_outcome(), Some(Outcome::Rejected(_))),
+                "{command}: {}",
+                session.notice
+            );
+        }
+        for _ in 0..8 {
+            session.input("a");
+        }
+        for _ in 0..3 {
+            session.input("wait");
+        }
+        assert_eq!(session.world.tick(), 38);
+        session.input("reportbody 2 32");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::BodyReported { to: watch, body })
+        );
+        session.input("save");
+        let saved = session.world.checkpoint();
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), saved);
+        session.input("wait");
+        session.input("wait");
+        let report = session
+            .world
+            .social()
+            .discoveries()
+            .find(|r| r.observer == watch && r.body == body)
+            .unwrap();
+        assert!(
+            matches!(report.source, KnowledgeSource::Reported { sender, hops: 1, .. }
+            if sender == PLAYER)
+        );
+        assert_eq!(
+            session
+                .world
+                .social()
+                .knowledge(watch, sealed_sim::living::IncidentId(4)),
+            None
+        );
+        session.input("wait");
+        let confirmed = session
+            .world
+            .social()
+            .discoveries()
+            .find(|r| r.observer == watch && r.body == body)
+            .unwrap();
+        assert_eq!(confirmed.source, KnowledgeSource::Observed);
+        assert_eq!(
+            confirmed.prior_report,
+            Some((
+                41,
+                KnowledgeSource::Reported {
+                    sender: PLAYER,
+                    witness: PLAYER,
+                    hops: 1
+                }
+            ))
+        );
+        session.input("help");
+        assert!(session.notice.contains("C2.7"));
+        let prior = session.world.checkpoint();
+        session.input("reportbody 2");
+        assert_eq!(session.world.checkpoint(), prior);
     }
 }

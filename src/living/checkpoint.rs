@@ -51,6 +51,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::PlayerAgency => 14,
         Rules::Consequences => 15,
         Rules::ViolenceLogistics => 16,
+        Rules::PlayerReporting => 17,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -92,6 +93,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         14 => Rules::PlayerAgency,
         15 => Rules::Consequences,
         16 => Rules::ViolenceLogistics,
+        17 => Rules::PlayerReporting,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -175,6 +177,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::Invite(actor)
@@ -194,6 +197,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::Provision(actor)
@@ -213,6 +217,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::Part(actor)
@@ -231,6 +236,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::OfferAccord
@@ -249,6 +255,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::SupportHall
@@ -266,6 +273,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::PledgeLodge
@@ -283,6 +291,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::AidLodge
@@ -300,6 +309,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::RenounceLodge
@@ -307,7 +317,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (26, _)
             if matches!(
                 rules,
-                Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+                Rules::PlayerAgency
+                    | Rules::Consequences
+                    | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::Ask(actor)
@@ -315,7 +328,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (27, 0)
             if matches!(
                 rules,
-                Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+                Rules::PlayerAgency
+                    | Rules::Consequences
+                    | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             Intent::Examine
@@ -323,14 +339,29 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (28, _)
             if matches!(
                 rules,
-                Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+                Rules::PlayerAgency
+                    | Rules::Consequences
+                    | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             ) =>
         {
             let (to, event) = unpack_testimony(value);
             Intent::Testify { to, event }
         }
-        (29, _) if matches!(rules, Rules::Consequences | Rules::ViolenceLogistics) => {
+        (29, _)
+            if matches!(
+                rules,
+                Rules::Consequences | Rules::ViolenceLogistics | Rules::PlayerReporting
+            ) =>
+        {
             Intent::Take(actor)
+        }
+        (30, _) if rules == Rules::PlayerReporting => {
+            let (to, body) = unpack_testimony(value);
+            Intent::ReportBody {
+                to,
+                body: ActorId::new(body.0),
+            }
         }
         _ => return Err(LoadError::InvalidIntent),
     })
@@ -356,6 +387,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::PlayerAgency => b"SH:C10:RULES:v14".to_vec(),
         Rules::Consequences => b"SH:C10:RULES:v15".to_vec(),
         Rules::ViolenceLogistics => b"SH:C10:RULES:v16".to_vec(),
+        Rules::PlayerReporting => b"SH:C10:RULES:v17".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -431,6 +463,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::PlayerAgency
             | Rules::Consequences
             | Rules::ViolenceLogistics
+            | Rules::PlayerReporting
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -463,6 +496,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::PlayerAgency => b"SH:C10:STATE:v14".to_vec(),
         Rules::Consequences => b"SH:C10:STATE:v15".to_vec(),
         Rules::ViolenceLogistics => b"SH:C10:STATE:v16".to_vec(),
+        Rules::PlayerReporting => b"SH:C10:STATE:v17".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -546,6 +580,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::PlayerAgency
                 | Rules::Consequences
                 | Rules::ViolenceLogistics
+                | Rules::PlayerReporting
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -609,7 +644,10 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         out.u64(report.sent);
         out.u64(report.due);
     }
-    if world.rules == Rules::ViolenceLogistics {
+    if matches!(
+        world.rules,
+        Rules::ViolenceLogistics | Rules::PlayerReporting
+    ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
             out.actor(discovery.observer);
@@ -627,6 +665,25 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     out.actor(sender);
                     out.actor(witness);
                     out.u8(hops);
+                }
+            }
+            if world.rules == Rules::PlayerReporting {
+                out.u8(u8::from(discovery.prior_report.is_some()));
+                if let Some((at, source)) = discovery.prior_report {
+                    out.u64(at);
+                    match source {
+                        KnowledgeSource::Observed => out.u8(0),
+                        KnowledgeSource::Reported {
+                            sender,
+                            witness,
+                            hops,
+                        } => {
+                            out.u8(1);
+                            out.actor(sender);
+                            out.actor(witness);
+                            out.u8(hops);
+                        }
+                    }
                 }
             }
         }
@@ -1145,6 +1202,7 @@ impl Wire {
             Intent::Examine => (27, 0),
             Intent::Testify { to, event } => (28, pack_testimony(to, event)),
             Intent::Take(id) => (29, id.get()),
+            Intent::ReportBody { to, body } => (30, pack_testimony(to, super::EventId(body.get()))),
         };
         self.u8(tag);
         self.u32(payload);
@@ -1188,11 +1246,13 @@ impl Wire {
             Goal::AuditContract(_) => 33,
             Goal::DeliverTestimony { .. } => 34,
             Goal::InvestigateDispute(_) => 35,
+            Goal::InvestigateBody(_) => 36,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),
             Goal::Follow(site) => self.position(site),
             Goal::Investigate(incident) => self.u32(incident.0),
+            Goal::InvestigateBody(body) => self.actor(body),
             Goal::Report {
                 recipient,
                 incident,
@@ -1251,6 +1311,7 @@ impl Wire {
             Some(Outcome::Briefed { .. }) => 33,
             Some(Outcome::Testified { .. }) => 34,
             Some(Outcome::Took { .. }) => 35,
+            Some(Outcome::BodyReported { .. }) => 36,
         });
         match outcome {
             Some(
@@ -1284,6 +1345,10 @@ impl Wire {
             Some(Outcome::Took { from, herbs }) => {
                 self.actor(from);
                 self.u32(herbs);
+            }
+            Some(Outcome::BodyReported { to, body }) => {
+                self.actor(to);
+                self.actor(body);
             }
             Some(Outcome::Rejected(reason)) => self.u8(match reason {
                 Rejection::Dead => 0,

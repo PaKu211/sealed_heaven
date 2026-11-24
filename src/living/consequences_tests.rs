@@ -358,3 +358,257 @@ fn finding_a_body_near_the_player_does_not_invent_an_eyewitness() {
     assert!(world.social().incidents().is_empty());
     assert_eq!(world.social().relationship(witness, PLAYER).regard, 0);
 }
+
+#[test]
+fn public_road_witness_reports_corpse_without_reporting_a_murderer() {
+    let mut world = World::player_reporting(0);
+    let courier = ActorId::new(32);
+    for _ in 0..14 {
+        world
+            .step(world.tick(), Intent::Move(Direction::East))
+            .unwrap();
+    }
+    for action in [
+        Intent::Wait,
+        Intent::Attack(courier),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::South),
+        Intent::Attack(courier),
+        Intent::Attack(courier),
+    ] {
+        world.step(world.tick(), action).unwrap();
+    }
+    assert_eq!(
+        world
+            .step(world.tick(), Intent::Move(Direction::South))
+            .unwrap(),
+        Outcome::Moved
+    );
+    for _ in 0..8 {
+        assert_eq!(
+            world
+                .step(world.tick(), Intent::Move(Direction::West))
+                .unwrap(),
+            Outcome::Moved
+        );
+    }
+    for _ in 0..3 {
+        wait(&mut world);
+    }
+    let watch = ActorId::new(2);
+    assert_eq!(world.tick(), 38);
+    let mut withheld = world.clone();
+    assert_eq!(
+        world
+            .step(
+                world.tick(),
+                Intent::ReportBody {
+                    to: watch,
+                    body: courier
+                }
+            )
+            .unwrap(),
+        Outcome::BodyReported {
+            to: watch,
+            body: courier
+        }
+    );
+    wait(&mut withheld);
+    assert_eq!(
+        world
+            .social()
+            .discoveries()
+            .find(|r| r.observer == watch && r.body == courier),
+        None
+    );
+    assert_eq!(world.social().pending_body_reports().count(), 1);
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+    wait(&mut world);
+    wait(&mut withheld);
+    assert_eq!(
+        world
+            .social()
+            .discoveries()
+            .find(|r| r.observer == watch && r.body == courier),
+        None
+    );
+    wait(&mut world);
+    wait(&mut withheld);
+    let report = world
+        .social()
+        .discoveries()
+        .find(|r| r.observer == watch && r.body == courier)
+        .unwrap();
+    assert_eq!(report.at, 41);
+    assert_eq!(report.nearby, None);
+    assert_eq!(
+        report.source,
+        KnowledgeSource::Reported {
+            sender: PLAYER,
+            witness: PLAYER,
+            hops: 1
+        }
+    );
+    assert_eq!(
+        withheld
+            .social()
+            .discoveries()
+            .find(|r| r.observer == watch && r.body == courier),
+        None
+    );
+    assert_eq!(
+        world.social().relationship(watch, PLAYER).regard,
+        withheld.social().relationship(watch, PLAYER).regard
+    );
+    assert_eq!(world.social().knowledge(watch, IncidentId(4)), None);
+    wait(&mut world);
+    assert_eq!(
+        world
+            .social()
+            .discoveries()
+            .find(|r| r.observer == watch && r.body == courier)
+            .unwrap()
+            .source,
+        KnowledgeSource::Observed
+    );
+    assert_eq!(
+        world
+            .social()
+            .discoveries()
+            .find(|r| r.observer == watch && r.body == courier)
+            .unwrap()
+            .prior_report,
+        Some((
+            41,
+            KnowledgeSource::Reported {
+                sender: PLAYER,
+                witness: PLAYER,
+                hops: 1
+            }
+        ))
+    );
+    assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+}
+
+#[test]
+fn unfounded_duplicate_and_unencodable_reports_never_become_testimony() {
+    let watch = ActorId::new(2);
+    let body = ActorId::new(32);
+    let mut world = World::player_reporting(1);
+    world.player.position = world.npc(watch).unwrap().position;
+    assert_eq!(
+        world
+            .step(world.tick(), Intent::ReportBody { to: watch, body })
+            .unwrap(),
+        Outcome::Rejected(Rejection::NoEvidence)
+    );
+    assert_eq!(world.social().pending_body_reports().count(), 0);
+    let before = world.checkpoint();
+    assert_eq!(
+        world.step(
+            world.tick(),
+            Intent::ReportBody {
+                to: ActorId::new(256),
+                body
+            }
+        ),
+        Err(StepError::InvalidBodyReport)
+    );
+    assert_eq!(world.checkpoint(), before);
+    let mut legacy = World::violence_logistics(1);
+    let before = legacy.checkpoint();
+    assert_eq!(
+        legacy.step(legacy.tick(), Intent::ReportBody { to: watch, body }),
+        Err(StepError::InvalidBodyReport)
+    );
+    assert_eq!(legacy.checkpoint(), before);
+    assert_eq!(World::restore(&before).unwrap(), legacy);
+}
+
+#[test]
+fn reported_body_redirects_a_free_watch_but_not_an_exhausted_one() {
+    let mut world = World::player_reporting(0);
+    let body = ActorId::new(32);
+    let watch = ActorId::new(2);
+    // Isolate institutional priorities: a watch without an active mission
+    // receives a true report from a player who personally saw a remote body.
+    let site = Position { x: 18, y: 3 };
+    world.npcs.get_mut(&body).unwrap().position = site;
+    world.npcs.get_mut(&body).unwrap().hp = 0;
+    world.player.position = site;
+    wait(&mut world);
+    assert!(
+        world
+            .social()
+            .discoveries()
+            .any(|r| r.observer == PLAYER && r.body == body)
+    );
+    world.player.position = world.npc(watch).unwrap().position;
+    world.supply.shrine = world.scenario.shrine_target;
+    let mut withheld = world.clone();
+    assert_eq!(
+        world
+            .step(world.tick(), Intent::ReportBody { to: watch, body })
+            .unwrap(),
+        Outcome::BodyReported { to: watch, body }
+    );
+    for _ in 0..2 {
+        wait(&mut world);
+        wait(&mut withheld);
+    }
+    assert_eq!(
+        world.choose_goal(world.npc(watch).unwrap()),
+        Goal::InvestigateBody(body)
+    );
+    assert_ne!(
+        withheld.choose_goal(withheld.npc(watch).unwrap()),
+        Goal::InvestigateBody(body)
+    );
+    let old = world.npc(watch).unwrap().position;
+    wait(&mut world);
+    assert_ne!(world.npc(watch).unwrap().position, old);
+    // Fixture-injected positions are deliberately not used as save evidence;
+    // the public route above proves checkpoint replay.
+    world.npcs.get_mut(&watch).unwrap().fatigue = 40;
+    assert_ne!(
+        world.choose_goal(world.npc(watch).unwrap()),
+        Goal::InvestigateBody(body)
+    );
+}
+
+#[test]
+fn a_dead_player_cannot_deliver_an_undelivered_body_report() {
+    let mut world = World::player_reporting(0);
+    let body = ActorId::new(32);
+    let watch = ActorId::new(2);
+    // Only the initial discovery is prepared here. The full public-command
+    // murder and travel route is tested separately above.
+    let site = world.npc(body).unwrap().position;
+    world.npcs.get_mut(&body).unwrap().hp = 0;
+    world.player.position = site;
+    wait(&mut world);
+    world.player.position = world.npc(watch).unwrap().position;
+    assert_eq!(
+        world
+            .step(world.tick(), Intent::ReportBody { to: watch, body })
+            .unwrap(),
+        Outcome::BodyReported { to: watch, body }
+    );
+    world.player.hp = 0;
+    for _ in 0..3 {
+        wait(&mut world);
+    }
+    assert_eq!(world.social().pending_body_reports().count(), 0);
+    assert!(
+        world
+            .social()
+            .discoveries()
+            .all(|discovery| discovery.observer != watch || discovery.body != body)
+    );
+}

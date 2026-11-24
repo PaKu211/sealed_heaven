@@ -120,6 +120,11 @@ pub enum Intent {
     },
     /// Take the herbs a dead carrier is no longer able to deliver.
     Take(ActorId),
+    /// Tell a nearby person about a corpse the player actually discovered.
+    ReportBody {
+        to: ActorId,
+        body: ActorId,
+    },
 }
 
 impl Intent {
@@ -244,6 +249,10 @@ pub enum Outcome {
         from: ActorId,
         herbs: u32,
     },
+    BodyReported {
+        to: ActorId,
+        body: ActorId,
+    },
     Rejected(Rejection),
 }
 
@@ -257,6 +266,7 @@ pub enum StepError {
     CompanyCampaignRequired,
     RivalryCampaignRequired,
     PoliticsCampaignRequired,
+    InvalidBodyReport,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -343,6 +353,7 @@ enum Rules {
     PlayerAgency,
     Consequences,
     ViolenceLogistics,
+    PlayerReporting,
 }
 
 impl Rules {
@@ -366,6 +377,7 @@ impl Rules {
                 | Self::PlayerAgency
                 | Self::Consequences
                 | Self::ViolenceLogistics
+                | Self::PlayerReporting
         )
     }
 }
@@ -431,6 +443,10 @@ impl World {
         Self::seeded(seed, Rules::ViolenceLogistics)
     }
 
+    pub fn player_reporting(seed: u32) -> Self {
+        Self::seeded(seed, Rules::PlayerReporting)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -482,6 +498,7 @@ impl World {
                         | Rules::PlayerAgency
                         | Rules::Consequences
                         | Rules::ViolenceLogistics
+                        | Rules::PlayerReporting
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -509,6 +526,7 @@ impl World {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             )
             .then(Company::default),
             rivalry: matches!(
@@ -524,6 +542,7 @@ impl World {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -538,6 +557,7 @@ impl World {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             )
             .then(Politics::new),
             traffic: matches!(
@@ -551,6 +571,7 @@ impl World {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -563,6 +584,7 @@ impl World {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -572,6 +594,7 @@ impl World {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -580,6 +603,7 @@ impl World {
                     | Rules::PlayerAgency
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
+                    | Rules::PlayerReporting
             )
             .then(Information::default),
         }
@@ -722,6 +746,11 @@ impl World {
         {
             return Err(StepError::PoliticsCampaignRequired);
         }
+        if let Intent::ReportBody { to, body } = intent
+            && (self.rules != Rules::PlayerReporting || to.get() > 255 || body.get() > 0x00ff_ffff)
+        {
+            return Err(StepError::InvalidBodyReport);
+        }
 
         self.tick += 1;
         if let Some(traffic) = self.traffic.as_mut() {
@@ -856,22 +885,36 @@ impl World {
             Intent::Examine => self.examine_site(),
             Intent::Testify { to, event } => self.testify(to, event),
             Intent::Take(id) => self.take_cargo(id),
+            Intent::ReportBody { to, body } => self.report_body(to, body),
         }
     }
 
     pub fn is_player_agency(&self) -> bool {
         matches!(
             self.rules,
-            Rules::PlayerAgency | Rules::Consequences | Rules::ViolenceLogistics
+            Rules::PlayerAgency
+                | Rules::Consequences
+                | Rules::ViolenceLogistics
+                | Rules::PlayerReporting
         )
     }
 
     pub fn is_consequences(&self) -> bool {
-        matches!(self.rules, Rules::Consequences | Rules::ViolenceLogistics)
+        matches!(
+            self.rules,
+            Rules::Consequences | Rules::ViolenceLogistics | Rules::PlayerReporting
+        )
     }
 
     pub fn is_violence_logistics(&self) -> bool {
-        self.rules == Rules::ViolenceLogistics
+        matches!(
+            self.rules,
+            Rules::ViolenceLogistics | Rules::PlayerReporting
+        )
+    }
+
+    pub fn is_player_reporting(&self) -> bool {
+        self.rules == Rules::PlayerReporting
     }
 
     fn grants_player_agency(&self) -> bool {

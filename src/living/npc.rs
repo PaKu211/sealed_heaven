@@ -52,6 +52,7 @@ pub enum Goal {
     SeekCare,
     Treat(ActorId),
     Investigate(IncidentId),
+    InvestigateBody(ActorId),
     Report {
         recipient: ActorId,
         incident: IncidentId,
@@ -216,6 +217,25 @@ impl World {
                     .map(|(incident, _)| Goal::Investigate(incident.id))
             })
             .flatten();
+        let body_lead = (self.rules == super::Rules::PlayerReporting
+            && npc.definition.role == Role::Watch)
+            .then(|| {
+                self.social
+                    .discoveries
+                    .values()
+                    .filter(|discovery| {
+                        discovery.observer == id
+                            && matches!(discovery.source, KnowledgeSource::Reported { .. })
+                    })
+                    .filter(|discovery| {
+                        self.npcs
+                            .get(&discovery.body)
+                            .is_some_and(|body| !body.alive())
+                    })
+                    .min_by_key(|discovery| (discovery.at, discovery.body))
+                    .map(|discovery| Goal::InvestigateBody(discovery.body))
+            })
+            .flatten();
         let teaches = self.is_hall_teacher(npc);
         let off_duty = !self.original_rules()
             && self.is_night()
@@ -290,6 +310,7 @@ impl World {
             (expedition_priority, expedition),
             (76, testimony),
             (74, news),
+            (70, body_lead),
             (68, disturbance),
             (54 + u16::from(npc.fatigue), resting.then_some(Goal::Rest)),
             (52, care.then_some(Goal::SeekCare)),
@@ -459,6 +480,15 @@ impl World {
                         .expect("planned actor")
                         .last_investigated = Some(incident);
                 } else {
+                    self.travel(id, site, 1);
+                }
+            }
+            Goal::InvestigateBody(body) => {
+                // A corpse stays at the site described by the reporting
+                // witness. Walking there costs real turns; only sight on
+                // arrival upgrades a secondhand report to direct discovery.
+                let site = self.npcs[&body].position;
+                if !self.perceives(pos, site) {
                     self.travel(id, site, 1);
                 }
             }

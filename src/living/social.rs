@@ -49,6 +49,9 @@ pub struct BodyDiscovery {
     pub at: u64,
     pub nearby: Option<ActorId>,
     pub source: KnowledgeSource,
+    /// Revision 17 keeps the original account after an observer checks the
+    /// body themselves. Revision 16 never upgrades received accounts.
+    pub prior_report: Option<(u64, KnowledgeSource)>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -238,8 +241,46 @@ impl Social {
 }
 
 impl World {
+    pub(super) fn report_body(
+        &mut self,
+        to: ActorId,
+        body: ActorId,
+    ) -> Result<super::Outcome, super::Rejection> {
+        use super::{Outcome, Rejection};
+        if !self.player.alive() {
+            return Err(Rejection::Dead);
+        }
+        let recipient = self
+            .npcs
+            .get(&to)
+            .filter(|npc| npc.alive())
+            .ok_or(Rejection::UnknownActor)?;
+        self.require_reach(recipient.position)?;
+        if !self.social.discoveries.contains_key(&(PLAYER, body)) {
+            return Err(Rejection::NoEvidence);
+        }
+        if self.social.relationship(to, PLAYER).refuses_aid() {
+            return Err(Rejection::Refused);
+        }
+        if self.social.discoveries.contains_key(&(to, body))
+            || self.social.body_reports.contains_key(&(to, body))
+        {
+            return Err(Rejection::Refused);
+        }
+        self.social.body_reports.insert(
+            (to, body),
+            BodyReport {
+                sender: PLAYER,
+                recipient: to,
+                body,
+                due: self.tick + REPORT_DELAY,
+            },
+        );
+        Ok(Outcome::BodyReported { to, body })
+    }
+
     pub(super) fn observe_bodies(&mut self) {
-        if self.rules != super::Rules::ViolenceLogistics {
+        if !self.is_violence_logistics() {
             return;
         }
         let bodies: Vec<_> = self
@@ -261,10 +302,14 @@ impl World {
             .collect();
         for (body, position) in bodies {
             for (observer, location) in &observers {
-                if *observer == body
-                    || self.social.discoveries.contains_key(&(*observer, body))
-                    || !self.perceives(*location, position)
-                {
+                if *observer == body || !self.perceives(*location, position) {
+                    continue;
+                }
+                let key = (*observer, body);
+                if self.social.discoveries.get(&key).is_some_and(|receipt| {
+                    receipt.source == KnowledgeSource::Observed
+                        || self.rules != super::Rules::PlayerReporting
+                }) {
                     continue;
                 }
                 // Even if a witness saw the killing, this independent body
@@ -274,14 +319,21 @@ impl World {
                     && self.perceives(*location, self.player.position)
                     && in_reach(self.player.position, position))
                 .then_some(PLAYER);
+                let prior_report = self
+                    .social
+                    .discoveries
+                    .get(&key)
+                    .map(|receipt| (receipt.at, receipt.source));
+                self.social.body_reports.remove(&key);
                 self.social.discoveries.insert(
-                    (*observer, body),
+                    key,
                     BodyDiscovery {
                         observer: *observer,
                         body,
                         at: self.tick,
                         nearby,
                         source: KnowledgeSource::Observed,
+                        prior_report,
                     },
                 );
             }
@@ -289,7 +341,7 @@ impl World {
     }
 
     pub(super) fn deliver_body_reports(&mut self) {
-        if self.rules != super::Rules::ViolenceLogistics {
+        if !self.is_violence_logistics() {
             return;
         }
         let due: Vec<_> = self
@@ -331,13 +383,14 @@ impl World {
                         witness,
                         hops,
                     },
+                    prior_report: None,
                 },
             );
         }
     }
 
     pub(super) fn queue_body_reports(&mut self) {
-        if self.rules != super::Rules::ViolenceLogistics {
+        if !self.is_violence_logistics() {
             return;
         }
         let known: Vec<_> = self.social.discoveries.values().copied().collect();
