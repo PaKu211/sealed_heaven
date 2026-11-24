@@ -9,9 +9,9 @@ use std::{
 use sealed_sim::living::{
     ActorId, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent, ContractEventKind,
     Direction, DisputePhase, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, InfoLogKind,
-    Intent, Invitation, JourneyEvent, LoadError, MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER,
-    PoliticalEventKind, Position, Provenance, Region, Rejection, ReliefEventKind, Role,
-    SectEventKind, StepError, TrafficEventKind, World,
+    Intent, Invitation, JourneyEvent, KnowledgeSource, LoadError, MAX_QI, MAX_SAVE_BYTES, Need,
+    Outcome, PLAYER, PoliticalEventKind, Position, Provenance, Region, Rejection, ReliefEventKind,
+    Role, SectEventKind, StepError, TrafficEventKind, World,
 };
 
 use crate::{clock, locale::Locale, persistence};
@@ -253,6 +253,62 @@ impl Session {
                 };
                 return true;
             }
+            "crimelog" => {
+                if !self.world.is_violence_logistics() {
+                    self.notice = text(self.locale, "Only in C2.5.", "Hanya di C2.5.").into();
+                    return true;
+                }
+                let lines: Vec<_> = self
+                    .world
+                    .social()
+                    .incidents()
+                    .iter()
+                    .rev()
+                    .filter_map(|incident| {
+                        let relation = if incident.source == PLAYER {
+                            text(self.locale, "you did this", "kamu melakukannya")
+                        } else if incident.target == PLAYER {
+                            text(self.locale, "you were struck", "kamu diserang")
+                        } else {
+                            match self.world.social().knowledge(PLAYER, incident.id)?.source {
+                                KnowledgeSource::Observed => {
+                                    text(self.locale, "witnessed", "disaksikan")
+                                }
+                                KnowledgeSource::Reported { hops: 1, .. } => {
+                                    text(self.locale, "heard firsthand", "dengar langsung")
+                                }
+                                KnowledgeSource::Reported { .. } => {
+                                    text(self.locale, "allegation", "dugaan")
+                                }
+                            }
+                        };
+                        let action = if incident.damage == 0 {
+                            text(self.locale, "took cargo from", "mengambil muatan dari")
+                        } else {
+                            text(self.locale, "hit", "menyerang")
+                        };
+                        Some(format!(
+                            "t{} {} {} {} ({relation})",
+                            incident.tick,
+                            actor_name(self.locale, &self.world, incident.source),
+                            action,
+                            actor_name(self.locale, &self.world, incident.target)
+                        ))
+                    })
+                    .take(12)
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "You know no assaults or thefts.",
+                        "Kamu belum mengetahui serangan atau pencurian.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
             "background" => {
                 let background = match argument {
                     Some("wanderer") => Background::Wanderer,
@@ -284,8 +340,8 @@ impl Session {
             "help" => {
                 self.notice = if self.world.is_violence_logistics() {
                     text(self.locale,
-                        "C2.5: attack <id> a living courier or contract provider; carried herbs remain on the body. take <id> recovers them. bodies shows only corpses you discovered, not the killer. Witnesses identify attackers; nearby strangers only have a lead. contractlog, accountlog, infolog, know track consequences. --c24 keeps C2.4.",
-                        "C2.5: attack <id> kurir atau pengantar kontrak; herba tetap di jenazah. take <id> mengambilnya. bodies hanya menunjukkan jenazah yang ditemukan, bukan pembunuhnya. Saksi mengenali penyerang; orang dekat hanya punya petunjuk. contractlog, accountlog, infolog, know mencatat akibat. --c24 untuk C2.4.")
+                        "C2.5: attack <id> a living courier or contract provider; carried herbs remain on the body. take <id> recovers them. bodies shows only corpses you discovered, not the killer. crimelog lists only your own actions or learned incidents. Witnesses identify attackers; nearby strangers only have a lead. contractlog, accountlog, infolog, know track consequences. --c24 keeps C2.4.",
+                        "C2.5: attack <id> kurir atau pengantar kontrak; herba tetap di jenazah. take <id> mengambilnya. bodies hanya menunjukkan jenazah yang ditemukan, bukan pembunuhnya. crimelog hanya mencatat tindakanmu atau kejadian yang kamu ketahui. Saksi mengenali penyerang; orang dekat hanya punya petunjuk. contractlog, accountlog, infolog, know mencatat akibat. --c24 untuk C2.4.")
                 } else if self.world.is_consequences() {
                     text(
                         self.locale,
@@ -3039,6 +3095,23 @@ mod tests {
         let view = session.frame();
         assert!(view.contains("t27 You took cargo from Bao Jun"));
         assert!(!view.contains("t27 You hit Bao Jun (0 HP)"));
+        let before = session.world.checkpoint();
+        session.input("crimelog");
+        assert!(
+            session
+                .notice
+                .contains("t26 You hit Bao Jun (you did this)")
+        );
+        assert!(
+            session
+                .notice
+                .contains("t27 You took cargo from Bao Jun (you did this)")
+        );
+        session.input("lang id");
+        session.input("crimelog");
+        assert!(session.notice.contains("kamu melakukannya"));
+        assert_eq!(session.world.checkpoint(), before);
+        session.input("lang en");
         assert_eq!(session.world.npc(ActorId::new(32)).unwrap().herbs, 0);
         session.input("save");
         let saved = session.world.checkpoint();
@@ -3053,5 +3126,23 @@ mod tests {
         session.input("help");
         assert!(session.notice.contains("C2.5"));
         assert_eq!(session.world.checkpoint(), saved);
+    }
+
+    #[test]
+    fn c26_investigation_views_do_not_tick_or_upgrade_old_campaigns() {
+        let mut current = Session::new(PathBuf::from("unused"));
+        current.world = World::violence_logistics(1);
+        let before = current.world.checkpoint();
+        current.input("crimelog");
+        assert!(current.notice.contains("You know no assaults or thefts"));
+        current.input("bodies");
+        assert!(current.notice.contains("You have discovered no bodies"));
+        assert_eq!(current.world.checkpoint(), before);
+        let mut old = Session::new(PathBuf::from("unused"));
+        old.world = World::consequences(1);
+        let before = old.world.checkpoint();
+        old.input("crimelog");
+        assert!(old.notice.contains("Only in C2.5"));
+        assert_eq!(old.world.checkpoint(), before);
     }
 }
