@@ -477,7 +477,17 @@ impl World {
             let npc = &self.npcs[&target];
             (npc.position, npc.hp)
         };
-        let damage = hp.min(amount);
+        let blocked = if target == PLAYER
+            && amount > 0
+            && self.rules == super::Rules::SectCultivation
+            && self.contested().is_some_and(|state| state.wards > 0)
+        {
+            self.contested.as_mut().unwrap().wards -= 1;
+            1
+        } else {
+            0
+        };
+        let damage = hp.min(amount.saturating_sub(blocked));
         if damage == 0 {
             return;
         }

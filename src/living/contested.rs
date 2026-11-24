@@ -17,6 +17,7 @@ pub enum Holder {
     Ground(Position),
     Carried(ActorId),
     Deposited(ActorId),
+    Consumed(ActorId),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -32,6 +33,7 @@ pub enum LotEventKind {
     Sold,
     Deposited,
     Dropped,
+    Attuned,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -52,11 +54,13 @@ pub struct Contested {
     pub known: BTreeMap<(ActorId, u32), Position>,
     pub history: Vec<LotEvent>,
     pub prestige: BTreeMap<ActorId, u32>,
+    pub wards: u8,
+    pub script_charges: u8,
 }
 
 impl Contested {
-    pub(super) fn new() -> Self {
-        let lots = [
+    pub(super) fn new(cultivation: bool) -> Self {
+        let mut lots: BTreeMap<_, _> = [
             (0, Good::SpiritOre, Position { x: 8, y: 4 }),
             (1, Good::SpiritOre, Position { x: 26, y: 4 }),
             (2, Good::JadeScript, Position { x: 29, y: 6 }),
@@ -73,11 +77,23 @@ impl Contested {
             )
         })
         .collect();
+        if cultivation {
+            lots.insert(
+                3,
+                Lot {
+                    id: 3,
+                    good: Good::JadeScript,
+                    holder: Holder::Ground(Position { x: 5, y: 4 }),
+                },
+            );
+        }
         Self {
             lots,
             known: BTreeMap::new(),
             history: Vec::new(),
             prestige: BTreeMap::new(),
+            wards: 0,
+            script_charges: 0,
         }
     }
 }
@@ -147,6 +163,52 @@ impl World {
                 .holder = Holder::Ground(site);
             self.record_lot(id, PLAYER, LotEventKind::Dropped, site);
         }
+    }
+
+    pub(super) fn attune_lot(&mut self, id: u32) -> Result<Outcome, Rejection> {
+        if self
+            .contested()
+            .and_then(|state| state.lots.get(&id))
+            .is_none_or(|lot| lot.holder != Holder::Carried(PLAYER))
+        {
+            return Err(Rejection::NoCargo);
+        }
+        let good = self.contested().unwrap().lots[&id].good;
+        let site = self.player.position;
+        let state = self.contested.as_mut().unwrap();
+        match good {
+            Good::SpiritOre => {
+                state.wards = state.wards.checked_add(2).ok_or(Rejection::PackFull)?
+            }
+            Good::JadeScript => {
+                state.script_charges = state
+                    .script_charges
+                    .checked_add(2)
+                    .ok_or(Rejection::PackFull)?
+            }
+        }
+        state.lots.get_mut(&id).unwrap().holder = Holder::Consumed(PLAYER);
+        self.record_lot(id, PLAYER, LotEventKind::Attuned, site);
+        Ok(Outcome::LotAttuned(id))
+    }
+
+    pub(super) fn channel_strike(&mut self, target: ActorId) -> Result<Outcome, Rejection> {
+        let npc = self
+            .npcs
+            .get(&target)
+            .filter(|npc| npc.alive())
+            .ok_or(Rejection::UnknownActor)?;
+        let site = npc.position;
+        if super::navigation::distance(self.player.position, site) > 2 || !self.player_sees(site) {
+            return Err(Rejection::OutOfReach);
+        }
+        let state = self.contested.as_mut().unwrap();
+        if state.script_charges == 0 {
+            return Err(Rejection::NoCargo);
+        }
+        state.script_charges -= 1;
+        self.damage(PLAYER, target, super::STRIKE, false);
+        Ok(Outcome::ChannelStruck(target))
     }
 
     pub(super) fn claim_lot(&mut self, id: u32) -> Result<Outcome, Rejection> {
@@ -690,6 +752,185 @@ mod tests {
                 .filter(|event| event.lot == 1 && event.kind == LotEventKind::Claimed)
                 .count(),
             1
+        );
+    }
+
+    #[test]
+    fn public_cultivation_consumes_real_relics_for_finite_combat_choices() {
+        let mut world = World::sect_cultivation(0);
+        let courier = ActorId::new(32);
+        for _ in 0..5 {
+            world
+                .step(world.tick(), Intent::Move(Direction::East))
+                .unwrap();
+        }
+        assert_eq!(
+            world.step(world.tick(), Intent::ClaimLot(3)).unwrap(),
+            Outcome::LotClaimed(3)
+        );
+        assert_eq!(
+            world.step(world.tick(), Intent::AttuneLot(3)).unwrap(),
+            Outcome::LotAttuned(3)
+        );
+        for _ in 0..3 {
+            world
+                .step(world.tick(), Intent::Move(Direction::East))
+                .unwrap();
+        }
+        assert_eq!(
+            world.step(world.tick(), Intent::ClaimLot(0)).unwrap(),
+            Outcome::LotClaimed(0)
+        );
+        let mut sell = world.clone();
+        assert_eq!(
+            world.step(world.tick(), Intent::AttuneLot(0)).unwrap(),
+            Outcome::LotAttuned(0)
+        );
+        assert_eq!(
+            world.contested().unwrap().lots[&0].holder,
+            Holder::Consumed(PLAYER)
+        );
+        assert_eq!(
+            world.contested().unwrap().lots[&3].holder,
+            Holder::Consumed(PLAYER)
+        );
+        assert_eq!(world.contested().unwrap().lots.len(), 4);
+        assert_eq!(
+            (
+                world.contested().unwrap().wards,
+                world.contested().unwrap().script_charges
+            ),
+            (2, 2)
+        );
+        assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+        assert_eq!(
+            world
+                .step(world.tick(), Intent::ChannelStrike(courier))
+                .unwrap(),
+            Outcome::Rejected(Rejection::OutOfReach)
+        );
+        assert_eq!(world.contested().unwrap().script_charges, 2);
+        for _ in 0..3 {
+            world
+                .step(world.tick(), Intent::Move(Direction::East))
+                .unwrap();
+        }
+        world.step(world.tick(), Intent::Wait).unwrap();
+        assert_eq!(world.player.position, Position { x: 11, y: 4 });
+        let mut ordinary = world.clone();
+        assert_eq!(
+            ordinary
+                .step(ordinary.tick(), Intent::Attack(courier))
+                .unwrap(),
+            Outcome::Rejected(Rejection::OutOfReach)
+        );
+        let hp = world.npcs[&courier].hp;
+        assert_eq!(
+            world
+                .step(world.tick(), Intent::ChannelStrike(courier))
+                .unwrap(),
+            Outcome::ChannelStruck(courier)
+        );
+        assert_eq!(world.npcs[&courier].hp, hp - super::super::STRIKE);
+        assert_eq!(world.contested().unwrap().script_charges, 1);
+        assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+        for _ in 0..20 {
+            sell.step(sell.tick(), Intent::Move(Direction::East))
+                .unwrap();
+        }
+        sell.step(sell.tick(), Intent::Move(Direction::South))
+            .unwrap();
+        assert_eq!(
+            sell.step(
+                sell.tick(),
+                Intent::OfferLot {
+                    to: ActorId::new(36),
+                    id: 0
+                }
+            )
+            .unwrap(),
+            Outcome::LotSold {
+                to: ActorId::new(36),
+                id: 0,
+                coins: 2
+            }
+        );
+        assert_eq!(sell.contested().unwrap().wards, 0);
+        assert_eq!(
+            sell.contested().unwrap().lots[&0].holder,
+            Holder::Carried(ActorId::new(36))
+        );
+        assert_eq!(sell.contested().unwrap().lots.len(), 4);
+        assert_eq!(World::restore(&sell.checkpoint()).unwrap(), sell);
+        let mut previous = World::contested_resources(0);
+        assert_eq!(previous.contested().unwrap().lots.len(), 3);
+        assert_eq!(
+            u16::from_le_bytes(previous.checkpoint()[12..14].try_into().unwrap()),
+            19
+        );
+        assert_eq!(World::restore(&previous.checkpoint()).unwrap(), previous);
+        let prior = previous.checkpoint();
+        assert_eq!(
+            previous.step(previous.tick(), Intent::AttuneLot(0)),
+            Err(super::super::StepError::ContestedCampaignRequired)
+        );
+        assert_eq!(previous.checkpoint(), prior);
+    }
+
+    #[test]
+    fn physical_ward_reduces_real_attacks_but_never_mints_a_lot() {
+        let mut guarded = World::sect_cultivation(0);
+        guarded.player.position = Position { x: 8, y: 4 };
+        guarded.claim_lot(0).unwrap();
+        guarded.attune_lot(0).unwrap();
+        let mut unguarded = World::sect_cultivation(0);
+        let attacker = ActorId::new(32);
+        let initial = guarded.player.hp;
+        for remaining in [1, 0] {
+            guarded.damage(attacker, PLAYER, 2, false);
+            unguarded.damage(attacker, PLAYER, 2, false);
+            assert_eq!(guarded.contested().unwrap().wards, remaining);
+            assert_eq!(guarded.social().incidents().last().unwrap().damage, 1);
+            assert_eq!(unguarded.social().incidents().last().unwrap().damage, 2);
+        }
+        assert_eq!(guarded.player.hp, initial - 2);
+        assert_eq!(unguarded.player.hp, initial - 4);
+        assert_eq!(
+            guarded.contested().unwrap().lots[&0].holder,
+            Holder::Consumed(PLAYER)
+        );
+        guarded.damage(attacker, PLAYER, 2, false);
+        assert_eq!(guarded.player.hp, initial - 4);
+    }
+
+    #[test]
+    fn jade_channels_are_finite_and_refused_attunement_has_no_effect() {
+        let mut world = World::sect_cultivation(0);
+        let target = ActorId::new(32);
+        world.player.position = Position { x: 5, y: 4 };
+        assert_eq!(world.attune_lot(3), Err(Rejection::NoCargo));
+        assert_eq!(world.contested().unwrap().script_charges, 0);
+        world.claim_lot(3).unwrap();
+        world.attune_lot(3).unwrap();
+        assert_eq!(world.attune_lot(3), Err(Rejection::NoCargo));
+        world.npcs.get_mut(&target).unwrap().position = Position { x: 6, y: 4 };
+        assert_eq!(
+            world.channel_strike(target),
+            Ok(Outcome::ChannelStruck(target))
+        );
+        assert_eq!(
+            world.channel_strike(target),
+            Ok(Outcome::ChannelStruck(target))
+        );
+        assert_eq!(world.channel_strike(target), Err(Rejection::NoCargo));
+        assert_eq!(
+            world.npcs[&target].hp,
+            world.npcs[&target].definition.hp - 4
+        );
+        assert_eq!(world.contested().unwrap().script_charges, 0);
+        assert_eq!(
+            world.contested().unwrap().lots[&3].holder,
+            Holder::Consumed(PLAYER)
         );
     }
 }

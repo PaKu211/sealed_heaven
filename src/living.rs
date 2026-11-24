@@ -133,6 +133,8 @@ pub enum Intent {
         to: ActorId,
         id: u32,
     },
+    AttuneLot(u32),
+    ChannelStrike(ActorId),
 }
 
 impl Intent {
@@ -267,6 +269,8 @@ pub enum Outcome {
         id: u32,
         coins: u32,
     },
+    LotAttuned(u32),
+    ChannelStruck(ActorId),
     Rejected(Rejection),
 }
 
@@ -372,6 +376,7 @@ enum Rules {
     PlayerReporting,
     PhysicalRecovery,
     ContestedResources,
+    SectCultivation,
 }
 
 impl Rules {
@@ -398,6 +403,7 @@ impl Rules {
                 | Self::PlayerReporting
                 | Self::PhysicalRecovery
                 | Self::ContestedResources
+                | Self::SectCultivation
         )
     }
 }
@@ -475,6 +481,10 @@ impl World {
         Self::seeded(seed, Rules::ContestedResources)
     }
 
+    pub fn sect_cultivation(seed: u32) -> Self {
+        Self::seeded(seed, Rules::SectCultivation)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -529,6 +539,7 @@ impl World {
                         | Rules::PlayerReporting
                         | Rules::PhysicalRecovery
                         | Rules::ContestedResources
+                        | Rules::SectCultivation
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -559,6 +570,7 @@ impl World {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             )
             .then(Company::default),
             rivalry: matches!(
@@ -577,6 +589,7 @@ impl World {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -594,6 +607,7 @@ impl World {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             )
             .then(Politics::new),
             traffic: matches!(
@@ -610,6 +624,7 @@ impl World {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -625,6 +640,7 @@ impl World {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -637,6 +653,7 @@ impl World {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -648,9 +665,11 @@ impl World {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             )
             .then(Information::default),
-            contested: (rules == Rules::ContestedResources).then(Contested::new),
+            contested: matches!(rules, Rules::ContestedResources | Rules::SectCultivation)
+                .then(|| Contested::new(rules == Rules::SectCultivation)),
         }
     }
 
@@ -794,7 +813,10 @@ impl World {
         if let Intent::ReportBody { to, body } = intent
             && (!matches!(
                 self.rules,
-                Rules::PlayerReporting | Rules::PhysicalRecovery | Rules::ContestedResources
+                Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -803,6 +825,11 @@ impl World {
         if matches!(intent, Intent::ClaimLot(_) | Intent::OfferLot { .. })
             && (self.contested.is_none()
                 || matches!(intent, Intent::OfferLot { to, id } if to.get() > 255 || id > 0x00ff_ffff))
+        {
+            return Err(StepError::ContestedCampaignRequired);
+        }
+        if matches!(intent, Intent::AttuneLot(_) | Intent::ChannelStrike(_))
+            && self.rules != Rules::SectCultivation
         {
             return Err(StepError::ContestedCampaignRequired);
         }
@@ -944,6 +971,8 @@ impl World {
             Intent::ReportBody { to, body } => self.report_body(to, body),
             Intent::ClaimLot(id) => self.claim_lot(id),
             Intent::OfferLot { to, id } => self.offer_lot(to, id),
+            Intent::AttuneLot(id) => self.attune_lot(id),
+            Intent::ChannelStrike(id) => self.channel_strike(id),
         }
     }
 
@@ -956,6 +985,7 @@ impl World {
                 | Rules::PlayerReporting
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
+                | Rules::SectCultivation
         )
     }
 
@@ -967,6 +997,7 @@ impl World {
                 | Rules::PlayerReporting
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
+                | Rules::SectCultivation
         )
     }
 
@@ -977,21 +1008,29 @@ impl World {
                 | Rules::PlayerReporting
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
+                | Rules::SectCultivation
         )
     }
 
     pub fn is_player_reporting(&self) -> bool {
         matches!(
             self.rules,
-            Rules::PlayerReporting | Rules::PhysicalRecovery | Rules::ContestedResources
+            Rules::PlayerReporting
+                | Rules::PhysicalRecovery
+                | Rules::ContestedResources
+                | Rules::SectCultivation
         )
     }
 
     pub fn is_physical_recovery(&self) -> bool {
         matches!(
             self.rules,
-            Rules::PhysicalRecovery | Rules::ContestedResources
+            Rules::PhysicalRecovery | Rules::ContestedResources | Rules::SectCultivation
         )
+    }
+
+    pub fn is_sect_cultivation(&self) -> bool {
+        self.rules == Rules::SectCultivation
     }
 
     fn grants_player_agency(&self) -> bool {

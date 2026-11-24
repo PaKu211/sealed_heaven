@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.contested().is_some() {
+        if self.world.is_sect_cultivation() {
+            World::sect_cultivation(seed)
+        } else if self.world.contested().is_some() {
             World::contested_resources(seed)
         } else if self.world.is_physical_recovery() {
             World::physical_recovery(seed)
@@ -99,6 +101,8 @@ impl Session {
                         | "ask"
                         | "take"
                         | "claim"
+                        | "attune"
+                        | "channel"
                 ))
         {
             self.notice = text(
@@ -201,6 +205,29 @@ impl Session {
                 }
                 Intent::ClaimLot(id)
             }
+            "attune" => {
+                let Some(id) = argument.and_then(|value| value.parse::<u32>().ok()) else {
+                    self.notice = "attune <lot>".into();
+                    return true;
+                };
+                if !self.world.is_sect_cultivation() {
+                    self.notice = "Only in C3.0.".into();
+                    return true;
+                }
+                Intent::AttuneLot(id)
+            }
+            "cultivation" => {
+                if !self.world.is_sect_cultivation() {
+                    self.notice = "Only in C3.0.".into();
+                    return true;
+                }
+                let state = self.world.contested().unwrap();
+                self.notice = format!(
+                    "Wards: {}; Jade channels: {}",
+                    state.wards, state.script_charges
+                );
+                return true;
+            }
             "offerlot" => {
                 let Some(id) = second.and_then(|value| value.parse::<u32>().ok()) else {
                     self.notice = text(
@@ -274,6 +301,7 @@ impl Session {
                                 text(self.locale, "deposited", "menyerahkan")
                             }
                             LotEventKind::Dropped => text(self.locale, "dropped", "menjatuhkan"),
+                            LotEventKind::Attuned => text(self.locale, "attuned", "mengolah"),
                         };
                         format!(
                             "#{} t{} {} {} lot #{}",
@@ -526,7 +554,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.contested().is_some() {
+                self.notice = if self.world.is_sect_cultivation() {
+                    text(self.locale,
+                        "C3.0: Keep a relic to cultivate instead of selling. attune <lot> consumes carried SpiritOre into two one-hit wards or JadeScript into two ranged channel <npc> strikes. Use cultivation to inspect charges. --c29 preserves C2.9.",
+                        "C3.0: Simpan relik untuk berkultivasi alih-alih menjual. attune <barang> menghabiskan SpiritOre menjadi dua perlindungan atau JadeScript menjadi dua serangan jarak jauh channel <npc>. Gunakan cultivation untuk melihat sisa. --c29 untuk C2.9.")
+                } else if self.world.contested().is_some() {
                     text(self.locale,
                         "C2.9: Rival sects compete for finite SpiritOre and JadeScript lots. Use lots, lotlog, claim <lot>, offerlot <npc> <lot> to sell a carried good face-to-face to Stonebank's envoy or Reed Hall's steward. Unseen goods stay private. --c28 preserves the previous campaign.",
                         "C2.9: Perguruan bersaing memperebutkan SpiritOre dan JadeScript yang terbatas. Gunakan lots, lotlog, claim <barang>, offerlot <npc> <barang> untuk menjual barang langsung kepada utusan Stonebank atau pengurus Balai Alang-alang. Barang tak terlihat tetap tersembunyi. --c28 untuk kampanye sebelumnya.")
@@ -617,11 +649,18 @@ impl Session {
                 self.notice = self.inspect(argument);
                 return true;
             }
-            "invite" | "pack" | "part" | "f" | "attack" | "e" | "talk" | "form" => {
+            "invite" | "pack" | "part" | "f" | "attack" | "e" | "talk" | "form" | "channel" => {
                 match self.target(argument) {
                     Ok(id) => match command {
                         "f" | "attack" => Intent::Attack(id),
                         "form" => Intent::ReedStrike(id),
+                        "channel" => {
+                            if !self.world.is_sect_cultivation() {
+                                self.notice = "Only in C3.0.".into();
+                                return true;
+                            }
+                            Intent::ChannelStrike(id)
+                        }
                         "invite" => Intent::Invite(id),
                         "pack" => Intent::Provision(id),
                         "part" => Intent::Part(id),
@@ -2379,6 +2418,19 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
         Outcome::LotClaimed(id) => {
             return format!("{} #{id}.", tr("You claimed lot", "Kamu mengambil barang"));
         }
+        Outcome::LotAttuned(id) => {
+            return format!("{} #{id}.", tr("You attuned lot", "Kamu mengolah barang"));
+        }
+        Outcome::ChannelStruck(id) => {
+            return format!(
+                "{} {}.",
+                tr(
+                    "You channeled a strike against",
+                    "Kamu menyalurkan serangan kepada"
+                ),
+                actor_name(locale, world, id)
+            );
+        }
         Outcome::LotSold { to, id, coins } => {
             return format!(
                 "{} #{id} {} {} {coins} {}.",
@@ -2580,7 +2632,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 19);
+    run_campaign(debug_world, 20);
+}
+
+pub(crate) fn run_c29() {
+    run_campaign(false, 19);
 }
 
 pub(crate) fn run_c28() {
@@ -2655,7 +2711,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         16 => "checkpoint.c25",
         17 => "checkpoint.c27",
         18 => "checkpoint.c28",
-        _ => "checkpoint.c29",
+        19 => "checkpoint.c29",
+        _ => "checkpoint.c30",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2673,7 +2730,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         16 => World::violence_logistics(0),
         17 => World::player_reporting(0),
         18 => World::physical_recovery(0),
-        _ => World::contested_resources(0),
+        19 => World::contested_resources(0),
+        _ => World::sect_cultivation(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -3617,5 +3675,55 @@ mod tests {
             u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
             19
         );
+    }
+
+    #[test]
+    fn c30_ascii_relics_enable_wards_and_jade_channel_without_duplication() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("cultivation.c30"));
+        session.world = World::sect_cultivation(0);
+        for _ in 0..5 {
+            session.input("d");
+        }
+        session.input("claim 3");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::LotClaimed(3)));
+        session.input("attune 3");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::LotAttuned(3)));
+        for _ in 0..3 {
+            session.input("d");
+        }
+        session.input("claim 0");
+        session.input("attune 0");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::LotAttuned(0)));
+        let prior = session.world.checkpoint();
+        session.input("cultivation");
+        assert!(session.notice.contains("Wards: 2; Jade channels: 2"));
+        session.input("lots");
+        assert!(!session.notice.contains("#0"));
+        assert!(!session.notice.contains("#3"));
+        assert_eq!(session.world.checkpoint(), prior);
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), prior);
+        session.input("channel 32");
+        assert_eq!(session.world.contested().unwrap().script_charges, 2);
+        session.input("wait");
+        for _ in 0..3 {
+            session.input("d");
+        }
+        session.input("wait");
+        session.input("channel 32");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::ChannelStruck(ActorId::new(32)))
+        );
+        assert_eq!(session.world.contested().unwrap().script_charges, 1);
+        assert_eq!(
+            u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
+            20
+        );
+        session.input("help");
+        assert!(session.notice.contains("C3.0"));
     }
 }

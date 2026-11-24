@@ -54,6 +54,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::PlayerReporting => 17,
         Rules::PhysicalRecovery => 18,
         Rules::ContestedResources => 19,
+        Rules::SectCultivation => 20,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -98,6 +99,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         17 => Rules::PlayerReporting,
         18 => Rules::PhysicalRecovery,
         19 => Rules::ContestedResources,
+        20 => Rules::SectCultivation,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -184,6 +186,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::Invite(actor)
@@ -206,6 +209,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::Provision(actor)
@@ -228,6 +232,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::Part(actor)
@@ -249,6 +254,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::OfferAccord
@@ -270,6 +276,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::SupportHall
@@ -290,6 +297,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::PledgeLodge
@@ -310,6 +318,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::AidLodge
@@ -330,6 +339,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::RenounceLodge
@@ -343,6 +353,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::Ask(actor)
@@ -356,6 +367,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::Examine
@@ -369,6 +381,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -382,6 +395,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             Intent::Take(actor)
@@ -389,7 +403,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (30, _)
             if matches!(
                 rules,
-                Rules::PlayerReporting | Rules::PhysicalRecovery | Rules::ContestedResources
+                Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -398,11 +415,15 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                 body: ActorId::new(body.0),
             }
         }
-        (31, _) if rules == Rules::ContestedResources => Intent::ClaimLot(value),
-        (32, _) if rules == Rules::ContestedResources => {
+        (31, _) if matches!(rules, Rules::ContestedResources | Rules::SectCultivation) => {
+            Intent::ClaimLot(value)
+        }
+        (32, _) if matches!(rules, Rules::ContestedResources | Rules::SectCultivation) => {
             let (to, id) = unpack_testimony(value);
             Intent::OfferLot { to, id: id.0 }
         }
+        (33, _) if rules == Rules::SectCultivation => Intent::AttuneLot(value),
+        (34, _) if rules == Rules::SectCultivation => Intent::ChannelStrike(actor),
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -430,6 +451,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::PlayerReporting => b"SH:C10:RULES:v17".to_vec(),
         Rules::PhysicalRecovery => b"SH:C10:RULES:v18".to_vec(),
         Rules::ContestedResources => b"SH:C10:RULES:v19".to_vec(),
+        Rules::SectCultivation => b"SH:C10:RULES:v20".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -508,6 +530,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::PlayerReporting
             | Rules::PhysicalRecovery
             | Rules::ContestedResources
+            | Rules::SectCultivation
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -543,6 +566,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::PlayerReporting => b"SH:C10:STATE:v17".to_vec(),
         Rules::PhysicalRecovery => b"SH:C10:STATE:v18".to_vec(),
         Rules::ContestedResources => b"SH:C10:STATE:v19".to_vec(),
+        Rules::SectCultivation => b"SH:C10:STATE:v20".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -629,6 +653,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::PlayerReporting
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
+                | Rules::SectCultivation
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -698,6 +723,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::PlayerReporting
             | Rules::PhysicalRecovery
             | Rules::ContestedResources
+            | Rules::SectCultivation
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -720,7 +746,10 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             }
             if matches!(
                 world.rules,
-                Rules::PlayerReporting | Rules::PhysicalRecovery | Rules::ContestedResources
+                Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
+                    | Rules::SectCultivation
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -751,7 +780,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if matches!(
         world.rules,
-        Rules::PhysicalRecovery | Rules::ContestedResources
+        Rules::PhysicalRecovery | Rules::ContestedResources | Rules::SectCultivation
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -790,6 +819,10 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     out.u8(2);
                     out.actor(actor);
                 }
+                Holder::Consumed(actor) => {
+                    out.u8(3);
+                    out.actor(actor);
+                }
             }
         }
         out.count(contested.known.len());
@@ -809,6 +842,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 LotEventKind::Sold => 1,
                 LotEventKind::Deposited => 2,
                 LotEventKind::Dropped => 3,
+                LotEventKind::Attuned => 4,
             });
             out.position(event.position);
             out.u8(u8::from(event.witnessed));
@@ -817,6 +851,10 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         for (&actor, &value) in &contested.prestige {
             out.actor(actor);
             out.u32(value);
+        }
+        if world.rules == Rules::SectCultivation {
+            out.u8(contested.wards);
+            out.u8(contested.script_charges);
         }
     }
     out.count(world.journal.len());
@@ -1330,6 +1368,8 @@ impl Wire {
             Intent::ReportBody { to, body } => (30, pack_testimony(to, super::EventId(body.get()))),
             Intent::ClaimLot(id) => (31, id),
             Intent::OfferLot { to, id } => (32, pack_testimony(to, super::EventId(id))),
+            Intent::AttuneLot(id) => (33, id),
+            Intent::ChannelStrike(id) => (34, id.get()),
         };
         self.u8(tag);
         self.u32(payload);
@@ -1447,6 +1487,8 @@ impl Wire {
             Some(Outcome::BodyReported { .. }) => 36,
             Some(Outcome::LotClaimed(_)) => 37,
             Some(Outcome::LotSold { .. }) => 38,
+            Some(Outcome::LotAttuned(_)) => 39,
+            Some(Outcome::ChannelStruck(_)) => 40,
         });
         match outcome {
             Some(
@@ -1491,6 +1533,8 @@ impl Wire {
                 self.u32(id);
                 self.u32(coins);
             }
+            Some(Outcome::LotAttuned(id)) => self.u32(id),
+            Some(Outcome::ChannelStruck(id)) => self.actor(id),
             Some(Outcome::Rejected(reason)) => self.u8(match reason {
                 Rejection::Dead => 0,
                 Rejection::Impassable => 1,
