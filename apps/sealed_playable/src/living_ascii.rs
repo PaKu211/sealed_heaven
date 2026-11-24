@@ -8,10 +8,10 @@ use std::{
 
 use sealed_sim::living::{
     ActorId, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent, ContractEventKind,
-    Direction, DisputePhase, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, InfoLogKind,
-    Intent, Invitation, JourneyEvent, KnowledgeSource, LoadError, MAX_QI, MAX_SAVE_BYTES, Need,
-    Outcome, PLAYER, PoliticalEventKind, Position, Provenance, Region, Rejection, ReliefEventKind,
-    Role, SectEventKind, StepError, TrafficEventKind, World,
+    Direction, DisputePhase, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, Holder,
+    InfoLogKind, Intent, Invitation, JourneyEvent, KnowledgeSource, LoadError, LotEventKind,
+    MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER, PoliticalEventKind, Position, Provenance,
+    Region, Rejection, ReliefEventKind, Role, SectEventKind, StepError, TrafficEventKind, World,
 };
 
 use crate::{clock, locale::Locale, persistence};
@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.is_physical_recovery() {
+        if self.world.contested().is_some() {
+            World::contested_resources(seed)
+        } else if self.world.is_physical_recovery() {
             World::physical_recovery(seed)
         } else if self.world.is_player_reporting() {
             World::player_reporting(seed)
@@ -76,7 +78,7 @@ impl Session {
         let argument = words.next();
         let second = words.next();
         if words.next().is_some()
-            || (second.is_some() && !matches!(command, "tell" | "reportbody"))
+            || (second.is_some() && !matches!(command, "tell" | "reportbody" | "offerlot"))
             || (argument.is_some()
                 && second.is_none()
                 && !matches!(
@@ -96,6 +98,7 @@ impl Session {
                         | "background"
                         | "ask"
                         | "take"
+                        | "claim"
                 ))
         {
             self.notice = text(
@@ -186,6 +189,113 @@ impl Session {
                     to,
                     body: ActorId::new(body),
                 }
+            }
+            "claim" => {
+                let Some(id) = argument.and_then(|value| value.parse::<u32>().ok()) else {
+                    self.notice = text(self.locale, "claim <lot>", "claim <barang>").into();
+                    return true;
+                };
+                if self.world.contested().is_none() {
+                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    return true;
+                }
+                Intent::ClaimLot(id)
+            }
+            "offerlot" => {
+                let Some(id) = second.and_then(|value| value.parse::<u32>().ok()) else {
+                    self.notice = text(
+                        self.locale,
+                        "offerlot <npc> <lot>",
+                        "offerlot <npc> <barang>",
+                    )
+                    .into();
+                    return true;
+                };
+                if self.world.contested().is_none() {
+                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    return true;
+                }
+                let to = match self.target(argument) {
+                    Ok(id) => id,
+                    Err(message) => {
+                        self.notice = message.into();
+                        return true;
+                    }
+                };
+                Intent::OfferLot { to, id }
+            }
+            "lots" => {
+                let Some(state) = self.world.contested() else {
+                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    return true;
+                };
+                let lines: Vec<_> = state
+                    .lots
+                    .values()
+                    .filter_map(|lot| {
+                        let place = match lot.holder {
+                            Holder::Ground(position) if self.world.player_sees(position) => {
+                                format!("({},{})", position.x, position.y)
+                            }
+                            Holder::Carried(PLAYER) => {
+                                text(self.locale, "your pack", "tasmu").into()
+                            }
+                            _ => return None,
+                        };
+                        Some(format!("#{} {:?} {place}", lot.id, lot.good))
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "No visible lots or carried relics.",
+                        "Tidak ada barang terlihat atau relik yang dibawa.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
+            "lotlog" => {
+                let Some(state) = self.world.contested() else {
+                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    return true;
+                };
+                let lines: Vec<_> = state
+                    .history
+                    .iter()
+                    .filter(|event| event.witnessed)
+                    .map(|event| {
+                        let verb = match event.kind {
+                            LotEventKind::Claimed => text(self.locale, "claimed", "mengambil"),
+                            LotEventKind::Sold => text(self.locale, "sold", "menjual"),
+                            LotEventKind::Deposited => {
+                                text(self.locale, "deposited", "menyerahkan")
+                            }
+                            LotEventKind::Dropped => text(self.locale, "dropped", "menjatuhkan"),
+                        };
+                        format!(
+                            "#{} t{} {} {} lot #{}",
+                            event.id,
+                            event.at,
+                            actor_name(self.locale, &self.world, event.actor),
+                            verb,
+                            event.lot
+                        )
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "No witnessed lot transfers.",
+                        "Belum ada perpindahan barang yang disaksikan.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
             }
             "know" => {
                 if !self.world.is_player_agency() {
@@ -416,7 +526,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.is_physical_recovery() {
+                self.notice = if self.world.contested().is_some() {
+                    text(self.locale,
+                        "C2.9: Rival sects compete for finite SpiritOre and JadeScript lots. Use lots, lotlog, claim <lot>, offerlot <npc> <lot> to sell a carried good face-to-face to Stonebank's envoy or Reed Hall's steward. Unseen goods stay private. --c28 preserves the previous campaign.",
+                        "C2.9: Perguruan bersaing memperebutkan SpiritOre dan JadeScript yang terbatas. Gunakan lots, lotlog, claim <barang>, offerlot <npc> <barang> untuk menjual barang langsung kepada utusan Stonebank atau pengurus Balai Alang-alang. Barang tak terlihat tetap tersembunyi. --c28 untuk kampanye sebelumnya.")
+                } else if self.world.is_physical_recovery() {
                     text(self.locale,
                         "C2.8: Watchmen who see a body can recover its real herbs and carry them back to the shrine when medicine is short. The body is not evidence of a killer. Use reportbody <npc> <body>, bodies and salvagelog. --c27 keeps C2.7; --c25 keeps C2.5.",
                         "C2.8: Penjaga yang melihat jenazah dapat mengambil herba sungguhan dan membawanya ke kuil saat obat kurang. Jenazah bukan bukti pembunuh. Gunakan reportbody <npc> <jenazah>, bodies dan salvagelog. --c27 untuk C2.7; --c25 untuk C2.5.")
@@ -889,6 +1003,12 @@ impl Session {
                     self.locale,
                     "Invalid body report or unavailable campaign.",
                     "Laporan jenazah tidak sah atau kampanye tidak tersedia.",
+                )
+                .into(),
+                StepError::ContestedCampaignRequired => text(
+                    self.locale,
+                    "Contested resources are unavailable in this campaign.",
+                    "Barang sengketa tidak tersedia di kampanye ini.",
                 )
                 .into(),
             };
@@ -2075,6 +2195,11 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::InvestigateBody(_) => ("checking a reported body", "memeriksa laporan jenazah"),
         Goal::RecoverBody(_) => ("recovering abandoned cargo", "mengambil muatan terlantar"),
         Goal::ReturnRecoveredCargo => ("returning recovered herbs", "mengantar herba temuan"),
+        Goal::ClaimLot(_) => ("seeking a relic lot", "mencari barang relik"),
+        Goal::DeliverLot(_) => (
+            "carrying a relic to the sect",
+            "mengantar relik ke perguruan",
+        ),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
         Goal::Retaliate => ("retaliating", "membalas serangan"),
@@ -2249,6 +2374,18 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 actor_name(locale, world, body),
                 tr("to", "kepada"),
                 actor_name(locale, world, to)
+            );
+        }
+        Outcome::LotClaimed(id) => {
+            return format!("{} #{id}.", tr("You claimed lot", "Kamu mengambil barang"));
+        }
+        Outcome::LotSold { to, id, coins } => {
+            return format!(
+                "{} #{id} {} {} {coins} {}.",
+                tr("You sold lot", "Kamu menjual barang"),
+                tr("to", "kepada"),
+                actor_name(locale, world, to),
+                tr("coins", "koin")
             );
         }
         Outcome::QiCentered { total } => return format!("Qi {total}/{MAX_QI}."),
@@ -2443,7 +2580,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 18);
+    run_campaign(debug_world, 19);
+}
+
+pub(crate) fn run_c28() {
+    run_campaign(false, 18);
 }
 
 pub(crate) fn run_c27() {
@@ -2513,7 +2654,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         15 => "checkpoint.c24",
         16 => "checkpoint.c25",
         17 => "checkpoint.c27",
-        _ => "checkpoint.c28",
+        18 => "checkpoint.c28",
+        _ => "checkpoint.c29",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2530,7 +2672,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         15 => World::consequences(0),
         16 => World::violence_logistics(0),
         17 => World::player_reporting(0),
-        _ => World::physical_recovery(0),
+        18 => World::physical_recovery(0),
+        _ => World::contested_resources(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -3415,5 +3558,64 @@ mod tests {
         let saved = session.world.checkpoint();
         session.input("salvagelog");
         assert_eq!(session.world.checkpoint(), saved);
+    }
+
+    #[test]
+    fn c29_ascii_claim_and_sale_compete_with_autonomous_sects_without_leaking_unseen_lots() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("contest.c29"));
+        session.world = World::contested_resources(0);
+        let pristine = session.world.checkpoint();
+        session.input("lots");
+        assert!(!session.notice.contains("#1"));
+        assert!(!session.notice.contains("#2"));
+        session.input("lotlog");
+        assert!(session.notice.contains("No witnessed"));
+        assert_eq!(session.world.checkpoint(), pristine);
+        for _ in 0..8 {
+            session.input("d");
+        }
+        session.input("lots");
+        assert!(session.notice.contains("#0 SpiritOre"));
+        session.input("claim 0");
+        assert_eq!(
+            session.world.contested().unwrap().lots[&0].holder,
+            Holder::Carried(PLAYER)
+        );
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::LotClaimed(0)));
+        session.input("lotlog");
+        assert!(session.notice.contains("lot #0"));
+        assert!(!session.notice.contains("lot #1"));
+        assert!(!session.notice.contains("lot #2"));
+        let saved = session.world.checkpoint();
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), saved);
+        for _ in 0..20 {
+            session.input("d");
+        }
+        session.input("s");
+        session.input("offerlot 36 0");
+        assert_eq!(
+            session.world.contested().unwrap().lots[&0].holder,
+            Holder::Carried(ActorId::new(36))
+        );
+        assert!(
+            matches!(session.world.latest_outcome(), Some(Outcome::LotSold { to, id: 0, coins: 2 }) if to == ActorId::new(36))
+        );
+        let once = session.world.contested().unwrap().history.len();
+        session.input("offerlot 36 0");
+        assert!(matches!(
+            session.world.latest_outcome(),
+            Some(Outcome::Rejected(_))
+        ));
+        assert_eq!(session.world.contested().unwrap().history.len(), once);
+        session.input("help");
+        assert!(session.notice.contains("C2.9"));
+        assert_eq!(
+            u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
+            19
+        );
     }
 }

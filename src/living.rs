@@ -5,6 +5,7 @@ mod checkpoint;
 mod company;
 #[cfg(test)]
 mod consequences_tests;
+mod contested;
 mod contract_memory;
 #[cfg(test)]
 mod contract_memory_tests;
@@ -41,6 +42,7 @@ pub use crate::ActorId;
 pub use crate::player5::{Direction, Position};
 pub use checkpoint::{LoadError, MAX_SAVE_BYTES};
 pub use company::{Company, CompanyEvent, Invitation, Journey, JourneyEvent};
+pub use contested::{Contested, Good, Holder, Lot, LotEvent, LotEventKind};
 pub use contract_memory::{AuditEvent, AuditFinding, ContractMemory, ContractReceipt};
 pub use contracts::{
     Bid, Contract, ContractEvent, ContractEventKind, ContractPhase, Contracts, Need,
@@ -125,6 +127,11 @@ pub enum Intent {
     ReportBody {
         to: ActorId,
         body: ActorId,
+    },
+    ClaimLot(u32),
+    OfferLot {
+        to: ActorId,
+        id: u32,
     },
 }
 
@@ -254,6 +261,12 @@ pub enum Outcome {
         to: ActorId,
         body: ActorId,
     },
+    LotClaimed(u32),
+    LotSold {
+        to: ActorId,
+        id: u32,
+        coins: u32,
+    },
     Rejected(Rejection),
 }
 
@@ -268,6 +281,7 @@ pub enum StepError {
     RivalryCampaignRequired,
     PoliticsCampaignRequired,
     InvalidBodyReport,
+    ContestedCampaignRequired,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -334,6 +348,7 @@ pub struct World {
     contracts: Option<Contracts>,
     contract_memory: Option<ContractMemory>,
     information: Option<Information>,
+    contested: Option<Contested>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -356,6 +371,7 @@ enum Rules {
     ViolenceLogistics,
     PlayerReporting,
     PhysicalRecovery,
+    ContestedResources,
 }
 
 impl Rules {
@@ -381,6 +397,7 @@ impl Rules {
                 | Self::ViolenceLogistics
                 | Self::PlayerReporting
                 | Self::PhysicalRecovery
+                | Self::ContestedResources
         )
     }
 }
@@ -454,6 +471,10 @@ impl World {
         Self::seeded(seed, Rules::PhysicalRecovery)
     }
 
+    pub fn contested_resources(seed: u32) -> Self {
+        Self::seeded(seed, Rules::ContestedResources)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -507,6 +528,7 @@ impl World {
                         | Rules::ViolenceLogistics
                         | Rules::PlayerReporting
                         | Rules::PhysicalRecovery
+                        | Rules::ContestedResources
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -536,6 +558,7 @@ impl World {
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
             )
             .then(Company::default),
             rivalry: matches!(
@@ -553,6 +576,7 @@ impl World {
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -569,6 +593,7 @@ impl World {
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
             )
             .then(Politics::new),
             traffic: matches!(
@@ -584,6 +609,7 @@ impl World {
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -598,6 +624,7 @@ impl World {
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -609,6 +636,7 @@ impl World {
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -619,8 +647,10 @@ impl World {
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
                     | Rules::PhysicalRecovery
+                    | Rules::ContestedResources
             )
             .then(Information::default),
+            contested: (rules == Rules::ContestedResources).then(Contested::new),
         }
     }
 
@@ -762,11 +792,19 @@ impl World {
             return Err(StepError::PoliticsCampaignRequired);
         }
         if let Intent::ReportBody { to, body } = intent
-            && (!matches!(self.rules, Rules::PlayerReporting | Rules::PhysicalRecovery)
-                || to.get() > 255
+            && (!matches!(
+                self.rules,
+                Rules::PlayerReporting | Rules::PhysicalRecovery | Rules::ContestedResources
+            ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
             return Err(StepError::InvalidBodyReport);
+        }
+        if matches!(intent, Intent::ClaimLot(_) | Intent::OfferLot { .. })
+            && (self.contested.is_none()
+                || matches!(intent, Intent::OfferLot { to, id } if to.get() > 255 || id > 0x00ff_ffff))
+        {
+            return Err(StepError::ContestedCampaignRequired);
         }
 
         self.tick += 1;
@@ -792,6 +830,7 @@ impl World {
         self.update_journey();
         // 3. Decide from one snapshot; resolve movement, work and combat by actor ID.
         self.advance_npcs(intent == Intent::Guard && outcome == Outcome::Guarded);
+        self.observe_lots();
         self.observe_bodies();
         self.queue_body_reports();
         // 4. Queue new conversations from the committed positions.
@@ -903,6 +942,8 @@ impl World {
             Intent::Testify { to, event } => self.testify(to, event),
             Intent::Take(id) => self.take_cargo(id),
             Intent::ReportBody { to, body } => self.report_body(to, body),
+            Intent::ClaimLot(id) => self.claim_lot(id),
+            Intent::OfferLot { to, id } => self.offer_lot(to, id),
         }
     }
 
@@ -914,6 +955,7 @@ impl World {
                 | Rules::ViolenceLogistics
                 | Rules::PlayerReporting
                 | Rules::PhysicalRecovery
+                | Rules::ContestedResources
         )
     }
 
@@ -924,22 +966,32 @@ impl World {
                 | Rules::ViolenceLogistics
                 | Rules::PlayerReporting
                 | Rules::PhysicalRecovery
+                | Rules::ContestedResources
         )
     }
 
     pub fn is_violence_logistics(&self) -> bool {
         matches!(
             self.rules,
-            Rules::ViolenceLogistics | Rules::PlayerReporting | Rules::PhysicalRecovery
+            Rules::ViolenceLogistics
+                | Rules::PlayerReporting
+                | Rules::PhysicalRecovery
+                | Rules::ContestedResources
         )
     }
 
     pub fn is_player_reporting(&self) -> bool {
-        matches!(self.rules, Rules::PlayerReporting | Rules::PhysicalRecovery)
+        matches!(
+            self.rules,
+            Rules::PlayerReporting | Rules::PhysicalRecovery | Rules::ContestedResources
+        )
     }
 
     pub fn is_physical_recovery(&self) -> bool {
-        self.rules == Rules::PhysicalRecovery
+        matches!(
+            self.rules,
+            Rules::PhysicalRecovery | Rules::ContestedResources
+        )
     }
 
     fn grants_player_agency(&self) -> bool {

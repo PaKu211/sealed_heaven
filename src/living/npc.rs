@@ -55,6 +55,8 @@ pub enum Goal {
     InvestigateBody(ActorId),
     RecoverBody(ActorId),
     ReturnRecoveredCargo,
+    ClaimLot(u32),
+    DeliverLot(u32),
     Report {
         recipient: ActorId,
         incident: IncidentId,
@@ -262,6 +264,7 @@ impl World {
                 .map(|receipt| Goal::RecoverBody(receipt.body))
         })
         .flatten();
+        let lot_goal = self.lot_goal(id);
         let teaches = self.is_hall_teacher(npc);
         let off_duty = !self.original_rules()
             && self.is_night()
@@ -324,6 +327,7 @@ impl World {
                 (recovery.is_some() && npc.fatigue >= 36).then_some(Goal::CampRest),
             ),
             (98, recovery),
+            (97, lot_goal),
             (
                 96,
                 (mission_active && npc.fatigue >= 36).then_some(Goal::CampRest),
@@ -525,6 +529,7 @@ impl World {
             }
             Goal::RecoverBody(body) => self.recover_corpse_cargo(id, body),
             Goal::ReturnRecoveredCargo => self.deliver_recovered_cargo(id),
+            Goal::ClaimLot(_) | Goal::DeliverLot(_) => self.work_lot(id, goal),
             Goal::Report { recipient, .. } => {
                 let peer = &self.npcs[&recipient];
                 // Outside visual range, go to a known work site or home.

@@ -512,6 +512,9 @@ impl World {
         }
         if target == PLAYER {
             self.player.hp -= damage;
+            if damage == hp {
+                self.drop_player_lots();
+            }
         } else {
             self.npcs.get_mut(&target).expect("known combat target").hp -= damage;
             // The physical herb stays on a fallen carrier; only the return
