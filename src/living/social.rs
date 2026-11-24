@@ -63,6 +63,17 @@ pub struct BodyReport {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RecoveryEvent {
+    pub id: u32,
+    pub at: u64,
+    pub actor: ActorId,
+    pub body: ActorId,
+    pub herbs: u32,
+    pub delivered: bool,
+    pub witnessed: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Report {
     pub incident: IncidentId,
     pub sender: ActorId,
@@ -98,6 +109,8 @@ pub struct Social {
     pub(super) pending: BTreeMap<(ActorId, IncidentId), Report>,
     pub(super) discoveries: BTreeMap<(ActorId, ActorId), BodyDiscovery>,
     pub(super) body_reports: BTreeMap<(ActorId, ActorId), BodyReport>,
+    pub(super) recovery_cargo: BTreeMap<ActorId, u32>,
+    pub(super) recoveries: Vec<RecoveryEvent>,
 }
 
 impl Social {
@@ -109,6 +122,8 @@ impl Social {
             pending: BTreeMap::new(),
             discoveries: BTreeMap::new(),
             body_reports: BTreeMap::new(),
+            recovery_cargo: BTreeMap::new(),
+            recoveries: Vec::new(),
         };
         for &(a, b) in contacts {
             social.meet(a, b);
@@ -147,6 +162,10 @@ impl Social {
 
     pub fn pending_body_reports(&self) -> impl Iterator<Item = &BodyReport> {
         self.body_reports.values()
+    }
+
+    pub fn recoveries(&self) -> &[RecoveryEvent] {
+        &self.recoveries
     }
 
     pub(super) fn meet(&mut self, a: ActorId, b: ActorId) {
@@ -307,8 +326,7 @@ impl World {
                 }
                 let key = (*observer, body);
                 if self.social.discoveries.get(&key).is_some_and(|receipt| {
-                    receipt.source == KnowledgeSource::Observed
-                        || self.rules != super::Rules::PlayerReporting
+                    receipt.source == KnowledgeSource::Observed || !self.is_player_reporting()
                 }) {
                     continue;
                 }
@@ -496,6 +514,11 @@ impl World {
             self.player.hp -= damage;
         } else {
             self.npcs.get_mut(&target).expect("known combat target").hp -= damage;
+            // The physical herb stays on a fallen carrier; only the return
+            // assignment ends. A player may still take it from the body.
+            if damage == hp && self.is_physical_recovery() {
+                self.social.recovery_cargo.remove(&target);
+            }
         }
     }
 

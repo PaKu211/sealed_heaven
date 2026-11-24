@@ -53,6 +53,8 @@ pub enum Goal {
     Treat(ActorId),
     Investigate(IncidentId),
     InvestigateBody(ActorId),
+    RecoverBody(ActorId),
+    ReturnRecoveredCargo,
     Report {
         recipient: ActorId,
         incident: IncidentId,
@@ -217,8 +219,7 @@ impl World {
                     .map(|(incident, _)| Goal::Investigate(incident.id))
             })
             .flatten();
-        let body_lead = (self.rules == super::Rules::PlayerReporting
-            && npc.definition.role == Role::Watch)
+        let body_lead = (self.is_player_reporting() && npc.definition.role == Role::Watch)
             .then(|| {
                 self.social
                     .discoveries
@@ -236,6 +237,31 @@ impl World {
                     .map(|discovery| Goal::InvestigateBody(discovery.body))
             })
             .flatten();
+        let recovery = (self.is_physical_recovery()
+            && npc.definition.role == Role::Watch
+            && self.companion(id).is_none())
+        .then(|| {
+            if self.social.recovery_cargo.get(&id).copied().unwrap_or(0) > 0 {
+                return Some(Goal::ReturnRecoveredCargo);
+            }
+            if self.supply.shrine >= self.scenario.shrine_target {
+                return None;
+            }
+            self.social
+                .discoveries
+                .values()
+                .filter(|receipt| {
+                    receipt.observer == id && receipt.source == KnowledgeSource::Observed
+                })
+                .filter(|receipt| {
+                    self.npcs
+                        .get(&receipt.body)
+                        .is_some_and(|body| !body.alive() && body.herbs > 0)
+                })
+                .min_by_key(|receipt| (receipt.at, receipt.body))
+                .map(|receipt| Goal::RecoverBody(receipt.body))
+        })
+        .flatten();
         let teaches = self.is_hall_teacher(npc);
         let off_duty = !self.original_rules()
             && self.is_night()
@@ -293,6 +319,11 @@ impl World {
         let plans = [
             (100, retaliation.then_some(Goal::Retaliate)),
             (100, (threat && !retaliation).then_some(Goal::Retreat)),
+            (
+                99,
+                (recovery.is_some() && npc.fatigue >= 36).then_some(Goal::CampRest),
+            ),
+            (98, recovery),
             (
                 96,
                 (mission_active && npc.fatigue >= 36).then_some(Goal::CampRest),
@@ -492,6 +523,8 @@ impl World {
                     self.travel(id, site, 1);
                 }
             }
+            Goal::RecoverBody(body) => self.recover_corpse_cargo(id, body),
+            Goal::ReturnRecoveredCargo => self.deliver_recovered_cargo(id),
             Goal::Report { recipient, .. } => {
                 let peer = &self.npcs[&recipient];
                 // Outside visual range, go to a known work site or home.

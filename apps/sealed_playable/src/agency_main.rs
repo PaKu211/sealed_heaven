@@ -40,6 +40,8 @@ fn main() {
         sealed_playable::ascii::run_c24();
     } else if options.iter().any(|arg| arg == "--c25") {
         sealed_playable::ascii::run_c25();
+    } else if options.iter().any(|arg| arg == "--c27") {
+        sealed_playable::ascii::run_c27();
     } else if options.iter().any(|arg| arg == "--c22") {
         sealed_playable::ascii::run_c22();
     } else if options.iter().any(|arg| arg == "--debug-world") {

@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.is_player_reporting() {
+        if self.world.is_physical_recovery() {
+            World::physical_recovery(seed)
+        } else if self.world.is_player_reporting() {
             World::player_reporting(seed)
         } else if self.world.is_violence_logistics() {
             World::violence_logistics(seed)
@@ -281,6 +283,54 @@ impl Session {
                 };
                 return true;
             }
+            "salvagelog" => {
+                if !self.world.is_physical_recovery() {
+                    self.notice = text(self.locale, "Only in C2.8.", "Hanya di C2.8.").into();
+                    return true;
+                }
+                let lines: Vec<_> = self
+                    .world
+                    .social()
+                    .recoveries()
+                    .iter()
+                    .filter(|event| event.witnessed)
+                    .map(|event| {
+                        format!(
+                            "#{} t{} {} {} {} {} {}",
+                            event.id,
+                            event.at,
+                            actor_name(self.locale, &self.world, event.actor),
+                            text(
+                                self.locale,
+                                if event.delivered {
+                                    "delivered"
+                                } else {
+                                    "recovered"
+                                },
+                                if event.delivered {
+                                    "mengantar"
+                                } else {
+                                    "mengambil"
+                                }
+                            ),
+                            event.herbs,
+                            text(self.locale, "herbs from", "herba dari"),
+                            actor_name(self.locale, &self.world, event.body)
+                        )
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "No witnessed cargo recovery.",
+                        "Belum menyaksikan pemulihan muatan.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
             "crimelog" => {
                 if !self.world.is_violence_logistics() {
                     self.notice = text(self.locale, "Only in C2.5.", "Hanya di C2.5.").into();
@@ -366,7 +416,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.is_player_reporting() {
+                self.notice = if self.world.is_physical_recovery() {
+                    text(self.locale,
+                        "C2.8: Watchmen who see a body can recover its real herbs and carry them back to the shrine when medicine is short. The body is not evidence of a killer. Use reportbody <npc> <body>, bodies and salvagelog. --c27 keeps C2.7; --c25 keeps C2.5.",
+                        "C2.8: Penjaga yang melihat jenazah dapat mengambil herba sungguhan dan membawanya ke kuil saat obat kurang. Jenazah bukan bukti pembunuh. Gunakan reportbody <npc> <jenazah>, bodies dan salvagelog. --c27 untuk C2.7; --c25 untuk C2.5.")
+                } else if self.world.is_player_reporting() {
                     text(self.locale,
                         "C2.7: Find a body, then reportbody <npc> <body> face-to-face. The listener hears a corpse report after two turns, not a murder accusation. A watchman may travel to confirm it. bodies and crimelog show what you personally know. --c25 keeps C2.5; --c24 keeps C2.4.",
                         "C2.7: Temukan jenazah, lalu reportbody <npc> <jenazah> secara tatap muka. Penerima mendengar laporan jenazah dua giliran kemudian, bukan tuduhan pembunuhan. Penjaga dapat pergi memeriksanya. bodies dan crimelog mencatat yang kamu ketahui. --c25 untuk C2.5; --c24 untuk C2.4.")
@@ -1787,6 +1841,11 @@ impl Session {
                 text(self.locale, "could not finish", "gagal menyelesaikan")
             }
             ContractEventKind::Withdrawn => text(self.locale, "withdrew from", "meninggalkan"),
+            ContractEventKind::ResolvedLocally => text(
+                self.locale,
+                "resolved locally before awarding",
+                "diselesaikan setempat sebelum penunjukan",
+            ),
         };
         format!(
             "t{} #{} · {} {verb} {objective}.",
@@ -2014,6 +2073,8 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::Treat(_) => ("attending to a patient", "merawat pasien"),
         Goal::Investigate(_) => ("investigating a disturbance", "menyelidiki gangguan"),
         Goal::InvestigateBody(_) => ("checking a reported body", "memeriksa laporan jenazah"),
+        Goal::RecoverBody(_) => ("recovering abandoned cargo", "mengambil muatan terlantar"),
+        Goal::ReturnRecoveredCargo => ("returning recovered herbs", "mengantar herba temuan"),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
         Goal::Retaliate => ("retaliating", "membalas serangan"),
@@ -2382,7 +2443,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 17);
+    run_campaign(debug_world, 18);
+}
+
+pub(crate) fn run_c27() {
+    run_campaign(false, 17);
 }
 
 pub(crate) fn run_c25() {
@@ -2447,7 +2512,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         14 => "checkpoint.c23",
         15 => "checkpoint.c24",
         16 => "checkpoint.c25",
-        _ => "checkpoint.c27",
+        17 => "checkpoint.c27",
+        _ => "checkpoint.c28",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2463,7 +2529,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         14 => World::player_agency(0),
         15 => World::consequences(0),
         16 => World::violence_logistics(0),
-        _ => World::player_reporting(0),
+        17 => World::player_reporting(0),
+        _ => World::physical_recovery(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -3292,5 +3359,61 @@ mod tests {
         let prior = session.world.checkpoint();
         session.input("reportbody 2");
         assert_eq!(session.world.checkpoint(), prior);
+    }
+
+    #[test]
+    fn c28_ascii_witnesses_physical_recovery_and_preserves_save() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("recovery.c28"));
+        session.world = World::physical_recovery(0);
+        for _ in 0..14 {
+            session.input("d");
+        }
+        for command in [
+            "wait",
+            "attack 32",
+            "w",
+            "d",
+            "d",
+            "w",
+            "w",
+            "d",
+            "d",
+            "s",
+            "attack 32",
+            "attack 32",
+        ] {
+            session.input(command);
+            assert!(
+                !matches!(session.world.latest_outcome(), Some(Outcome::Rejected(_))),
+                "{command}: {}",
+                session.notice
+            );
+        }
+        for _ in 26..47 {
+            session.input("wait");
+        }
+        assert_eq!(session.world.social().recoveries().len(), 1);
+        session.input("salvagelog");
+        assert!(session.notice.contains("recovered 1 herbs from Bao Jun"));
+        let before = session.world.checkpoint();
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), before);
+        for _ in 47..75 {
+            session.input("wait");
+        }
+        assert_eq!(session.world.social().recoveries().len(), 2);
+        assert_eq!(session.world.npc(ActorId::new(32)).unwrap().herbs, 0);
+        assert_eq!(
+            u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
+            18
+        );
+        session.input("help");
+        assert!(session.notice.contains("C2.8"));
+        let saved = session.world.checkpoint();
+        session.input("salvagelog");
+        assert_eq!(session.world.checkpoint(), saved);
     }
 }

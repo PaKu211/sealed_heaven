@@ -22,6 +22,23 @@ fn herb_total(world: &World) -> u32 {
         + world.npcs.values().map(|npc| npc.herbs).sum::<u32>()
 }
 
+fn regional_material_total(world: &World) -> u32 {
+    let region = world.region().unwrap();
+    herb_total(world)
+        + world.supply().consumed
+        + region.market_herbs
+        + region.garden_herbs
+        + region.hall_offerings
+        + region.remedies * 2
+        + region.remedies_used * 2
+        + world.rivalry().unwrap().consumed_herbs
+        + world.company().unwrap().herbs_used
+        + world
+            .npcs()
+            .map(|npc| u32::from(npc.packed_herbs))
+            .sum::<u32>()
+}
+
 #[test]
 fn unseen_theft_moves_herbs_without_telling_the_distant_watch() {
     let mut world = World::consequences(0);
@@ -611,4 +628,138 @@ fn a_dead_player_cannot_deliver_an_undelivered_body_report() {
             .discoveries()
             .all(|discovery| discovery.observer != watch || discovery.body != body)
     );
+}
+
+#[test]
+fn public_ambush_watch_salvages_one_real_herb_and_resolves_the_extra_contract() {
+    let mut world = World::physical_recovery(0);
+    let body = ActorId::new(32);
+    let initial_material = regional_material_total(&world);
+    for _ in 0..14 {
+        world
+            .step(world.tick(), Intent::Move(Direction::East))
+            .unwrap();
+    }
+    for action in [
+        Intent::Wait,
+        Intent::Attack(body),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::North),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::East),
+        Intent::Move(Direction::South),
+        Intent::Attack(body),
+        Intent::Attack(body),
+    ] {
+        world.step(world.tick(), action).unwrap();
+    }
+    assert_eq!(world.npc(body).unwrap().herbs, 1);
+    let mut restored = World::restore(&world.checkpoint()).unwrap();
+    let mut stolen = world.clone();
+    for turn in 26..75 {
+        wait(&mut world);
+        wait(&mut restored);
+        if turn == 26 {
+            assert_eq!(
+                stolen.step(stolen.tick(), Intent::Take(body)).unwrap(),
+                Outcome::Took {
+                    from: body,
+                    herbs: 1
+                }
+            );
+        } else {
+            wait(&mut stolen);
+        }
+        assert_eq!(world.state_digest(), restored.state_digest());
+        assert_eq!(
+            regional_material_total(&world),
+            initial_material + world.supply().regrown + world.region().unwrap().garden_regrown,
+            "material ledger at tick {}",
+            world.tick()
+        );
+        if matches!(world.tick(), 47 | 67) {
+            assert_eq!(World::restore(&world.checkpoint()).unwrap(), world);
+        }
+    }
+    let events = world.social().recoveries();
+    assert_eq!(events.len(), 2);
+    assert_eq!((events[0].id, events[1].id), (0, 1));
+    assert_eq!((events[0].herbs, events[1].herbs), (1, 1));
+    assert!(!events[0].delivered);
+    assert!(events[1].delivered);
+    assert!(events[0].witnessed);
+    assert!(!events[1].witnessed);
+    assert_eq!(world.npc(body).unwrap().herbs, 0);
+    assert_eq!(world.npc(ActorId::new(2)).unwrap().herbs, 0);
+    assert!(world.supply().shrine >= world.scenario().shrine_target);
+    assert!(
+        world
+            .contracts()
+            .unwrap()
+            .history
+            .iter()
+            .any(|event| event.need == Need::ShrineMedicine
+                && event.kind == ContractEventKind::ResolvedLocally)
+    );
+    assert_eq!(world.contracts().unwrap().failed, 0);
+    assert_eq!(stolen.player().herbs, 1);
+    assert!(stolen.social().recoveries().is_empty());
+    assert_eq!(World::restore(&stolen.checkpoint()).unwrap(), stolen);
+    assert!(
+        stolen
+            .contracts()
+            .unwrap()
+            .active
+            .iter()
+            .any(|case| case.need == Need::ShrineMedicine)
+    );
+    let mut legacy = World::player_reporting(0);
+    for _ in 0..75 {
+        wait(&mut legacy);
+    }
+    assert_eq!(World::restore(&legacy.checkpoint()).unwrap(), legacy);
+    assert!(legacy.social().recoveries().is_empty());
+}
+
+#[test]
+fn fallen_recovery_worker_keeps_the_herb_on_their_body() {
+    let mut world = World::physical_recovery(0);
+    let body = ActorId::new(32);
+    let watch = ActorId::new(2);
+    world.npcs.get_mut(&body).unwrap().hp = 0;
+    world.npcs.get_mut(&body).unwrap().herbs = 1;
+    world.npcs.get_mut(&watch).unwrap().position = world.npc(body).unwrap().position;
+    world.social.discoveries.insert(
+        (watch, body),
+        BodyDiscovery {
+            observer: watch,
+            body,
+            at: 0,
+            nearby: None,
+            source: KnowledgeSource::Observed,
+            prior_report: None,
+        },
+    );
+    world.recover_corpse_cargo(watch, body);
+    assert_eq!(world.npc(body).unwrap().herbs, 0);
+    assert_eq!(world.npc(watch).unwrap().herbs, 1);
+    let total = herb_total(&world);
+    world.damage(PLAYER, watch, 6, false);
+    assert!(!world.npc(watch).unwrap().alive());
+    assert!(world.social.recovery_cargo.is_empty());
+    assert_eq!(world.npc(watch).unwrap().herbs, 1);
+    assert_eq!(herb_total(&world), total);
+    world.player.position = world.npc(watch).unwrap().position;
+    assert_eq!(
+        world.step(world.tick(), Intent::Take(watch)).unwrap(),
+        Outcome::Took {
+            from: watch,
+            herbs: 1
+        }
+    );
+    assert_eq!(world.npc(watch).unwrap().herbs, 0);
+    assert_eq!(world.player().herbs, 1);
 }

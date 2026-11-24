@@ -23,6 +23,7 @@ mod npc;
 mod player_agency_tests;
 mod politics;
 mod qinghe;
+mod recovery;
 mod region;
 mod relief;
 #[cfg(test)]
@@ -58,8 +59,8 @@ pub use relief::{Relief, ReliefCase, ReliefEvent, ReliefEventKind, ReliefPhase};
 pub use rivalry::{Rivalry, SectEvent, SectEventKind};
 pub use school::{Duty, FORM_QI_COST, HallRank, MAX_QI, School, Succession};
 pub use social::{
-    BodyDiscovery, BodyReport, Incident, IncidentId, Knowledge, KnowledgeSource, Relationship,
-    Report, Social,
+    BodyDiscovery, BodyReport, Incident, IncidentId, Knowledge, KnowledgeSource, RecoveryEvent,
+    Relationship, Report, Social,
 };
 pub use traffic::{Traffic, TrafficEvent, TrafficEventKind};
 
@@ -354,6 +355,7 @@ enum Rules {
     Consequences,
     ViolenceLogistics,
     PlayerReporting,
+    PhysicalRecovery,
 }
 
 impl Rules {
@@ -378,6 +380,7 @@ impl Rules {
                 | Self::Consequences
                 | Self::ViolenceLogistics
                 | Self::PlayerReporting
+                | Self::PhysicalRecovery
         )
     }
 }
@@ -447,6 +450,10 @@ impl World {
         Self::seeded(seed, Rules::PlayerReporting)
     }
 
+    pub fn physical_recovery(seed: u32) -> Self {
+        Self::seeded(seed, Rules::PhysicalRecovery)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -499,6 +506,7 @@ impl World {
                         | Rules::Consequences
                         | Rules::ViolenceLogistics
                         | Rules::PlayerReporting
+                        | Rules::PhysicalRecovery
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -527,6 +535,7 @@ impl World {
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
             )
             .then(Company::default),
             rivalry: matches!(
@@ -543,6 +552,7 @@ impl World {
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -558,6 +568,7 @@ impl World {
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
             )
             .then(Politics::new),
             traffic: matches!(
@@ -572,6 +583,7 @@ impl World {
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -585,6 +597,7 @@ impl World {
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -595,6 +608,7 @@ impl World {
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -604,6 +618,7 @@ impl World {
                     | Rules::Consequences
                     | Rules::ViolenceLogistics
                     | Rules::PlayerReporting
+                    | Rules::PhysicalRecovery
             )
             .then(Information::default),
         }
@@ -747,7 +762,9 @@ impl World {
             return Err(StepError::PoliticsCampaignRequired);
         }
         if let Intent::ReportBody { to, body } = intent
-            && (self.rules != Rules::PlayerReporting || to.get() > 255 || body.get() > 0x00ff_ffff)
+            && (!matches!(self.rules, Rules::PlayerReporting | Rules::PhysicalRecovery)
+                || to.get() > 255
+                || body.get() > 0x00ff_ffff)
         {
             return Err(StepError::InvalidBodyReport);
         }
@@ -896,25 +913,33 @@ impl World {
                 | Rules::Consequences
                 | Rules::ViolenceLogistics
                 | Rules::PlayerReporting
+                | Rules::PhysicalRecovery
         )
     }
 
     pub fn is_consequences(&self) -> bool {
         matches!(
             self.rules,
-            Rules::Consequences | Rules::ViolenceLogistics | Rules::PlayerReporting
+            Rules::Consequences
+                | Rules::ViolenceLogistics
+                | Rules::PlayerReporting
+                | Rules::PhysicalRecovery
         )
     }
 
     pub fn is_violence_logistics(&self) -> bool {
         matches!(
             self.rules,
-            Rules::ViolenceLogistics | Rules::PlayerReporting
+            Rules::ViolenceLogistics | Rules::PlayerReporting | Rules::PhysicalRecovery
         )
     }
 
     pub fn is_player_reporting(&self) -> bool {
-        self.rules == Rules::PlayerReporting
+        matches!(self.rules, Rules::PlayerReporting | Rules::PhysicalRecovery)
+    }
+
+    pub fn is_physical_recovery(&self) -> bool {
+        self.rules == Rules::PhysicalRecovery
     }
 
     fn grants_player_agency(&self) -> bool {

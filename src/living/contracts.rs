@@ -114,6 +114,7 @@ pub enum ContractEventKind {
     Delivered,
     Failed,
     Withdrawn,
+    ResolvedLocally,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -171,6 +172,21 @@ impl World {
                     Some((
                         case.need,
                         ContractEventKind::Failed,
+                        responsible,
+                        npc.position,
+                    ))
+                } else if self.is_physical_recovery()
+                    && matches!(
+                        case.phase,
+                        ContractPhase::Soliciting | ContractPhase::Awarding
+                    )
+                    && case.need == Need::ShrineMedicine
+                    && self.supply.shrine >= self.scenario.shrine_target
+                    && self.perceives(npc.position, case.need.site(self))
+                {
+                    Some((
+                        case.need,
+                        ContractEventKind::ResolvedLocally,
                         responsible,
                         npc.position,
                     ))
@@ -594,7 +610,7 @@ impl World {
         registry.last_closed[need.index()] = self.tick;
         if kind == ContractEventKind::Delivered {
             registry.completed = registry.completed.saturating_add(1);
-        } else {
+        } else if kind != ContractEventKind::ResolvedLocally {
             registry.failed = registry.failed.saturating_add(1);
         }
         self.record_contract_with_id(case_id, need, kind, actor, position);
