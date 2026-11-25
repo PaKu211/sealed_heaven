@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.is_sect_cultivation() {
+        if self.world.martial().is_some() {
+            World::martial_mentorship(seed)
+        } else if self.world.is_sect_cultivation() {
             World::sect_cultivation(seed)
         } else if self.world.contested().is_some() {
             World::contested_resources(seed)
@@ -103,6 +105,8 @@ impl Session {
                         | "claim"
                         | "attune"
                         | "channel"
+                        | "drill"
+                        | "technique"
                 ))
         {
             self.notice = text(
@@ -226,6 +230,46 @@ impl Session {
                     "Wards: {}; Jade channels: {}",
                     state.wards, state.script_charges
                 );
+                return true;
+            }
+            "martial" => {
+                let Some(martial) = self.world.martial() else {
+                    self.notice = "Only in C3.1.".into();
+                    return true;
+                };
+                let skill = martial.skills[&PLAYER];
+                self.notice = format!(
+                    "Form: {:?}; lessons: {}; strain: {}; parry: {}",
+                    skill.form, skill.lessons, skill.strain, skill.parry
+                );
+                return true;
+            }
+            "martiallog" => {
+                let Some(martial) = self.world.martial() else {
+                    self.notice = "Only in C3.1.".into();
+                    return true;
+                };
+                let lines: Vec<_> = martial
+                    .lessons
+                    .iter()
+                    .filter(|lesson| lesson.witnessed)
+                    .map(|lesson| {
+                        format!(
+                            "#{} t{} {} trained with {} in {:?}{}",
+                            lesson.id,
+                            lesson.at,
+                            actor_name(self.locale, &self.world, lesson.student),
+                            actor_name(self.locale, &self.world, lesson.teacher),
+                            lesson.form,
+                            if lesson.learned { " (learned)" } else { "" }
+                        )
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    "No witnessed lessons.".into()
+                } else {
+                    lines.join("\n")
+                };
                 return true;
             }
             "offerlot" => {
@@ -554,7 +598,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.is_sect_cultivation() {
+                self.notice = if self.world.martial().is_some() {
+                    text(self.locale,
+                        "C3.1: Seek Ren Zhi (33) for Reed Palm or Stonebank's envoy (35) for Stone Fist. drill <teacher> twice face-to-face (one coin per lesson); martial and martiallog show personal and witnessed progress. technique <npc> uses your learned form; wait eases strain. Sect oaths restrict rival lessons. NPC disciples train without you. --c30 keeps C3.0.",
+                        "C3.1: Temui Ren Zhi (33) untuk Telapak Alang-alang atau utusan Batu Tepi (35) untuk Tinju Batu. drill <guru> dua kali langsung (satu koin per pelajaran); martial dan martiallog menampilkan latihan diri dan yang disaksikan. technique <npc> memakai jurus; wait meredakan kelelahan. Sumpah perguruan membatasi guru saingan. Murid NPC berlatih sendiri. --c30 untuk C3.0.")
+                } else if self.world.is_sect_cultivation() {
                     text(self.locale,
                         "C3.0: Keep a relic to cultivate instead of selling. attune <lot> consumes carried SpiritOre into two one-hit wards or JadeScript into two ranged channel <npc> strikes. Use cultivation to inspect charges. --c29 preserves C2.9.",
                         "C3.0: Simpan relik untuk berkultivasi alih-alih menjual. attune <barang> menghabiskan SpiritOre menjadi dua perlindungan atau JadeScript menjadi dua serangan jarak jauh channel <npc>. Gunakan cultivation untuk melihat sisa. --c29 untuk C2.9.")
@@ -649,29 +697,42 @@ impl Session {
                 self.notice = self.inspect(argument);
                 return true;
             }
-            "invite" | "pack" | "part" | "f" | "attack" | "e" | "talk" | "form" | "channel" => {
-                match self.target(argument) {
-                    Ok(id) => match command {
-                        "f" | "attack" => Intent::Attack(id),
-                        "form" => Intent::ReedStrike(id),
-                        "channel" => {
-                            if !self.world.is_sect_cultivation() {
-                                self.notice = "Only in C3.0.".into();
-                                return true;
-                            }
-                            Intent::ChannelStrike(id)
+            "invite" | "pack" | "part" | "f" | "attack" | "e" | "talk" | "form" | "channel"
+            | "drill" | "technique" => match self.target(argument) {
+                Ok(id) => match command {
+                    "f" | "attack" => Intent::Attack(id),
+                    "form" => Intent::ReedStrike(id),
+                    "channel" => {
+                        if !self.world.is_sect_cultivation() {
+                            self.notice = "Only in C3.0.".into();
+                            return true;
                         }
-                        "invite" => Intent::Invite(id),
-                        "pack" => Intent::Provision(id),
-                        "part" => Intent::Part(id),
-                        _ => Intent::Talk(id),
-                    },
-                    Err(message) => {
-                        self.notice = message.into();
-                        return true;
+                        Intent::ChannelStrike(id)
                     }
+                    "drill" => {
+                        if self.world.martial().is_none() {
+                            self.notice = "Only in C3.1.".into();
+                            return true;
+                        }
+                        Intent::Drill(id)
+                    }
+                    "technique" => {
+                        if self.world.martial().is_none() {
+                            self.notice = "Only in C3.1.".into();
+                            return true;
+                        }
+                        Intent::TechniqueStrike(id)
+                    }
+                    "invite" => Intent::Invite(id),
+                    "pack" => Intent::Provision(id),
+                    "part" => Intent::Part(id),
+                    _ => Intent::Talk(id),
+                },
+                Err(message) => {
+                    self.notice = message.into();
+                    return true;
                 }
-            }
+            },
             "v" | "save" => {
                 self.notice =
                     match persistence::write_atomic(&self.save_path, &self.world.checkpoint()) {
@@ -2239,6 +2300,11 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
             "carrying a relic to the sect",
             "mengantar relik ke perguruan",
         ),
+        Goal::MartialPractice(_) => ("training with a mentor", "berlatih bersama guru"),
+        Goal::MartialRest => (
+            "recovering from training",
+            "memulihkan diri setelah latihan",
+        ),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
         Goal::Retaliate => ("retaliating", "membalas serangan"),
@@ -2431,6 +2497,25 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 actor_name(locale, world, id)
             );
         }
+        Outcome::MartialDrilled { teacher, learned } => {
+            return format!(
+                "{} {}{}.",
+                tr("You drilled with", "Kamu berlatih bersama"),
+                actor_name(locale, world, teacher),
+                if learned {
+                    tr(" and learned a form", " dan menguasai jurus")
+                } else {
+                    ""
+                }
+            );
+        }
+        Outcome::TechniqueStruck { target, form } => {
+            return format!(
+                "{form:?}: {} {}.",
+                tr("you struck", "kamu menyerang"),
+                actor_name(locale, world, target)
+            );
+        }
         Outcome::LotSold { to, id, coins } => {
             return format!(
                 "{} #{id} {} {} {coins} {}.",
@@ -2537,6 +2622,10 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 "Nothing here records an institutional finding.",
                 "Tidak ada temuan lembaga di petak ini.",
             ),
+            Rejection::Overtrained => (
+                "Too strained; wait and recover.",
+                "Terlalu lelah; tunggu dan pulihkan diri.",
+            ),
             Rejection::NoCargo => ("You need more herbs.", "Herba yang kamu bawa belum cukup."),
             Rejection::PracticeComplete => (
                 "You already mastered this practice.",
@@ -2632,7 +2721,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 20);
+    run_campaign(debug_world, 21);
+}
+
+pub(crate) fn run_c30() {
+    run_campaign(false, 20);
 }
 
 pub(crate) fn run_c29() {
@@ -2712,7 +2805,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         17 => "checkpoint.c27",
         18 => "checkpoint.c28",
         19 => "checkpoint.c29",
-        _ => "checkpoint.c30",
+        20 => "checkpoint.c30",
+        _ => "checkpoint.c31",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2731,7 +2825,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         17 => World::player_reporting(0),
         18 => World::physical_recovery(0),
         19 => World::contested_resources(0),
-        _ => World::sect_cultivation(0),
+        20 => World::sect_cultivation(0),
+        _ => World::martial_mentorship(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -3725,5 +3820,61 @@ mod tests {
         );
         session.input("help");
         assert!(session.notice.contains("C3.0"));
+    }
+
+    #[test]
+    fn c31_ascii_two_lessons_really_change_combat_and_keep_private_npc_training() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("martial.c31"));
+        session.world = World::martial_mentorship(0);
+        session.input("martiallog");
+        assert!(session.notice.contains("No witnessed"));
+        for _ in 0..25 {
+            session.input("d");
+        }
+        session.input("martiallog");
+        assert!(!session.notice.contains("Luo Xiu"));
+        session.input("drill 35");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::MartialDrilled {
+                teacher: ActorId::new(35),
+                learned: false
+            })
+        );
+        session.input("d");
+        session.input("s");
+        session.input("drill 35");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::MartialDrilled {
+                teacher: ActorId::new(35),
+                learned: true
+            })
+        );
+        session.input("martial");
+        assert!(session.notice.contains("StoneFist"));
+        session.input("martiallog");
+        assert!(session.notice.contains("StoneFist"));
+        assert!(!session.notice.contains("Luo Xiu"));
+        let prior = session.world.checkpoint();
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), prior);
+        session.input("technique 35");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::TechniqueStruck {
+                target: ActorId::new(35),
+                form: sealed_sim::living::Form::StoneFist
+            })
+        );
+        assert_eq!(
+            u16::from_le_bytes(session.world.checkpoint()[12..14].try_into().unwrap()),
+            21
+        );
+        session.input("help");
+        assert!(session.notice.contains("C3.1"));
     }
 }

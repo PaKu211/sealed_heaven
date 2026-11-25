@@ -18,6 +18,7 @@ mod faction_agency_tests;
 mod information;
 #[cfg(test)]
 mod information_tests;
+mod martial;
 mod navigation;
 mod npc;
 #[cfg(test)]
@@ -54,6 +55,7 @@ pub use information::{
     Dispute, DisputePhase, EventId, InfoEvent, InfoKnowledge, InfoLogEvent, InfoLogKind,
     InfoReport, Information, Provenance,
 };
+pub use martial::{Form, Lesson, Martial, MartialSkill};
 pub use npc::{Activity, Goal, Npc, NpcDefinition, Role};
 pub use politics::{Allegiance, PoliticalEvent, PoliticalEventKind, Politics};
 pub use region::{Background, MarketQuote, Region, RegionSites};
@@ -135,6 +137,8 @@ pub enum Intent {
     },
     AttuneLot(u32),
     ChannelStrike(ActorId),
+    Drill(ActorId),
+    TechniqueStrike(ActorId),
 }
 
 impl Intent {
@@ -195,6 +199,7 @@ pub enum Rejection {
     FactionTrustRequired,
     /// The tile has no institutional finding to examine.
     NoEvidence,
+    Overtrained,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -271,6 +276,14 @@ pub enum Outcome {
     },
     LotAttuned(u32),
     ChannelStruck(ActorId),
+    MartialDrilled {
+        teacher: ActorId,
+        learned: bool,
+    },
+    TechniqueStruck {
+        target: ActorId,
+        form: Form,
+    },
     Rejected(Rejection),
 }
 
@@ -353,6 +366,7 @@ pub struct World {
     contract_memory: Option<ContractMemory>,
     information: Option<Information>,
     contested: Option<Contested>,
+    martial: Option<Martial>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -377,6 +391,7 @@ enum Rules {
     PhysicalRecovery,
     ContestedResources,
     SectCultivation,
+    MartialMentorship,
 }
 
 impl Rules {
@@ -404,6 +419,7 @@ impl Rules {
                 | Self::PhysicalRecovery
                 | Self::ContestedResources
                 | Self::SectCultivation
+                | Self::MartialMentorship
         )
     }
 }
@@ -485,6 +501,10 @@ impl World {
         Self::seeded(seed, Rules::SectCultivation)
     }
 
+    pub fn martial_mentorship(seed: u32) -> Self {
+        Self::seeded(seed, Rules::MartialMentorship)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -540,6 +560,7 @@ impl World {
                         | Rules::PhysicalRecovery
                         | Rules::ContestedResources
                         | Rules::SectCultivation
+                        | Rules::MartialMentorship
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -571,6 +592,7 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             )
             .then(Company::default),
             rivalry: matches!(
@@ -590,6 +612,7 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -608,6 +631,7 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             )
             .then(Politics::new),
             traffic: matches!(
@@ -625,6 +649,7 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -641,6 +666,7 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -654,6 +680,7 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -666,10 +693,20 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             )
             .then(Information::default),
-            contested: matches!(rules, Rules::ContestedResources | Rules::SectCultivation)
-                .then(|| Contested::new(rules == Rules::SectCultivation)),
+            contested: matches!(
+                rules,
+                Rules::ContestedResources | Rules::SectCultivation | Rules::MartialMentorship
+            )
+            .then(|| {
+                Contested::new(matches!(
+                    rules,
+                    Rules::SectCultivation | Rules::MartialMentorship
+                ))
+            }),
+            martial: (rules == Rules::MartialMentorship).then(|| Martial::new(scenario)),
         }
     }
 
@@ -817,6 +854,7 @@ impl World {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -829,7 +867,14 @@ impl World {
             return Err(StepError::ContestedCampaignRequired);
         }
         if matches!(intent, Intent::AttuneLot(_) | Intent::ChannelStrike(_))
-            && self.rules != Rules::SectCultivation
+            && !matches!(
+                self.rules,
+                Rules::SectCultivation | Rules::MartialMentorship
+            )
+        {
+            return Err(StepError::ContestedCampaignRequired);
+        }
+        if matches!(intent, Intent::Drill(_) | Intent::TechniqueStrike(_)) && self.martial.is_none()
         {
             return Err(StepError::ContestedCampaignRequired);
         }
@@ -857,6 +902,9 @@ impl World {
         self.update_journey();
         // 3. Decide from one snapshot; resolve movement, work and combat by actor ID.
         self.advance_npcs(intent == Intent::Guard && outcome == Outcome::Guarded);
+        if intent == Intent::Wait {
+            self.recover_martial(PLAYER);
+        }
         self.observe_lots();
         self.observe_bodies();
         self.queue_body_reports();
@@ -973,6 +1021,8 @@ impl World {
             Intent::OfferLot { to, id } => self.offer_lot(to, id),
             Intent::AttuneLot(id) => self.attune_lot(id),
             Intent::ChannelStrike(id) => self.channel_strike(id),
+            Intent::Drill(id) => self.drill(id),
+            Intent::TechniqueStrike(id) => self.technique_strike(id),
         }
     }
 
@@ -986,6 +1036,7 @@ impl World {
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
                 | Rules::SectCultivation
+                | Rules::MartialMentorship
         )
     }
 
@@ -998,6 +1049,7 @@ impl World {
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
                 | Rules::SectCultivation
+                | Rules::MartialMentorship
         )
     }
 
@@ -1009,6 +1061,7 @@ impl World {
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
                 | Rules::SectCultivation
+                | Rules::MartialMentorship
         )
     }
 
@@ -1019,18 +1072,25 @@ impl World {
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
                 | Rules::SectCultivation
+                | Rules::MartialMentorship
         )
     }
 
     pub fn is_physical_recovery(&self) -> bool {
         matches!(
             self.rules,
-            Rules::PhysicalRecovery | Rules::ContestedResources | Rules::SectCultivation
+            Rules::PhysicalRecovery
+                | Rules::ContestedResources
+                | Rules::SectCultivation
+                | Rules::MartialMentorship
         )
     }
 
     pub fn is_sect_cultivation(&self) -> bool {
-        self.rules == Rules::SectCultivation
+        matches!(
+            self.rules,
+            Rules::SectCultivation | Rules::MartialMentorship
+        )
     }
 
     fn grants_player_agency(&self) -> bool {

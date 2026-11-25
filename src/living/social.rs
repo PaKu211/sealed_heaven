@@ -477,9 +477,17 @@ impl World {
             let npc = &self.npcs[&target];
             (npc.position, npc.hp)
         };
+        let parry = if amount > 0 && hp > 0 {
+            self.martial_block(target)
+        } else {
+            0
+        };
         let blocked = if target == PLAYER
             && amount > 0
-            && self.rules == super::Rules::SectCultivation
+            && matches!(
+                self.rules,
+                super::Rules::SectCultivation | super::Rules::MartialMentorship
+            )
             && self.contested().is_some_and(|state| state.wards > 0)
         {
             self.contested.as_mut().unwrap().wards -= 1;
@@ -487,7 +495,7 @@ impl World {
         } else {
             0
         };
-        let damage = hp.min(amount.saturating_sub(blocked));
+        let damage = hp.min(amount.saturating_sub(blocked + parry));
         if damage == 0 {
             return;
         }

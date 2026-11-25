@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use super::navigation::{distance, in_reach, moved, next_step};
 use super::{
     ActorId, BREATH_MASTERY, GUARD_BLOCK, IncidentId, KnowledgeSource, PLAYER, Position, Region,
-    STRIKE, World,
+    World,
 };
 
 const THREAT_MEMORY: u64 = 12;
@@ -57,6 +57,8 @@ pub enum Goal {
     ReturnRecoveredCargo,
     ClaimLot(u32),
     DeliverLot(u32),
+    MartialPractice(ActorId),
+    MartialRest,
     Report {
         recipient: ActorId,
         incident: IncidentId,
@@ -265,6 +267,7 @@ impl World {
         })
         .flatten();
         let lot_goal = self.lot_goal(id);
+        let martial_goal = self.martial_goal(npc);
         let teaches = self.is_hall_teacher(npc);
         let off_duty = !self.original_rules()
             && self.is_night()
@@ -328,6 +331,7 @@ impl World {
             ),
             (98, recovery),
             (97, lot_goal),
+            (64, martial_goal),
             (
                 96,
                 (mission_active && npc.fatigue >= 36).then_some(Goal::CampRest),
@@ -443,6 +447,7 @@ impl World {
             && (npc.position == npc.definition.home || self.companion(id).is_some())
         {
             self.npcs.get_mut(&id).expect("planned actor").fatigue = npc.fatigue.saturating_sub(4);
+            self.recover_martial(id);
             return;
         }
         let fatigue = npc.fatigue.saturating_add(1).min(40);
@@ -456,7 +461,14 @@ impl World {
             Goal::CampRest => {
                 self.npcs.get_mut(&id).expect("camping actor").fatigue =
                     npc.fatigue.saturating_sub(7);
+                self.recover_martial(id);
             }
+            Goal::MartialRest => {
+                self.recover_martial(id);
+                self.npcs.get_mut(&id).expect("resting student").fatigue =
+                    npc.fatigue.saturating_sub(4);
+            }
+            Goal::MartialPractice(teacher) => self.work_martial(id, teacher),
             Goal::Retreat => self.retreat(id),
             Goal::TendClinic => self.travel(id, scenario.clinic, 0),
             Goal::SeekCare => self.travel(id, scenario.clinic, 1),
@@ -544,7 +556,8 @@ impl World {
                     } else {
                         0
                     };
-                    self.damage(id, PLAYER, STRIKE - block, true);
+                    let damage = self.npc_martial_damage(id);
+                    self.damage(id, PLAYER, damage.saturating_sub(block), true);
                 } else if self.player.alive() {
                     self.travel(id, self.player.position, 1);
                 }

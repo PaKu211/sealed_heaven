@@ -8,10 +8,10 @@ use crate::encoding::sha256;
 use super::{
     ActorId, Allegiance, AuditFinding, Background, Company, ContractEventKind, ContractMemory,
     ContractPhase, Contracts, Direction, DisputePhase, Duty, FactionAgency, FactionEventKind,
-    FactionPhase, Goal, Good, Holder, InfoLogKind, Information, Intent, Invitation, JourneyEvent,
-    KnowledgeSource, LotEventKind, MAX_TICKS, Need, Outcome, PoliticalEventKind, Politics,
-    Position, Provenance, Region, Rejection, Relief, ReliefEventKind, ReliefPhase, Rivalry, Role,
-    Rules, Scenario, School, SectEventKind, Traffic, TrafficEventKind, World,
+    FactionPhase, Form, Goal, Good, Holder, InfoLogKind, Information, Intent, Invitation,
+    JourneyEvent, KnowledgeSource, LotEventKind, MAX_TICKS, Need, Outcome, PoliticalEventKind,
+    Politics, Position, Provenance, Region, Rejection, Relief, ReliefEventKind, ReliefPhase,
+    Rivalry, Role, Rules, Scenario, School, SectEventKind, Traffic, TrafficEventKind, World,
 };
 
 const MAGIC: &[u8; 12] = b"SH:C10:WORLD";
@@ -55,6 +55,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::PhysicalRecovery => 18,
         Rules::ContestedResources => 19,
         Rules::SectCultivation => 20,
+        Rules::MartialMentorship => 21,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -100,6 +101,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         18 => Rules::PhysicalRecovery,
         19 => Rules::ContestedResources,
         20 => Rules::SectCultivation,
+        21 => Rules::MartialMentorship,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -187,6 +189,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::Invite(actor)
@@ -210,6 +213,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::Provision(actor)
@@ -233,6 +237,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::Part(actor)
@@ -255,6 +260,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::OfferAccord
@@ -277,6 +283,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::SupportHall
@@ -298,6 +305,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::PledgeLodge
@@ -319,6 +327,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::AidLodge
@@ -340,6 +349,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::RenounceLodge
@@ -354,6 +364,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::Ask(actor)
@@ -368,6 +379,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::Examine
@@ -382,6 +394,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -396,6 +409,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             Intent::Take(actor)
@@ -407,6 +421,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -415,15 +430,31 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                 body: ActorId::new(body.0),
             }
         }
-        (31, _) if matches!(rules, Rules::ContestedResources | Rules::SectCultivation) => {
+        (31, _)
+            if matches!(
+                rules,
+                Rules::ContestedResources | Rules::SectCultivation | Rules::MartialMentorship
+            ) =>
+        {
             Intent::ClaimLot(value)
         }
-        (32, _) if matches!(rules, Rules::ContestedResources | Rules::SectCultivation) => {
+        (32, _)
+            if matches!(
+                rules,
+                Rules::ContestedResources | Rules::SectCultivation | Rules::MartialMentorship
+            ) =>
+        {
             let (to, id) = unpack_testimony(value);
             Intent::OfferLot { to, id: id.0 }
         }
-        (33, _) if rules == Rules::SectCultivation => Intent::AttuneLot(value),
-        (34, _) if rules == Rules::SectCultivation => Intent::ChannelStrike(actor),
+        (33, _) if matches!(rules, Rules::SectCultivation | Rules::MartialMentorship) => {
+            Intent::AttuneLot(value)
+        }
+        (34, _) if matches!(rules, Rules::SectCultivation | Rules::MartialMentorship) => {
+            Intent::ChannelStrike(actor)
+        }
+        (35, _) if rules == Rules::MartialMentorship => Intent::Drill(actor),
+        (36, _) if rules == Rules::MartialMentorship => Intent::TechniqueStrike(actor),
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -452,6 +483,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::PhysicalRecovery => b"SH:C10:RULES:v18".to_vec(),
         Rules::ContestedResources => b"SH:C10:RULES:v19".to_vec(),
         Rules::SectCultivation => b"SH:C10:RULES:v20".to_vec(),
+        Rules::MartialMentorship => b"SH:C10:RULES:v21".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -531,6 +563,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::PhysicalRecovery
             | Rules::ContestedResources
             | Rules::SectCultivation
+            | Rules::MartialMentorship
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -567,6 +600,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::PhysicalRecovery => b"SH:C10:STATE:v18".to_vec(),
         Rules::ContestedResources => b"SH:C10:STATE:v19".to_vec(),
         Rules::SectCultivation => b"SH:C10:STATE:v20".to_vec(),
+        Rules::MartialMentorship => b"SH:C10:STATE:v21".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -654,6 +688,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::PhysicalRecovery
                 | Rules::ContestedResources
                 | Rules::SectCultivation
+                | Rules::MartialMentorship
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -724,6 +759,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::PhysicalRecovery
             | Rules::ContestedResources
             | Rules::SectCultivation
+            | Rules::MartialMentorship
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -750,6 +786,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::PhysicalRecovery
                     | Rules::ContestedResources
                     | Rules::SectCultivation
+                    | Rules::MartialMentorship
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -780,7 +817,10 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if matches!(
         world.rules,
-        Rules::PhysicalRecovery | Rules::ContestedResources | Rules::SectCultivation
+        Rules::PhysicalRecovery
+            | Rules::ContestedResources
+            | Rules::SectCultivation
+            | Rules::MartialMentorship
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -852,9 +892,40 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             out.actor(actor);
             out.u32(value);
         }
-        if world.rules == Rules::SectCultivation {
+        if matches!(
+            world.rules,
+            Rules::SectCultivation | Rules::MartialMentorship
+        ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
+        }
+    }
+    if let Some(martial) = world.martial() {
+        out.count(martial.skills.len());
+        for (&actor, skill) in &martial.skills {
+            out.actor(actor);
+            out.u8(match skill.form {
+                None => 0,
+                Some(Form::ReedPalm) => 1,
+                Some(Form::StoneFist) => 2,
+            });
+            out.optional_actor(skill.teacher);
+            out.u8(skill.lessons);
+            out.u8(skill.strain);
+            out.u8(skill.parry);
+        }
+        out.count(martial.lessons.len());
+        for lesson in &martial.lessons {
+            out.u32(lesson.id);
+            out.u64(lesson.at);
+            out.actor(lesson.student);
+            out.actor(lesson.teacher);
+            out.u8(match lesson.form {
+                Form::ReedPalm => 1,
+                Form::StoneFist => 2,
+            });
+            out.u8(u8::from(lesson.learned));
+            out.u8(u8::from(lesson.witnessed));
         }
     }
     out.count(world.journal.len());
@@ -1370,6 +1441,8 @@ impl Wire {
             Intent::OfferLot { to, id } => (32, pack_testimony(to, super::EventId(id))),
             Intent::AttuneLot(id) => (33, id),
             Intent::ChannelStrike(id) => (34, id.get()),
+            Intent::Drill(id) => (35, id.get()),
+            Intent::TechniqueStrike(id) => (36, id.get()),
         };
         self.u8(tag);
         self.u32(payload);
@@ -1418,6 +1491,8 @@ impl Wire {
             Goal::ReturnRecoveredCargo => 38,
             Goal::ClaimLot(_) => 39,
             Goal::DeliverLot(_) => 40,
+            Goal::MartialPractice(_) => 41,
+            Goal::MartialRest => 42,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),
@@ -1426,6 +1501,7 @@ impl Wire {
             Goal::InvestigateBody(body) => self.actor(body),
             Goal::RecoverBody(body) => self.actor(body),
             Goal::ClaimLot(id) | Goal::DeliverLot(id) => self.u32(id),
+            Goal::MartialPractice(teacher) => self.actor(teacher),
             Goal::Report {
                 recipient,
                 incident,
@@ -1489,6 +1565,8 @@ impl Wire {
             Some(Outcome::LotSold { .. }) => 38,
             Some(Outcome::LotAttuned(_)) => 39,
             Some(Outcome::ChannelStruck(_)) => 40,
+            Some(Outcome::MartialDrilled { .. }) => 41,
+            Some(Outcome::TechniqueStruck { .. }) => 42,
         });
         match outcome {
             Some(
@@ -1535,6 +1613,17 @@ impl Wire {
             }
             Some(Outcome::LotAttuned(id)) => self.u32(id),
             Some(Outcome::ChannelStruck(id)) => self.actor(id),
+            Some(Outcome::MartialDrilled { teacher, learned }) => {
+                self.actor(teacher);
+                self.u8(u8::from(learned));
+            }
+            Some(Outcome::TechniqueStruck { target, form }) => {
+                self.actor(target);
+                self.u8(match form {
+                    Form::ReedPalm => 1,
+                    Form::StoneFist => 2,
+                });
+            }
             Some(Outcome::Rejected(reason)) => self.u8(match reason {
                 Rejection::Dead => 0,
                 Rejection::Impassable => 1,
@@ -1570,6 +1659,7 @@ impl Wire {
                 Rejection::OathConflict => 31,
                 Rejection::FactionTrustRequired => 32,
                 Rejection::NoEvidence => 33,
+                Rejection::Overtrained => 34,
             }),
             _ => {}
         }
