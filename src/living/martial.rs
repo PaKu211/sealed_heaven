@@ -218,6 +218,9 @@ impl World {
         if skill.strain >= 3 {
             return Err(Rejection::Overtrained);
         }
+        if self.meridians().is_some() {
+            self.use_martial_qi(PLAYER)?;
+        }
         let (damage, exertion, parry) = match form {
             Form::ReedPalm => (2, 1, 1),
             Form::StoneFist => (3, 2, 0),
@@ -249,6 +252,9 @@ impl World {
         let Some(form) = skill.form else {
             return super::STRIKE;
         };
+        if self.meridians().is_some() && self.use_martial_qi(actor).is_err() {
+            return super::STRIKE;
+        }
         let state = self
             .martial
             .as_mut()

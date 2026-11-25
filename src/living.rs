@@ -19,6 +19,7 @@ mod information;
 #[cfg(test)]
 mod information_tests;
 mod martial;
+mod meridian;
 mod navigation;
 mod npc;
 #[cfg(test)]
@@ -56,6 +57,7 @@ pub use information::{
     InfoReport, Information, Provenance,
 };
 pub use martial::{Form, Lesson, Martial, MartialSkill};
+pub use meridian::{MeridianEvent, MeridianEventKind, MeridianState, Meridians};
 pub use npc::{Activity, Goal, Npc, NpcDefinition, Role};
 pub use politics::{Allegiance, PoliticalEvent, PoliticalEventKind, Politics};
 pub use region::{Background, MarketQuote, Region, RegionSites};
@@ -139,6 +141,9 @@ pub enum Intent {
     ChannelStrike(ActorId),
     Drill(ActorId),
     TechniqueStrike(ActorId),
+    DrawQi,
+    CirculateQi,
+    MendMeridians,
 }
 
 impl Intent {
@@ -200,6 +205,7 @@ pub enum Rejection {
     /// The tile has no institutional finding to examine.
     NoEvidence,
     Overtrained,
+    MeridiansBlocked,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -284,6 +290,12 @@ pub enum Outcome {
         target: ActorId,
         form: Form,
     },
+    QiDrawn(u8),
+    QiCirculated {
+        channels: u8,
+        blockage: u8,
+    },
+    MeridiansMended,
     Rejected(Rejection),
 }
 
@@ -367,6 +379,7 @@ pub struct World {
     information: Option<Information>,
     contested: Option<Contested>,
     martial: Option<Martial>,
+    meridians: Option<Meridians>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -392,6 +405,7 @@ enum Rules {
     ContestedResources,
     SectCultivation,
     MartialMentorship,
+    MeridianCultivation,
 }
 
 impl Rules {
@@ -420,6 +434,7 @@ impl Rules {
                 | Self::ContestedResources
                 | Self::SectCultivation
                 | Self::MartialMentorship
+                | Self::MeridianCultivation
         )
     }
 }
@@ -505,6 +520,10 @@ impl World {
         Self::seeded(seed, Rules::MartialMentorship)
     }
 
+    pub fn meridian_cultivation(seed: u32) -> Self {
+        Self::seeded(seed, Rules::MeridianCultivation)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -561,6 +580,7 @@ impl World {
                         | Rules::ContestedResources
                         | Rules::SectCultivation
                         | Rules::MartialMentorship
+                        | Rules::MeridianCultivation
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -593,6 +613,7 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(Company::default),
             rivalry: matches!(
@@ -613,6 +634,7 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -632,6 +654,7 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(Politics::new),
             traffic: matches!(
@@ -650,6 +673,7 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -667,6 +691,7 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -681,6 +706,7 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -694,19 +720,25 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(Information::default),
             contested: matches!(
                 rules,
-                Rules::ContestedResources | Rules::SectCultivation | Rules::MartialMentorship
+                Rules::ContestedResources
+                    | Rules::SectCultivation
+                    | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             )
             .then(|| {
                 Contested::new(matches!(
                     rules,
-                    Rules::SectCultivation | Rules::MartialMentorship
+                    Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
                 ))
             }),
-            martial: (rules == Rules::MartialMentorship).then(|| Martial::new(scenario)),
+            martial: matches!(rules, Rules::MartialMentorship | Rules::MeridianCultivation)
+                .then(|| Martial::new(scenario)),
+            meridians: (rules == Rules::MeridianCultivation).then(|| Meridians::new(scenario)),
         }
     }
 
@@ -855,6 +887,7 @@ impl World {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -869,12 +902,19 @@ impl World {
         if matches!(intent, Intent::AttuneLot(_) | Intent::ChannelStrike(_))
             && !matches!(
                 self.rules,
-                Rules::SectCultivation | Rules::MartialMentorship
+                Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
             )
         {
             return Err(StepError::ContestedCampaignRequired);
         }
         if matches!(intent, Intent::Drill(_) | Intent::TechniqueStrike(_)) && self.martial.is_none()
+        {
+            return Err(StepError::ContestedCampaignRequired);
+        }
+        if matches!(
+            intent,
+            Intent::DrawQi | Intent::CirculateQi | Intent::MendMeridians
+        ) && self.meridians.is_none()
         {
             return Err(StepError::ContestedCampaignRequired);
         }
@@ -1023,6 +1063,9 @@ impl World {
             Intent::ChannelStrike(id) => self.channel_strike(id),
             Intent::Drill(id) => self.drill(id),
             Intent::TechniqueStrike(id) => self.technique_strike(id),
+            Intent::DrawQi => self.draw_qi(),
+            Intent::CirculateQi => self.circulate_qi(),
+            Intent::MendMeridians => self.mend_meridians(),
         }
     }
 
@@ -1037,6 +1080,7 @@ impl World {
                 | Rules::ContestedResources
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
+                | Rules::MeridianCultivation
         )
     }
 
@@ -1050,6 +1094,7 @@ impl World {
                 | Rules::ContestedResources
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
+                | Rules::MeridianCultivation
         )
     }
 
@@ -1062,6 +1107,7 @@ impl World {
                 | Rules::ContestedResources
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
+                | Rules::MeridianCultivation
         )
     }
 
@@ -1073,6 +1119,7 @@ impl World {
                 | Rules::ContestedResources
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
+                | Rules::MeridianCultivation
         )
     }
 
@@ -1083,13 +1130,14 @@ impl World {
                 | Rules::ContestedResources
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
+                | Rules::MeridianCultivation
         )
     }
 
     pub fn is_sect_cultivation(&self) -> bool {
         matches!(
             self.rules,
-            Rules::SectCultivation | Rules::MartialMentorship
+            Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
         )
     }
 

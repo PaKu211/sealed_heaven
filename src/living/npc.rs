@@ -59,6 +59,9 @@ pub enum Goal {
     DeliverLot(u32),
     MartialPractice(ActorId),
     MartialRest,
+    MeridianDraw,
+    MeridianCirculate,
+    MeridianCare,
     Report {
         recipient: ActorId,
         incident: IncidentId,
@@ -268,6 +271,7 @@ impl World {
         .flatten();
         let lot_goal = self.lot_goal(id);
         let martial_goal = self.martial_goal(npc);
+        let meridian_goal = self.npc_meridian_goal(id);
         let teaches = self.is_hall_teacher(npc);
         let off_duty = !self.original_rules()
             && self.is_night()
@@ -332,6 +336,14 @@ impl World {
             (98, recovery),
             (97, lot_goal),
             (64, martial_goal),
+            (
+                if meridian_goal == Some(Goal::MeridianCare) {
+                    89
+                } else {
+                    65
+                },
+                meridian_goal,
+            ),
             (
                 96,
                 (mission_active && npc.fatigue >= 36).then_some(Goal::CampRest),
@@ -469,6 +481,9 @@ impl World {
                     npc.fatigue.saturating_sub(4);
             }
             Goal::MartialPractice(teacher) => self.work_martial(id, teacher),
+            Goal::MeridianDraw | Goal::MeridianCirculate | Goal::MeridianCare => {
+                self.work_meridian(id, goal)
+            }
             Goal::Retreat => self.retreat(id),
             Goal::TendClinic => self.travel(id, scenario.clinic, 0),
             Goal::SeekCare => self.travel(id, scenario.clinic, 1),

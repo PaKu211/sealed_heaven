@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.martial().is_some() {
+        if self.world.meridians().is_some() {
+            World::meridian_cultivation(seed)
+        } else if self.world.martial().is_some() {
             World::martial_mentorship(seed)
         } else if self.world.is_sect_cultivation() {
             World::sect_cultivation(seed)
@@ -136,6 +138,42 @@ impl Session {
             "duty" => Intent::HallDuty,
             "study" => Intent::StudyForm,
             "center" => Intent::CenterQi,
+            "drawqi" if self.world.meridians().is_some() => Intent::DrawQi,
+            "circulate" if self.world.meridians().is_some() => Intent::CirculateQi,
+            "mend" if self.world.meridians().is_some() => Intent::MendMeridians,
+            "meridians" if self.world.meridians().is_some() => {
+                let state = self.world.meridians().unwrap().people[&PLAYER];
+                self.notice = format!(
+                    "Qi: {}; open channels: {}; blockage: {}",
+                    state.qi, state.channels, state.blockage
+                );
+                return true;
+            }
+            "meridianlog" if self.world.meridians().is_some() => {
+                let lines: Vec<_> = self
+                    .world
+                    .meridians()
+                    .unwrap()
+                    .events
+                    .iter()
+                    .filter(|event| event.witnessed)
+                    .map(|event| {
+                        format!(
+                            "#{} t{} {} {:?}",
+                            event.id,
+                            event.at,
+                            actor_name(self.locale, &self.world, event.actor),
+                            event.kind
+                        )
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    "No witnessed meridian events.".into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
             "accord" => Intent::OfferAccord,
             "sponsor" => Intent::SupportHall,
             "pledge" => Intent::PledgeLodge,
@@ -598,7 +636,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.martial().is_some() {
+                self.notice = if self.world.meridians().is_some() {
+                    text(self.locale,
+                        "C3.2: Gather real herbs; at Qinghe shrine or Reed Hall drawqi spends one herb for one Qi. circulate spends Qi: a rested body opens a channel; strain or wounds obstruct it. Two open channels and Qi are required for technique. Blockage requires mend at a staffed clinic, using real shrine medicine. meridians and meridianlog show known condition. --c31 keeps C3.1.",
+                        "C3.2: Petik herba sungguhan; di kuil Qinghe atau Balai Alang-alang drawqi memakai satu herba untuk satu Qi. circulate memakai Qi: tubuh pulih membuka jalur, latihan berat atau luka menyumbatnya. Dua jalur terbuka dan Qi diperlukan untuk technique. Sumbatan dirawat dengan mend di klinik yang dijaga, memakai obat kuil. meridians dan meridianlog mencatat kondisi. --c31 untuk C3.1.")
+                } else if self.world.martial().is_some() {
                     text(self.locale,
                         "C3.1: Seek Ren Zhi (33) for Reed Palm or Stonebank's envoy (35) for Stone Fist. drill <teacher> twice face-to-face (one coin per lesson); martial and martiallog show personal and witnessed progress. technique <npc> uses your learned form; wait eases strain. Sect oaths restrict rival lessons. NPC disciples train without you. --c30 keeps C3.0.",
                         "C3.1: Temui Ren Zhi (33) untuk Telapak Alang-alang atau utusan Batu Tepi (35) untuk Tinju Batu. drill <guru> dua kali langsung (satu koin per pelajaran); martial dan martiallog menampilkan latihan diri dan yang disaksikan. technique <npc> memakai jurus; wait meredakan kelelahan. Sumpah perguruan membatasi guru saingan. Murid NPC berlatih sendiri. --c30 untuk C3.0.")
@@ -2305,6 +2347,12 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
             "recovering from training",
             "memulihkan diri setelah latihan",
         ),
+        Goal::MeridianDraw => (
+            "drawing Qi from an offering",
+            "menyerap Qi dari persembahan",
+        ),
+        Goal::MeridianCirculate => ("circulating Qi", "mengalirkan Qi"),
+        Goal::MeridianCare => ("seeking meridian care", "mencari perawatan meridian"),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
         Goal::Retaliate => ("retaliating", "membalas serangan"),
@@ -2516,6 +2564,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 actor_name(locale, world, target)
             );
         }
+        Outcome::QiDrawn(qi) => return format!("Qi {qi} (one herb consumed)."),
+        Outcome::QiCirculated { channels, blockage } => {
+            return format!("Channels {channels}; blockage {blockage}.");
+        }
+        Outcome::MeridiansMended => ("Your meridians were treated.", "Jalur meridianmu dirawat."),
         Outcome::LotSold { to, id, coins } => {
             return format!(
                 "{} #{id} {} {} {coins} {}.",
@@ -2626,6 +2679,10 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 "Too strained; wait and recover.",
                 "Terlalu lelah; tunggu dan pulihkan diri.",
             ),
+            Rejection::MeridiansBlocked => (
+                "Blocked meridians require a healer.",
+                "Meridian tersumbat perlu perawatan tabib.",
+            ),
             Rejection::NoCargo => ("You need more herbs.", "Herba yang kamu bawa belum cukup."),
             Rejection::PracticeComplete => (
                 "You already mastered this practice.",
@@ -2721,7 +2778,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 21);
+    run_campaign(debug_world, 22);
+}
+
+pub(crate) fn run_c31() {
+    run_campaign(false, 21);
 }
 
 pub(crate) fn run_c30() {
@@ -2806,7 +2867,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         18 => "checkpoint.c28",
         19 => "checkpoint.c29",
         20 => "checkpoint.c30",
-        _ => "checkpoint.c31",
+        21 => "checkpoint.c31",
+        _ => "checkpoint.c32",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2826,7 +2888,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         18 => World::physical_recovery(0),
         19 => World::contested_resources(0),
         20 => World::sect_cultivation(0),
-        _ => World::martial_mentorship(0),
+        21 => World::martial_mentorship(0),
+        _ => World::meridian_cultivation(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -3876,5 +3939,48 @@ mod tests {
         );
         session.input("help");
         assert!(session.notice.contains("C3.1"));
+    }
+
+    #[test]
+    fn c32_ascii_gathers_real_herbs_and_opens_meridians_in_public_turns() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("meridians.c32"));
+        session.world = World::meridian_cultivation(0);
+        for _ in 0..8 {
+            session.input("d");
+        }
+        for command in ["w", "w", "g", "g", "g", "s", "s"] {
+            session.input(command);
+        }
+        for _ in 0..5 {
+            session.input("a");
+        }
+        session.input("s");
+        assert_eq!(session.world.player().herbs, 3);
+        for command in ["drawqi", "circulate", "drawqi", "circulate", "drawqi"] {
+            session.input(command);
+            assert!(
+                !matches!(session.world.latest_outcome(), Some(Outcome::Rejected(_))),
+                "{command}: {}",
+                session.notice
+            );
+        }
+        let state = session.world.meridians().unwrap().people[&PLAYER];
+        assert_eq!((state.qi, state.channels, state.blockage), (1, 2, 0));
+        assert_eq!(session.world.player().herbs, 0);
+        let saved = session.world.checkpoint();
+        session.input("meridianlog");
+        assert!(session.notice.contains("Opened"));
+        assert!(!session.notice.contains("t1 "));
+        session.input("meridians");
+        assert!(session.notice.contains("Qi: 1; open channels: 2"));
+        assert_eq!(session.world.checkpoint(), saved);
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), saved);
+        assert_eq!(u16::from_le_bytes(saved[12..14].try_into().unwrap()), 22);
+        session.input("help");
+        assert!(session.notice.contains("C3.2"));
     }
 }

@@ -486,7 +486,9 @@ impl World {
             && amount > 0
             && matches!(
                 self.rules,
-                super::Rules::SectCultivation | super::Rules::MartialMentorship
+                super::Rules::SectCultivation
+                    | super::Rules::MartialMentorship
+                    | super::Rules::MeridianCultivation
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

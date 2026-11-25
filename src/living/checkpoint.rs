@@ -9,9 +9,10 @@ use super::{
     ActorId, Allegiance, AuditFinding, Background, Company, ContractEventKind, ContractMemory,
     ContractPhase, Contracts, Direction, DisputePhase, Duty, FactionAgency, FactionEventKind,
     FactionPhase, Form, Goal, Good, Holder, InfoLogKind, Information, Intent, Invitation,
-    JourneyEvent, KnowledgeSource, LotEventKind, MAX_TICKS, Need, Outcome, PoliticalEventKind,
-    Politics, Position, Provenance, Region, Rejection, Relief, ReliefEventKind, ReliefPhase,
-    Rivalry, Role, Rules, Scenario, School, SectEventKind, Traffic, TrafficEventKind, World,
+    JourneyEvent, KnowledgeSource, LotEventKind, MAX_TICKS, MeridianEventKind, Need, Outcome,
+    PoliticalEventKind, Politics, Position, Provenance, Region, Rejection, Relief, ReliefEventKind,
+    ReliefPhase, Rivalry, Role, Rules, Scenario, School, SectEventKind, Traffic, TrafficEventKind,
+    World,
 };
 
 const MAGIC: &[u8; 12] = b"SH:C10:WORLD";
@@ -56,6 +57,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::ContestedResources => 19,
         Rules::SectCultivation => 20,
         Rules::MartialMentorship => 21,
+        Rules::MeridianCultivation => 22,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -102,6 +104,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         19 => Rules::ContestedResources,
         20 => Rules::SectCultivation,
         21 => Rules::MartialMentorship,
+        22 => Rules::MeridianCultivation,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -190,6 +193,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::Invite(actor)
@@ -214,6 +218,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::Provision(actor)
@@ -238,6 +243,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::Part(actor)
@@ -261,6 +267,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::OfferAccord
@@ -284,6 +291,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::SupportHall
@@ -306,6 +314,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::PledgeLodge
@@ -328,6 +337,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::AidLodge
@@ -350,6 +360,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::RenounceLodge
@@ -365,6 +376,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::Ask(actor)
@@ -380,6 +392,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::Examine
@@ -395,6 +408,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -410,6 +424,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::Take(actor)
@@ -422,6 +437,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -433,7 +449,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (31, _)
             if matches!(
                 rules,
-                Rules::ContestedResources | Rules::SectCultivation | Rules::MartialMentorship
+                Rules::ContestedResources
+                    | Rules::SectCultivation
+                    | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             Intent::ClaimLot(value)
@@ -441,20 +460,40 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (32, _)
             if matches!(
                 rules,
-                Rules::ContestedResources | Rules::SectCultivation | Rules::MartialMentorship
+                Rules::ContestedResources
+                    | Rules::SectCultivation
+                    | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) =>
         {
             let (to, id) = unpack_testimony(value);
             Intent::OfferLot { to, id: id.0 }
         }
-        (33, _) if matches!(rules, Rules::SectCultivation | Rules::MartialMentorship) => {
+        (33, _)
+            if matches!(
+                rules,
+                Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
+            ) =>
+        {
             Intent::AttuneLot(value)
         }
-        (34, _) if matches!(rules, Rules::SectCultivation | Rules::MartialMentorship) => {
+        (34, _)
+            if matches!(
+                rules,
+                Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
+            ) =>
+        {
             Intent::ChannelStrike(actor)
         }
-        (35, _) if rules == Rules::MartialMentorship => Intent::Drill(actor),
-        (36, _) if rules == Rules::MartialMentorship => Intent::TechniqueStrike(actor),
+        (35, _) if matches!(rules, Rules::MartialMentorship | Rules::MeridianCultivation) => {
+            Intent::Drill(actor)
+        }
+        (36, _) if matches!(rules, Rules::MartialMentorship | Rules::MeridianCultivation) => {
+            Intent::TechniqueStrike(actor)
+        }
+        (37, 0) if rules == Rules::MeridianCultivation => Intent::DrawQi,
+        (38, 0) if rules == Rules::MeridianCultivation => Intent::CirculateQi,
+        (39, 0) if rules == Rules::MeridianCultivation => Intent::MendMeridians,
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -484,6 +523,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::ContestedResources => b"SH:C10:RULES:v19".to_vec(),
         Rules::SectCultivation => b"SH:C10:RULES:v20".to_vec(),
         Rules::MartialMentorship => b"SH:C10:RULES:v21".to_vec(),
+        Rules::MeridianCultivation => b"SH:C10:RULES:v22".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -564,6 +604,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::ContestedResources
             | Rules::SectCultivation
             | Rules::MartialMentorship
+            | Rules::MeridianCultivation
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -601,6 +642,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::ContestedResources => b"SH:C10:STATE:v19".to_vec(),
         Rules::SectCultivation => b"SH:C10:STATE:v20".to_vec(),
         Rules::MartialMentorship => b"SH:C10:STATE:v21".to_vec(),
+        Rules::MeridianCultivation => b"SH:C10:STATE:v22".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -689,6 +731,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::ContestedResources
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
+                | Rules::MeridianCultivation
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -760,6 +803,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::ContestedResources
             | Rules::SectCultivation
             | Rules::MartialMentorship
+            | Rules::MeridianCultivation
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -787,6 +831,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::ContestedResources
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -821,6 +866,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::ContestedResources
             | Rules::SectCultivation
             | Rules::MartialMentorship
+            | Rules::MeridianCultivation
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -894,7 +940,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         }
         if matches!(
             world.rules,
-            Rules::SectCultivation | Rules::MartialMentorship
+            Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -926,6 +972,30 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             });
             out.u8(u8::from(lesson.learned));
             out.u8(u8::from(lesson.witnessed));
+        }
+    }
+    if let Some(meridians) = world.meridians() {
+        out.count(meridians.people.len());
+        for (&actor, state) in &meridians.people {
+            out.actor(actor);
+            out.u8(state.qi);
+            out.u8(state.channels);
+            out.u8(state.blockage);
+        }
+        out.count(meridians.events.len());
+        for event in &meridians.events {
+            out.u32(event.id);
+            out.u64(event.at);
+            out.actor(event.actor);
+            out.u8(match event.kind {
+                MeridianEventKind::Drawn => 0,
+                MeridianEventKind::Opened => 1,
+                MeridianEventKind::Obstructed => 2,
+                MeridianEventKind::Treated => 3,
+                MeridianEventKind::Spent => 4,
+            });
+            out.position(event.site);
+            out.u8(u8::from(event.witnessed));
         }
     }
     out.count(world.journal.len());
@@ -1443,6 +1513,9 @@ impl Wire {
             Intent::ChannelStrike(id) => (34, id.get()),
             Intent::Drill(id) => (35, id.get()),
             Intent::TechniqueStrike(id) => (36, id.get()),
+            Intent::DrawQi => (37, 0),
+            Intent::CirculateQi => (38, 0),
+            Intent::MendMeridians => (39, 0),
         };
         self.u8(tag);
         self.u32(payload);
@@ -1493,6 +1566,9 @@ impl Wire {
             Goal::DeliverLot(_) => 40,
             Goal::MartialPractice(_) => 41,
             Goal::MartialRest => 42,
+            Goal::MeridianDraw => 43,
+            Goal::MeridianCirculate => 44,
+            Goal::MeridianCare => 45,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),
@@ -1567,6 +1643,9 @@ impl Wire {
             Some(Outcome::ChannelStruck(_)) => 40,
             Some(Outcome::MartialDrilled { .. }) => 41,
             Some(Outcome::TechniqueStruck { .. }) => 42,
+            Some(Outcome::QiDrawn(_)) => 43,
+            Some(Outcome::QiCirculated { .. }) => 44,
+            Some(Outcome::MeridiansMended) => 45,
         });
         match outcome {
             Some(
@@ -1624,6 +1703,11 @@ impl Wire {
                     Form::StoneFist => 2,
                 });
             }
+            Some(Outcome::QiDrawn(qi)) => self.u8(qi),
+            Some(Outcome::QiCirculated { channels, blockage }) => {
+                self.u8(channels);
+                self.u8(blockage);
+            }
             Some(Outcome::Rejected(reason)) => self.u8(match reason {
                 Rejection::Dead => 0,
                 Rejection::Impassable => 1,
@@ -1660,6 +1744,7 @@ impl Wire {
                 Rejection::FactionTrustRequired => 32,
                 Rejection::NoEvidence => 33,
                 Rejection::Overtrained => 34,
+                Rejection::MeridiansBlocked => 35,
             }),
             _ => {}
         }
