@@ -36,7 +36,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.meridians().is_some() {
+        if self.world.injuries().is_some() {
+            World::persistent_injury(seed)
+        } else if self.world.meridians().is_some() {
             World::meridian_cultivation(seed)
         } else if self.world.martial().is_some() {
             World::martial_mentorship(seed)
@@ -141,6 +143,37 @@ impl Session {
             "drawqi" if self.world.meridians().is_some() => Intent::DrawQi,
             "circulate" if self.world.meridians().is_some() => Intent::CirculateQi,
             "mend" if self.world.meridians().is_some() => Intent::MendMeridians,
+            "treatwounds" if self.world.injuries().is_some() => Intent::TreatWounds,
+            "wounds" if self.world.injuries().is_some() => {
+                let state = self.world.injuries().unwrap().people[&PLAYER];
+                self.notice = format!("Arm wounds: {}; leg wounds: {}", state.arms, state.legs);
+                return true;
+            }
+            "woundlog" if self.world.injuries().is_some() => {
+                let lines: Vec<_> = self
+                    .world
+                    .injuries()
+                    .unwrap()
+                    .events
+                    .iter()
+                    .filter(|event| event.witnessed)
+                    .map(|event| {
+                        format!(
+                            "#{} t{} {} {:?}",
+                            event.id,
+                            event.at,
+                            actor_name(self.locale, &self.world, event.actor),
+                            event.kind
+                        )
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    "No witnessed wounds.".into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
             "meridians" if self.world.meridians().is_some() => {
                 let state = self.world.meridians().unwrap().people[&PLAYER];
                 self.notice = format!(
@@ -636,7 +669,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.meridians().is_some() {
+                self.notice = if self.world.injuries().is_some() {
+                    text(self.locale,
+                        "C3.3: Real blows can leave lasting arm or leg wounds. Severe arm wounds weaken strikes; severe leg wounds slow movement on alternating ticks. Injured NPCs retreat and seek care. At a staffed clinic treatwounds spends one shrine herb and heals one wound; wounds and woundlog show your condition and witnessed events. --c32 keeps C3.2.",
+                        "C3.3: Pukulan nyata dapat meninggalkan luka lengan atau kaki. Luka lengan berat melemahkan serangan; luka kaki berat memperlambat gerak setiap dua giliran. NPC terluka mundur dan mencari perawatan. Di klinik yang dijaga treatwounds memakai satu herba kuil dan menyembuhkan satu luka; wounds dan woundlog menunjukkan kondisi serta peristiwa yang disaksikan. --c32 untuk C3.2.")
+                } else if self.world.meridians().is_some() {
                     text(self.locale,
                         "C3.2: Gather real herbs; at Qinghe shrine or Reed Hall drawqi spends one herb for one Qi. circulate spends Qi: a rested body opens a channel; strain or wounds obstruct it. Two open channels and Qi are required for technique. Blockage requires mend at a staffed clinic, using real shrine medicine. meridians and meridianlog show known condition. --c31 keeps C3.1.",
                         "C3.2: Petik herba sungguhan; di kuil Qinghe atau Balai Alang-alang drawqi memakai satu herba untuk satu Qi. circulate memakai Qi: tubuh pulih membuka jalur, latihan berat atau luka menyumbatnya. Dua jalur terbuka dan Qi diperlukan untuk technique. Sumbatan dirawat dengan mend di klinik yang dijaga, memakai obat kuil. meridians dan meridianlog mencatat kondisi. --c31 untuk C3.1.")
@@ -2353,6 +2390,7 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         ),
         Goal::MeridianCirculate => ("circulating Qi", "mengalirkan Qi"),
         Goal::MeridianCare => ("seeking meridian care", "mencari perawatan meridian"),
+        Goal::SeekWoundCare => ("seeking wound care", "mencari perawatan luka"),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
         Goal::Retaliate => ("retaliating", "membalas serangan"),
@@ -2569,6 +2607,10 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
             return format!("Channels {channels}; blockage {blockage}.");
         }
         Outcome::MeridiansMended => ("Your meridians were treated.", "Jalur meridianmu dirawat."),
+        Outcome::WoundTreated => (
+            "One wound was treated using shrine medicine.",
+            "Satu luka dirawat memakai obat kuil.",
+        ),
         Outcome::LotSold { to, id, coins } => {
             return format!(
                 "{} #{id} {} {} {coins} {}.",
@@ -2683,6 +2725,10 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 "Blocked meridians require a healer.",
                 "Meridian tersumbat perlu perawatan tabib.",
             ),
+            Rejection::Hobbled => (
+                "Your leg wound slows you this turn.",
+                "Luka kaki memperlambat langkahmu giliran ini.",
+            ),
             Rejection::NoCargo => ("You need more herbs.", "Herba yang kamu bawa belum cukup."),
             Rejection::PracticeComplete => (
                 "You already mastered this practice.",
@@ -2778,7 +2824,11 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 22);
+    run_campaign(debug_world, 23);
+}
+
+pub(crate) fn run_c32() {
+    run_campaign(false, 22);
 }
 
 pub(crate) fn run_c31() {
@@ -2868,7 +2918,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         19 => "checkpoint.c29",
         20 => "checkpoint.c30",
         21 => "checkpoint.c31",
-        _ => "checkpoint.c32",
+        22 => "checkpoint.c32",
+        _ => "checkpoint.c33",
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2889,7 +2940,8 @@ fn run_campaign(debug_world: bool, revision: u16) {
         19 => World::contested_resources(0),
         20 => World::sect_cultivation(0),
         21 => World::martial_mentorship(0),
-        _ => World::meridian_cultivation(0),
+        22 => World::meridian_cultivation(0),
+        _ => World::persistent_injury(0),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -3982,5 +4034,46 @@ mod tests {
         assert_eq!(u16::from_le_bytes(saved[12..14].try_into().unwrap()), 22);
         session.input("help");
         assert!(session.notice.contains("C3.2"));
+    }
+
+    #[test]
+    fn c33_ascii_public_assault_leaves_a_witnessed_wound_and_replays() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("wounds.c33"));
+        session.world = World::persistent_injury(0);
+        for command in ["w", "d", "d", "attack 1"] {
+            session.input(command);
+        }
+        for (command, times) in [
+            ("w", 3),
+            ("d", 9),
+            ("s", 2),
+            ("w", 2),
+            ("a", 6),
+            ("s", 3),
+            ("a", 2),
+        ] {
+            for _ in 0..times {
+                session.input(command);
+            }
+        }
+        session.input("attack 1");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::Struck(ActorId::new(1)))
+        );
+        session.input("woundlog");
+        assert!(session.notice.contains("Yao Lian"));
+        assert!(session.notice.contains("Legs"));
+        session.input("wounds");
+        assert!(session.notice.contains("Arm wounds: 0; leg wounds: 0"));
+        let prior = session.world.checkpoint();
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), prior);
+        assert_eq!(u16::from_le_bytes(prior[12..14].try_into().unwrap()), 23);
+        session.input("help");
+        assert!(session.notice.contains("C3.3"));
     }
 }

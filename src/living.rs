@@ -18,6 +18,7 @@ mod faction_agency_tests;
 mod information;
 #[cfg(test)]
 mod information_tests;
+mod injury;
 mod martial;
 mod meridian;
 mod navigation;
@@ -56,6 +57,7 @@ pub use information::{
     Dispute, DisputePhase, EventId, InfoEvent, InfoKnowledge, InfoLogEvent, InfoLogKind,
     InfoReport, Information, Provenance,
 };
+pub use injury::{Injuries, WoundEvent, WoundKind, Wounds};
 pub use martial::{Form, Lesson, Martial, MartialSkill};
 pub use meridian::{MeridianEvent, MeridianEventKind, MeridianState, Meridians};
 pub use npc::{Activity, Goal, Npc, NpcDefinition, Role};
@@ -144,6 +146,7 @@ pub enum Intent {
     DrawQi,
     CirculateQi,
     MendMeridians,
+    TreatWounds,
 }
 
 impl Intent {
@@ -206,6 +209,7 @@ pub enum Rejection {
     NoEvidence,
     Overtrained,
     MeridiansBlocked,
+    Hobbled,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -296,6 +300,7 @@ pub enum Outcome {
         blockage: u8,
     },
     MeridiansMended,
+    WoundTreated,
     Rejected(Rejection),
 }
 
@@ -380,6 +385,7 @@ pub struct World {
     contested: Option<Contested>,
     martial: Option<Martial>,
     meridians: Option<Meridians>,
+    injuries: Option<Injuries>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -406,6 +412,7 @@ enum Rules {
     SectCultivation,
     MartialMentorship,
     MeridianCultivation,
+    PersistentInjury,
 }
 
 impl Rules {
@@ -435,6 +442,7 @@ impl Rules {
                 | Self::SectCultivation
                 | Self::MartialMentorship
                 | Self::MeridianCultivation
+                | Self::PersistentInjury
         )
     }
 }
@@ -524,6 +532,10 @@ impl World {
         Self::seeded(seed, Rules::MeridianCultivation)
     }
 
+    pub fn persistent_injury(seed: u32) -> Self {
+        Self::seeded(seed, Rules::PersistentInjury)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -581,6 +593,7 @@ impl World {
                         | Rules::SectCultivation
                         | Rules::MartialMentorship
                         | Rules::MeridianCultivation
+                        | Rules::PersistentInjury
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -614,6 +627,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(Company::default),
             rivalry: matches!(
@@ -635,6 +649,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -655,6 +670,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(Politics::new),
             traffic: matches!(
@@ -674,6 +690,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -692,6 +709,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -707,6 +725,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -721,6 +740,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(Information::default),
             contested: matches!(
@@ -729,16 +749,25 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
             .then(|| {
                 Contested::new(matches!(
                     rules,
-                    Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
+                    Rules::SectCultivation
+                        | Rules::MartialMentorship
+                        | Rules::MeridianCultivation
+                        | Rules::PersistentInjury
                 ))
             }),
-            martial: matches!(rules, Rules::MartialMentorship | Rules::MeridianCultivation)
-                .then(|| Martial::new(scenario)),
-            meridians: (rules == Rules::MeridianCultivation).then(|| Meridians::new(scenario)),
+            martial: matches!(
+                rules,
+                Rules::MartialMentorship | Rules::MeridianCultivation | Rules::PersistentInjury
+            )
+            .then(|| Martial::new(scenario)),
+            meridians: matches!(rules, Rules::MeridianCultivation | Rules::PersistentInjury)
+                .then(|| Meridians::new(scenario)),
+            injuries: (rules == Rules::PersistentInjury).then(|| Injuries::new(scenario)),
         }
     }
 
@@ -888,6 +917,7 @@ impl World {
                     | Rules::SectCultivation
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -902,7 +932,10 @@ impl World {
         if matches!(intent, Intent::AttuneLot(_) | Intent::ChannelStrike(_))
             && !matches!(
                 self.rules,
-                Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
+                Rules::SectCultivation
+                    | Rules::MartialMentorship
+                    | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -916,6 +949,9 @@ impl World {
             Intent::DrawQi | Intent::CirculateQi | Intent::MendMeridians
         ) && self.meridians.is_none()
         {
+            return Err(StepError::ContestedCampaignRequired);
+        }
+        if intent == Intent::TreatWounds && self.injuries.is_none() {
             return Err(StepError::ContestedCampaignRequired);
         }
 
@@ -971,6 +1007,9 @@ impl World {
         match intent {
             Intent::Wait => unreachable!(),
             Intent::Move(direction) => {
+                if self.hobbled(PLAYER) {
+                    return Err(Rejection::Hobbled);
+                }
                 let destination = navigation::moved(self.player.position, direction)
                     .filter(|&position| self.walkable(position))
                     .ok_or(Rejection::Impassable)?;
@@ -1066,6 +1105,7 @@ impl World {
             Intent::DrawQi => self.draw_qi(),
             Intent::CirculateQi => self.circulate_qi(),
             Intent::MendMeridians => self.mend_meridians(),
+            Intent::TreatWounds => self.treat_wounds(),
         }
     }
 
@@ -1081,6 +1121,7 @@ impl World {
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
+                | Rules::PersistentInjury
         )
     }
 
@@ -1095,6 +1136,7 @@ impl World {
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
+                | Rules::PersistentInjury
         )
     }
 
@@ -1108,6 +1150,7 @@ impl World {
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
+                | Rules::PersistentInjury
         )
     }
 
@@ -1120,6 +1163,7 @@ impl World {
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
+                | Rules::PersistentInjury
         )
     }
 
@@ -1131,13 +1175,17 @@ impl World {
                 | Rules::SectCultivation
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
+                | Rules::PersistentInjury
         )
     }
 
     pub fn is_sect_cultivation(&self) -> bool {
         matches!(
             self.rules,
-            Rules::SectCultivation | Rules::MartialMentorship | Rules::MeridianCultivation
+            Rules::SectCultivation
+                | Rules::MartialMentorship
+                | Rules::MeridianCultivation
+                | Rules::PersistentInjury
         )
     }
 
@@ -1201,7 +1249,7 @@ impl World {
         } else {
             (STRIKE, Outcome::Struck(id))
         };
-        self.damage(PLAYER, id, damage, false);
+        self.damage(PLAYER, id, self.wounded_strike(PLAYER, damage), false);
         Ok(outcome)
     }
 

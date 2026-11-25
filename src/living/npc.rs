@@ -62,6 +62,7 @@ pub enum Goal {
     MeridianDraw,
     MeridianCirculate,
     MeridianCare,
+    SeekWoundCare,
     Report {
         recipient: ActorId,
         incident: IncidentId,
@@ -186,6 +187,7 @@ impl World {
         let retaliation = threat
             && npc.definition.responds_to_attack
             && npc.hp > 1
+            && !self.severe_wounds(id)
             && distance(npc.definition.home, self.player.position) <= PURSUIT_LEASH;
         let care = self.supply.shrine > 0
             && npc.hp < npc.definition.hp
@@ -272,6 +274,7 @@ impl World {
         let lot_goal = self.lot_goal(id);
         let martial_goal = self.martial_goal(npc);
         let meridian_goal = self.npc_meridian_goal(id);
+        let wound_goal = self.wound_goal(id);
         let teaches = self.is_hall_teacher(npc);
         let off_duty = !self.original_rules()
             && self.is_night()
@@ -335,6 +338,7 @@ impl World {
             ),
             (98, recovery),
             (97, lot_goal),
+            (if self.severe_wounds(id) { 99 } else { 90 }, wound_goal),
             (64, martial_goal),
             (
                 if meridian_goal == Some(Goal::MeridianCare) {
@@ -484,6 +488,7 @@ impl World {
             Goal::MeridianDraw | Goal::MeridianCirculate | Goal::MeridianCare => {
                 self.work_meridian(id, goal)
             }
+            Goal::SeekWoundCare => self.work_wound_care(id),
             Goal::Retreat => self.retreat(id),
             Goal::TendClinic => self.travel(id, scenario.clinic, 0),
             Goal::SeekCare => self.travel(id, scenario.clinic, 1),
@@ -572,7 +577,12 @@ impl World {
                         0
                     };
                     let damage = self.npc_martial_damage(id);
-                    self.damage(id, PLAYER, damage.saturating_sub(block), true);
+                    self.damage(
+                        id,
+                        PLAYER,
+                        self.wounded_strike(id, damage.saturating_sub(block)),
+                        true,
+                    );
                 } else if self.player.alive() {
                     self.travel(id, self.player.position, 1);
                 }
@@ -638,6 +648,9 @@ impl World {
     }
 
     fn retreat(&mut self, id: ActorId) {
+        if self.hobbled(id) {
+            return;
+        }
         let npc = &self.npcs[&id];
         let threat = self.player.position;
         let current = distance(npc.position, threat);
@@ -662,6 +675,9 @@ impl World {
     }
 
     pub(super) fn travel(&mut self, id: ActorId, destination: Position, reach: u32) {
+        if self.hobbled(id) {
+            return;
+        }
         if self.traffic.is_some() {
             self.travel_with_courtesy(id, destination, reach);
             return;

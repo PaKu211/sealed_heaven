@@ -207,7 +207,12 @@ impl World {
             return Err(Rejection::NoCargo);
         }
         state.script_charges -= 1;
-        self.damage(PLAYER, target, super::STRIKE, false);
+        self.damage(
+            PLAYER,
+            target,
+            self.wounded_strike(PLAYER, super::STRIKE),
+            false,
+        );
         Ok(Outcome::ChannelStruck(target))
     }
 

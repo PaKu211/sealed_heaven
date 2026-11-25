@@ -116,6 +116,9 @@ impl World {
     /// When all such routes are blocked, approach the static choke instead of
     /// freezing at a distant tile, and request a deterministic adjacent swap.
     pub(super) fn travel_with_courtesy(&mut self, id: ActorId, destination: Position, reach: u32) {
+        if self.hobbled(id) {
+            return;
+        }
         let position = self.npcs[&id].position;
         if distance(position, destination) <= reach {
             self.traffic
@@ -178,7 +181,10 @@ impl World {
 
     fn can_yield(&self, blocker: ActorId, mover: ActorId) -> bool {
         let npc = &self.npcs[&blocker];
-        if !npc.alive() || self.social.relationship(blocker, mover).refuses_aid() {
+        if !npc.alive()
+            || self.hobbled(blocker)
+            || self.social.relationship(blocker, mover).refuses_aid()
+        {
             return false;
         }
         if matches!(

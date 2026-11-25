@@ -394,6 +394,7 @@ pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
             | Rules::SectCultivation
             | Rules::MartialMentorship
             | Rules::MeridianCultivation
+            | Rules::PersistentInjury
     ) {
         return if seed & 1 == 0 {
             &RIDGE_POLITICS

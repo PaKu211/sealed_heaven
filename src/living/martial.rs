@@ -234,7 +234,7 @@ impl World {
             .unwrap();
         skill.strain += exertion;
         skill.parry = parry;
-        self.damage(PLAYER, target, damage, false);
+        self.damage(PLAYER, target, self.wounded_strike(PLAYER, damage), false);
         Ok(Outcome::TechniqueStruck { target, form })
     }
 

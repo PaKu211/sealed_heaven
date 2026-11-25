@@ -489,6 +489,7 @@ impl World {
                 super::Rules::SectCultivation
                     | super::Rules::MartialMentorship
                     | super::Rules::MeridianCultivation
+                    | super::Rules::PersistentInjury
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {
@@ -543,6 +544,7 @@ impl World {
                 self.social.recovery_cargo.remove(&target);
             }
         }
+        self.record_wound(target, damage, hp - damage, amount);
     }
 
     /// A body is robbed where it lies. Only people who can see both the player

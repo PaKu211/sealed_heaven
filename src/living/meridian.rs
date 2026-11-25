@@ -111,7 +111,8 @@ impl World {
             return Err(Rejection::InsufficientQi);
         }
         let strained = self.martial().unwrap().skills[&PLAYER].strain >= 2
-            || self.player.hp <= super::PLAYER_HP / 2;
+            || self.player.hp <= super::PLAYER_HP / 2
+            || self.severe_wounds(PLAYER);
         let state = self
             .meridians
             .as_mut()
@@ -246,7 +247,8 @@ impl World {
                     return;
                 }
                 let strained = self.martial().unwrap().skills[&actor].strain >= 2
-                    || self.npcs[&actor].hp <= self.npcs[&actor].definition.hp / 2;
+                    || self.npcs[&actor].hp <= self.npcs[&actor].definition.hp / 2
+                    || self.severe_wounds(actor);
                 let state = self
                     .meridians
                     .as_mut()
