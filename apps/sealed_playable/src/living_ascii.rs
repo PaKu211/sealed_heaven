@@ -7,11 +7,13 @@ use std::{
 };
 
 use sealed_sim::living::{
-    ActorId, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent, ContractEventKind,
-    Direction, DisputePhase, Duty, FORM_QI_COST, FactionEventKind, Goal, HallRank, Holder,
-    InfoLogKind, Intent, Invitation, JourneyEvent, KnowledgeSource, LoadError, LotEventKind,
-    MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER, PoliticalEventKind, Position, Provenance,
-    Region, Rejection, ReliefEventKind, Role, SectEventKind, StepError, TrafficEventKind, World,
+    ActorId, AgencyEventKind, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent,
+    ContractEventKind, DecisionReason, Direction, DisputePhase, Duty, FORM_QI_COST,
+    FactionEventKind, Goal, HallRank, Holder, InfoLogKind, Intent, Invitation, JourneyEvent,
+    KnowledgeSource, LoadError, LotEventKind, MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER,
+    PoliticalEventKind, Position, Provenance, Region, Rejection, ReliefEventKind, Role,
+    SectEventKind, StepError,
+    TrafficEventKind, World,
 };
 
 use crate::{clock, locale::Locale, persistence};
@@ -36,7 +38,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.injuries().is_some() {
+        if self.world.character_agency().is_some() {
+            World::autonomous_agency(seed)
+        } else if self.world.injuries().is_some() {
             World::persistent_injury(seed)
         } else if self.world.meridians().is_some() {
             World::meridian_cultivation(seed)
@@ -111,6 +115,7 @@ impl Session {
                         | "channel"
                         | "drill"
                         | "technique"
+                        | "agency"
                 ))
         {
             self.notice = text(
@@ -169,6 +174,151 @@ impl Session {
                     .collect();
                 self.notice = if lines.is_empty() {
                     "No witnessed wounds.".into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
+            "agency" if self.world.character_agency().is_some() => {
+                let Some(id) = argument.and_then(|value| value.parse::<u32>().ok()) else {
+                    self.notice = "agency <visible npc>".into();
+                    return true;
+                };
+                let id = ActorId::new(id);
+                let Some(npc) = self.world.npc(id).filter(|npc| {
+                    npc.alive() && self.world.player_sees(npc.position)
+                }) else {
+                    self.notice = text(
+                        self.locale,
+                        "That character is not visible.",
+                        "Tokoh itu tidak terlihat.",
+                    )
+                    .into();
+                    return true;
+                };
+                let observed = self
+                    .world
+                    .character_agency()
+                    .unwrap()
+                    .history
+                    .iter()
+                    .rev()
+                    .find(|event| {
+                        event.actor == id
+                            && event.witnessed
+                            && event.kind == AgencyEventKind::GoalChanged
+                    });
+                self.notice = observed.map_or_else(
+                    || {
+                        format!(
+                            "{}: {}",
+                            npc.definition.name,
+                            text(
+                                self.locale,
+                                "you have not witnessed a change of purpose",
+                                "kamu belum menyaksikan perubahan tujuannya",
+                            )
+                        )
+                    },
+                    |event| {
+                        format!(
+                            "{}: {} {} — {}",
+                            npc.definition.name,
+                            text(self.locale, "you observed", "kamu menyaksikan"),
+                            event
+                                .goal
+                                .map(|goal| goal_label(self.locale, goal))
+                                .unwrap_or("?"),
+                            event
+                                .reason
+                                .map(|reason| decision_reason_label(self.locale, reason))
+                                .unwrap_or("?")
+                        )
+                    },
+                );
+                return true;
+            }
+            "agencylog" if self.world.character_agency().is_some() => {
+                let lines: Vec<_> = self
+                    .world
+                    .character_agency()
+                    .unwrap()
+                    .history
+                    .iter()
+                    .rev()
+                    .filter(|event| event.witnessed)
+                    .take(12)
+                    .map(|event| {
+                        let actor = actor_name(self.locale, &self.world, event.actor);
+                        match event.kind {
+                            AgencyEventKind::GoalChanged => format!(
+                                "#{} t{} {actor}: {} ({})",
+                                event.id,
+                                event.at,
+                                event.goal.map(|goal| goal_label(self.locale, goal)).unwrap_or("?"),
+                                event
+                                    .reason
+                                    .map(|reason| decision_reason_label(self.locale, reason))
+                                    .unwrap_or("?")
+                            ),
+                            AgencyEventKind::WorkGathered => format!(
+                                "#{} t{} {actor} {}",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "gathered work herbs",
+                                    "memetik herba untuk bekerja",
+                                )
+                            ),
+                            AgencyEventKind::WorkSold => format!(
+                                "#{} t{} {actor} {} {} {}",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "sold work herbs for",
+                                    "menjual herba kerja senilai",
+                                ),
+                                event.amount,
+                                text(self.locale, "coin(s)", "koin")
+                            ),
+                            AgencyEventKind::CarePaid => format!(
+                                "#{} t{} {actor} {} {} {}",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "paid",
+                                    "membayar",
+                                ),
+                                event.amount,
+                                text(
+                                    self.locale,
+                                    "coin(s) for wound care",
+                                    "koin untuk perawatan luka",
+                                )
+                            ),
+                            AgencyEventKind::CareBartered => format!(
+                                "#{} t{} {actor} {}",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "bartered an herb for wound care",
+                                    "menukar satu herba untuk perawatan luka",
+                                )
+                            ),
+                        }
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "You have witnessed no character decisions.",
+                        "Kamu belum menyaksikan keputusan tokoh.",
+                    )
+                    .into()
                 } else {
                     lines.join("\n")
                 };
@@ -669,7 +819,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.injuries().is_some() {
+                self.notice = if self.world.character_agency().is_some() {
+                    text(self.locale,
+                        "C3.4: Injured NPCs without treatment money can gather and sell physical herbs, pay a present medic, recover, and resume interrupted ambitions. agency <visible npc> explains current circumstances; agencylog lists only decisions and transactions you witnessed. --c33 keeps free-care C3.3.",
+                        "C3.4: NPC terluka tanpa biaya perawatan dapat memetik dan menjual herba nyata, membayar tabib yang hadir, pulih, lalu melanjutkan ambisi yang terputus. agency <npc terlihat> menjelaskan keadaan saat ini; agencylog hanya mencatat keputusan dan transaksi yang kamu saksikan. --c33 mempertahankan C3.3 dengan perawatan gratis.")
+                } else if self.world.injuries().is_some() {
                     text(self.locale,
                         "C3.3: Real blows can leave lasting arm or leg wounds. Severe arm wounds weaken strikes; severe leg wounds slow movement on alternating ticks. Injured NPCs retreat and seek care. At a staffed clinic treatwounds spends one shrine herb and heals one wound; wounds and woundlog show your condition and witnessed events. --c32 keeps C3.2.",
                         "C3.3: Pukulan nyata dapat meninggalkan luka lengan atau kaki. Luka lengan berat melemahkan serangan; luka kaki berat memperlambat gerak setiap dua giliran. NPC terluka mundur dan mencari perawatan. Di klinik yang dijaga treatwounds memakai satu herba kuil dan menyembuhkan satu luka; wounds dan woundlog menunjukkan kondisi serta peristiwa yang disaksikan. --c32 untuk C3.2.")
@@ -2391,6 +2545,14 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::MeridianCirculate => ("circulating Qi", "mengalirkan Qi"),
         Goal::MeridianCare => ("seeking meridian care", "mencari perawatan meridian"),
         Goal::SeekWoundCare => ("seeking wound care", "mencari perawatan luka"),
+        Goal::GatherForCare => (
+            "working to afford treatment",
+            "bekerja untuk biaya perawatan",
+        ),
+        Goal::SellForCare => (
+            "selling work herbs for treatment",
+            "menjual herba kerja untuk perawatan",
+        ),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
         Goal::Retaliate => ("retaliating", "membalas serangan"),
@@ -2824,7 +2986,35 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 23);
+    run_campaign(debug_world, 24);
+}
+
+fn decision_reason_label(locale: Locale, reason: DecisionReason) -> &'static str {
+    let (en, id) = match reason {
+        DecisionReason::ImmediateDanger => ("immediate danger", "bahaya langsung"),
+        DecisionReason::PhysicalRecovery => ("physical recovery", "pemulihan tubuh"),
+        DecisionReason::TreatmentFunds => ("treatment costs", "biaya perawatan"),
+        DecisionReason::MedicalDuty => ("medical duty", "tugas pengobatan"),
+        DecisionReason::Cultivation => ("cultivation", "kultivasi"),
+        DecisionReason::MartialAmbition => ("martial ambition", "ambisi bela diri"),
+        DecisionReason::InstitutionalObligation => (
+            "institutional obligation",
+            "kewajiban kelembagaan",
+        ),
+        DecisionReason::KnownOpportunity => ("a known opportunity", "peluang yang diketahui"),
+        DecisionReason::Fatigue => ("fatigue", "kelelahan"),
+        DecisionReason::Livelihood => ("livelihood", "mata pencaharian"),
+        DecisionReason::Routine => ("routine", "rutinitas"),
+        DecisionReason::ResumingAmbition => (
+            "resuming an interrupted pursuit",
+            "melanjutkan tujuan yang terputus",
+        ),
+    };
+    text(locale, en, id)
+}
+
+pub(crate) fn run_c33() {
+    run_campaign(false, 23);
 }
 
 pub(crate) fn run_c32() {
@@ -2919,7 +3109,9 @@ fn run_campaign(debug_world: bool, revision: u16) {
         20 => "checkpoint.c30",
         21 => "checkpoint.c31",
         22 => "checkpoint.c32",
-        _ => "checkpoint.c33",
+        23 => "checkpoint.c33",
+        24 => "checkpoint.c34",
+        _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
     session.world = match revision {
@@ -2941,7 +3133,9 @@ fn run_campaign(debug_world: bool, revision: u16) {
         20 => World::sect_cultivation(0),
         21 => World::martial_mentorship(0),
         22 => World::meridian_cultivation(0),
-        _ => World::persistent_injury(0),
+        23 => World::persistent_injury(0),
+        24 => World::autonomous_agency(0),
+        _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
@@ -4075,5 +4269,91 @@ mod tests {
         assert_eq!(u16::from_le_bytes(prior[12..14].try_into().unwrap()), 23);
         session.input("help");
         assert!(session.notice.contains("C3.3"));
+    }
+
+    #[test]
+    fn c34_ascii_public_injury_drives_work_paid_care_and_private_observation() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("agency.c34"));
+        session.world = World::autonomous_agency(0);
+        for command in ["w", "d", "d", "attack 1"] {
+            session.input(command);
+        }
+        for (command, times) in [
+            ("w", 3),
+            ("d", 9),
+            ("s", 2),
+            ("w", 2),
+            ("a", 6),
+            ("s", 3),
+            ("a", 2),
+        ] {
+            for _ in 0..times {
+                session.input(command);
+            }
+        }
+        session.input("attack 1");
+        assert!(session.world.injuries().unwrap().people[&ActorId::new(1)].injured());
+
+        let observed = session.world.checkpoint();
+        session.input("agencylog");
+        assert!(!session.notice.is_empty());
+        assert_eq!(session.world.checkpoint(), observed);
+
+        let mut unfinished_checkpoint = None;
+        for _ in 0..300 {
+            session.input("wait");
+            let patient = session.world.character_agency().unwrap().people[&ActorId::new(1)];
+            if unfinished_checkpoint.is_none()
+                && patient.coins > 0
+                && session.world.injuries().unwrap().people[&ActorId::new(1)].injured()
+            {
+                let checkpoint = session.world.checkpoint();
+                assert_eq!(World::restore(&checkpoint).unwrap(), session.world);
+                unfinished_checkpoint = Some(checkpoint);
+            }
+            if !session.world.injuries().unwrap().people[&ActorId::new(1)].injured() {
+                break;
+            }
+        }
+        assert!(unfinished_checkpoint.is_some());
+        assert!(!session.world.injuries().unwrap().people[&ActorId::new(1)].injured());
+        let history = &session.world.character_agency().unwrap().history;
+        assert!(history.iter().any(|event| {
+            event.actor == ActorId::new(1) && event.kind == AgencyEventKind::WorkGathered
+        }));
+        assert!(history.iter().any(|event| {
+            event.actor == ActorId::new(1)
+                && matches!(event.kind, AgencyEventKind::CarePaid | AgencyEventKind::CareBartered)
+        }));
+
+        let inspected = session.world.checkpoint();
+        session.input("agency 1");
+        assert!(!session.notice.contains("coin(s)"));
+        assert!(!session.notice.contains("ambition"));
+        assert_eq!(session.world.checkpoint(), inspected);
+        session.input("lang id");
+        session.input("agencylog");
+        assert!(!session.notice.contains("coin(s)"));
+        assert!(!session.notice.contains("Some("));
+        session.input("lang en");
+
+        session.input("agency 34");
+        assert!(session.notice.contains("not visible"));
+        let saved = session.world.checkpoint();
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), saved);
+        assert_eq!(u16::from_le_bytes(saved[12..14].try_into().unwrap()), 24);
+        session.input("help");
+        assert!(session.notice.contains("C3.4"));
+
+        let c33 = World::persistent_injury(0).checkpoint();
+        assert_eq!(u16::from_le_bytes(c33[12..14].try_into().unwrap()), 23);
+        assert_eq!(
+            u16::from_le_bytes(session.new_seeded_world(7).checkpoint()[12..14].try_into().unwrap()),
+            24
+        );
     }
 }

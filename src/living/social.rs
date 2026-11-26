@@ -490,6 +490,7 @@ impl World {
                     | super::Rules::MartialMentorship
                     | super::Rules::MeridianCultivation
                     | super::Rules::PersistentInjury
+                    | super::Rules::AutonomousAgency
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

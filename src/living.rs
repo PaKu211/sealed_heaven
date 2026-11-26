@@ -1,6 +1,7 @@
 //! Deterministic settlement simulation. The authored scenario supplies locations and
 //! actor capabilities; a turn has no renderer, wall clock, or external dependency.
 
+mod character_agency;
 mod checkpoint;
 mod company;
 #[cfg(test)]
@@ -43,6 +44,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub use crate::ActorId;
 pub use crate::player5::{Direction, Position};
+pub use character_agency::{
+    AgencyEvent, AgencyEventKind, Ambition, CLINIC_FEE, CharacterAgency, CharacterState,
+    DecisionReason,
+};
 pub use checkpoint::{LoadError, MAX_SAVE_BYTES};
 pub use company::{Company, CompanyEvent, Invitation, Journey, JourneyEvent};
 pub use contested::{Contested, Good, Holder, Lot, LotEvent, LotEventKind};
@@ -386,6 +391,7 @@ pub struct World {
     martial: Option<Martial>,
     meridians: Option<Meridians>,
     injuries: Option<Injuries>,
+    character_agency: Option<CharacterAgency>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -413,6 +419,7 @@ enum Rules {
     MartialMentorship,
     MeridianCultivation,
     PersistentInjury,
+    AutonomousAgency,
 }
 
 impl Rules {
@@ -443,6 +450,7 @@ impl Rules {
                 | Self::MartialMentorship
                 | Self::MeridianCultivation
                 | Self::PersistentInjury
+                | Self::AutonomousAgency
         )
     }
 }
@@ -536,6 +544,10 @@ impl World {
         Self::seeded(seed, Rules::PersistentInjury)
     }
 
+    pub fn autonomous_agency(seed: u32) -> Self {
+        Self::seeded(seed, Rules::AutonomousAgency)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -594,6 +606,7 @@ impl World {
                         | Rules::MartialMentorship
                         | Rules::MeridianCultivation
                         | Rules::PersistentInjury
+                        | Rules::AutonomousAgency
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -628,6 +641,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(Company::default),
             rivalry: matches!(
@@ -650,6 +664,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -671,6 +686,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(Politics::new),
             traffic: matches!(
@@ -691,6 +707,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -710,6 +727,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -726,6 +744,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -741,6 +760,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(Information::default),
             contested: matches!(
@@ -750,6 +770,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(|| {
                 Contested::new(matches!(
@@ -758,16 +779,26 @@ impl World {
                         | Rules::MartialMentorship
                         | Rules::MeridianCultivation
                         | Rules::PersistentInjury
+                        | Rules::AutonomousAgency
                 ))
             }),
             martial: matches!(
                 rules,
-                Rules::MartialMentorship | Rules::MeridianCultivation | Rules::PersistentInjury
+                Rules::MartialMentorship
+                    | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
             .then(|| Martial::new(scenario)),
-            meridians: matches!(rules, Rules::MeridianCultivation | Rules::PersistentInjury)
-                .then(|| Meridians::new(scenario)),
-            injuries: (rules == Rules::PersistentInjury).then(|| Injuries::new(scenario)),
+            meridians: matches!(
+                rules,
+                Rules::MeridianCultivation | Rules::PersistentInjury | Rules::AutonomousAgency
+            )
+            .then(|| Meridians::new(scenario)),
+            injuries: matches!(rules, Rules::PersistentInjury | Rules::AutonomousAgency)
+                .then(|| Injuries::new(scenario)),
+            character_agency: (rules == Rules::AutonomousAgency)
+                .then(|| CharacterAgency::new(scenario)),
         }
     }
 
@@ -918,6 +949,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -936,6 +968,7 @@ impl World {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -988,6 +1021,7 @@ impl World {
         self.observe_player_death();
         self.queue_reports();
         self.queue_info_reports();
+        self.reconcile_character_agency_inventory();
         if let Some(traffic) = self.traffic.as_mut() {
             traffic.finish_tick();
         }
@@ -1122,6 +1156,7 @@ impl World {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         )
     }
 
@@ -1137,6 +1172,7 @@ impl World {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         )
     }
 
@@ -1151,6 +1187,7 @@ impl World {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         )
     }
 
@@ -1164,6 +1201,7 @@ impl World {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         )
     }
 
@@ -1176,6 +1214,7 @@ impl World {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         )
     }
 
@@ -1186,6 +1225,7 @@ impl World {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         )
     }
 

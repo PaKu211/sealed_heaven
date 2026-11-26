@@ -35,6 +35,8 @@ pub struct Traffic {
     pub history: Vec<TrafficEvent>,
     /// Only a turn-local reservation; empty at every committed boundary.
     committed: BTreeSet<ActorId>,
+    /// A medic may commit at most one consequential care action per turn.
+    care_providers: BTreeSet<ActorId>,
 }
 
 impl Traffic {
@@ -44,10 +46,12 @@ impl Traffic {
 
     pub(super) fn begin_tick(&mut self) {
         self.committed.clear();
+        self.care_providers.clear();
     }
 
     pub(super) fn finish_tick(&mut self) {
         self.committed.clear();
+        self.care_providers.clear();
     }
 
     pub(super) fn was_committed(&self, id: ActorId) -> bool {
@@ -56,6 +60,14 @@ impl Traffic {
 
     pub(super) fn mark_committed(&mut self, id: ActorId) {
         self.committed.insert(id);
+    }
+
+    pub(super) fn care_was_committed(&self, id: ActorId) -> bool {
+        self.care_providers.contains(&id)
+    }
+
+    pub(super) fn mark_care_committed(&mut self, id: ActorId) {
+        self.care_providers.insert(id);
     }
 
     fn clear_stall(&mut self, id: ActorId) {

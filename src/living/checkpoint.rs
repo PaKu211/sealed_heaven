@@ -6,13 +6,13 @@
 use crate::encoding::sha256;
 
 use super::{
-    ActorId, Allegiance, AuditFinding, Background, Company, ContractEventKind, ContractMemory,
-    ContractPhase, Contracts, Direction, DisputePhase, Duty, FactionAgency, FactionEventKind,
-    FactionPhase, Form, Goal, Good, Holder, InfoLogKind, Information, Intent, Invitation,
-    JourneyEvent, KnowledgeSource, LotEventKind, MAX_TICKS, MeridianEventKind, Need, Outcome,
-    PoliticalEventKind, Politics, Position, Provenance, Region, Rejection, Relief, ReliefEventKind,
-    ReliefPhase, Rivalry, Role, Rules, Scenario, School, SectEventKind, Traffic, TrafficEventKind,
-    World, WoundKind,
+    ActorId, AgencyEventKind, Allegiance, Ambition, AuditFinding, Background, Company,
+    ContractEventKind, ContractMemory, ContractPhase, Contracts, DecisionReason, Direction,
+    DisputePhase, Duty, FactionAgency, FactionEventKind, FactionPhase, Form, Goal, Good, Holder,
+    InfoLogKind, Information, Intent, Invitation, JourneyEvent, KnowledgeSource, LotEventKind,
+    MAX_TICKS, MeridianEventKind, Need, Outcome, PoliticalEventKind, Politics, Position,
+    Provenance, Region, Rejection, Relief, ReliefEventKind, ReliefPhase, Rivalry, Role, Rules,
+    Scenario, School, SectEventKind, Traffic, TrafficEventKind, World, WoundKind,
 };
 
 const MAGIC: &[u8; 12] = b"SH:C10:WORLD";
@@ -59,6 +59,7 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::MartialMentorship => 21,
         Rules::MeridianCultivation => 22,
         Rules::PersistentInjury => 23,
+        Rules::AutonomousAgency => 24,
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
@@ -107,6 +108,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         21 => Rules::MartialMentorship,
         22 => Rules::MeridianCultivation,
         23 => Rules::PersistentInjury,
+        24 => Rules::AutonomousAgency,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -197,6 +199,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::Invite(actor)
@@ -223,6 +226,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::Provision(actor)
@@ -249,6 +253,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::Part(actor)
@@ -274,6 +279,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::OfferAccord
@@ -299,6 +305,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::SupportHall
@@ -323,6 +330,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::PledgeLodge
@@ -347,6 +355,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::AidLodge
@@ -371,6 +380,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::RenounceLodge
@@ -388,6 +398,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::Ask(actor)
@@ -405,6 +416,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::Examine
@@ -422,6 +434,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -439,6 +452,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::Take(actor)
@@ -453,6 +467,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -469,6 +484,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::ClaimLot(value)
@@ -481,6 +497,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -493,6 +510,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::AttuneLot(value)
@@ -504,6 +522,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -511,7 +530,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (35, _)
             if matches!(
                 rules,
-                Rules::MartialMentorship | Rules::MeridianCultivation | Rules::PersistentInjury
+                Rules::MartialMentorship
+                    | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::Drill(actor)
@@ -519,7 +541,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (36, _)
             if matches!(
                 rules,
-                Rules::MartialMentorship | Rules::MeridianCultivation | Rules::PersistentInjury
+                Rules::MartialMentorship
+                    | Rules::MeridianCultivation
+                    | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -531,6 +556,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (38, 0) if rules == Rules::PersistentInjury => Intent::CirculateQi,
         (39, 0) if rules == Rules::PersistentInjury => Intent::MendMeridians,
         (40, 0) if rules == Rules::PersistentInjury => Intent::TreatWounds,
+        (37, 0) if rules == Rules::AutonomousAgency => Intent::DrawQi,
+        (38, 0) if rules == Rules::AutonomousAgency => Intent::CirculateQi,
+        (39, 0) if rules == Rules::AutonomousAgency => Intent::MendMeridians,
+        (40, 0) if rules == Rules::AutonomousAgency => Intent::TreatWounds,
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -562,6 +591,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::MartialMentorship => b"SH:C10:RULES:v21".to_vec(),
         Rules::MeridianCultivation => b"SH:C10:RULES:v22".to_vec(),
         Rules::PersistentInjury => b"SH:C10:RULES:v23".to_vec(),
+        Rules::AutonomousAgency => b"SH:C10:RULES:v24".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -644,6 +674,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::MartialMentorship
             | Rules::MeridianCultivation
             | Rules::PersistentInjury
+            | Rules::AutonomousAgency
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -683,6 +714,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::MartialMentorship => b"SH:C10:STATE:v21".to_vec(),
         Rules::MeridianCultivation => b"SH:C10:STATE:v22".to_vec(),
         Rules::PersistentInjury => b"SH:C10:STATE:v23".to_vec(),
+        Rules::AutonomousAgency => b"SH:C10:STATE:v24".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -773,6 +805,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -846,6 +879,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::MartialMentorship
             | Rules::MeridianCultivation
             | Rules::PersistentInjury
+            | Rules::AutonomousAgency
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -875,6 +909,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::MartialMentorship
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -911,6 +946,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::MartialMentorship
             | Rules::MeridianCultivation
             | Rules::PersistentInjury
+            | Rules::AutonomousAgency
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -988,6 +1024,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::MartialMentorship
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
+                | Rules::AutonomousAgency
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1065,6 +1102,46 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             out.position(event.site);
             out.u8(u8::from(event.witnessed));
         }
+    }
+    if let Some(agency) = world.character_agency() {
+        out.count(agency.people.len());
+        for (&actor, state) in &agency.people {
+            out.actor(actor);
+            out.u32(state.coins);
+            out.u8(state.livelihood_herbs);
+            out.ambition(state.ambition);
+            out.u8(u8::from(state.suspended.is_some()));
+            if let Some(goal) = state.suspended {
+                out.goal(goal);
+            }
+        }
+        out.u32(agency.clinic_coins);
+        out.count(agency.history.len());
+        for event in &agency.history {
+            out.u32(event.id);
+            out.u64(event.at);
+            out.actor(event.actor);
+            out.u8(match event.kind {
+                AgencyEventKind::GoalChanged => 0,
+                AgencyEventKind::WorkGathered => 1,
+                AgencyEventKind::WorkSold => 2,
+                AgencyEventKind::CarePaid => 3,
+                AgencyEventKind::CareBartered => 4,
+            });
+            out.u8(u8::from(event.goal.is_some()));
+            if let Some(goal) = event.goal {
+                out.goal(goal);
+            }
+            out.u8(u8::from(event.reason.is_some()));
+            if let Some(reason) = event.reason {
+                out.decision_reason(reason);
+            }
+            out.u32(event.amount);
+            out.optional_actor(event.other);
+            out.position(event.site);
+            out.u8(u8::from(event.witnessed));
+        }
+        out.u32(agency.next_event);
     }
     out.count(world.journal.len());
     for &intent in &world.journal {
@@ -1539,6 +1616,33 @@ impl Wire {
         }
     }
 
+    fn ambition(&mut self, ambition: Ambition) {
+        self.u8(match ambition {
+            Ambition::CommunityService => 0,
+            Ambition::Prosperity => 1,
+            Ambition::MartialMastery => 2,
+            Ambition::Cultivation => 3,
+            Ambition::InstitutionalDuty => 4,
+        });
+    }
+
+    fn decision_reason(&mut self, reason: DecisionReason) {
+        self.u8(match reason {
+            DecisionReason::ImmediateDanger => 0,
+            DecisionReason::PhysicalRecovery => 1,
+            DecisionReason::TreatmentFunds => 2,
+            DecisionReason::MedicalDuty => 3,
+            DecisionReason::Cultivation => 4,
+            DecisionReason::MartialAmbition => 5,
+            DecisionReason::InstitutionalObligation => 6,
+            DecisionReason::KnownOpportunity => 7,
+            DecisionReason::Fatigue => 8,
+            DecisionReason::Livelihood => 9,
+            DecisionReason::Routine => 10,
+            DecisionReason::ResumingAmbition => 11,
+        });
+    }
+
     fn intent(&mut self, intent: Intent) {
         let (tag, payload) = match intent {
             Intent::Wait => (0, 0),
@@ -1639,6 +1743,8 @@ impl Wire {
             Goal::MeridianCirculate => 44,
             Goal::MeridianCare => 45,
             Goal::SeekWoundCare => 46,
+            Goal::GatherForCare => 47,
+            Goal::SellForCare => 48,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),

@@ -142,40 +142,73 @@ impl World {
 
     pub(super) fn wound_goal(&self, actor: ActorId) -> Option<Goal> {
         let wounds = self.injuries()?.people[&actor];
-        if !wounds.injured() || !self.npcs[&actor].alive() || self.supply.shrine == 0 {
+        if !wounds.injured()
+            || !self.npcs[&actor].alive()
+            || (self.character_agency().is_none() && self.supply.shrine == 0)
+        {
             return None;
         }
-        self.npcs
-            .values()
-            .any(|npc| {
-                npc.alive()
-                    && npc.definition.role == Role::Medic
-                    && !self.social.relationship(npc.id(), actor).refuses_aid()
-            })
-            .then_some(Goal::SeekWoundCare)
+        let available = self.npcs.values().any(|npc| {
+            npc.alive()
+                && npc.definition.role == Role::Medic
+                && !self.social.relationship(npc.id(), actor).refuses_aid()
+        });
+        available.then(|| {
+            if self.character_agency().is_some() {
+                self.personal_care_goal(actor)
+            } else {
+                Goal::SeekWoundCare
+            }
+        })
     }
 
     pub(super) fn work_wound_care(&mut self, actor: ActorId) {
         let site = self.scenario.clinic;
+        let self_attending = self.character_agency().is_some()
+            && self.npcs[&actor].definition.role == Role::Medic
+            && !self.social.relationship(actor, actor).refuses_aid();
         if !in_reach(self.npcs[&actor].position, site) {
             self.travel(actor, site, 1);
             return;
         }
-        if self.supply.shrine == 0
-            || !self.npcs.values().any(|npc| {
+        let medic = self
+            .npcs
+            .values()
+            .filter(|npc| {
                 npc.alive()
                     && npc.definition.role == Role::Medic
-                    && npc.position == site
+                    && (npc.position == site
+                        || (self_attending && npc.id() == actor && in_reach(npc.position, site)))
                     && !self.social.relationship(npc.id(), actor).refuses_aid()
+                    && (self.character_agency().is_none()
+                        || !self
+                            .traffic()
+                            .expect("agency inherits traffic")
+                            .care_was_committed(npc.id()))
             })
+            .map(|npc| npc.id())
+            .min();
+        if !self.injuries().unwrap().people[&actor].injured()
+            || medic.is_none()
+            || (self.character_agency().is_none() && self.supply.shrine == 0)
         {
             return;
         }
+        if !self.pay_for_npc_care(actor, medic.unwrap()) {
+            return;
+        }
+        debug_assert!(self.supply.shrine > 0);
         self.supply.shrine -= 1;
         self.supply.consumed += 1;
         let hp = self.npcs[&actor].hp;
         self.npcs.get_mut(&actor).unwrap().hp = (hp + 1).min(self.npcs[&actor].definition.hp);
         self.reduce_wound(actor);
+        if self.character_agency().is_some() {
+            self.traffic
+                .as_mut()
+                .expect("agency inherits traffic")
+                .mark_care_committed(medic.unwrap());
+        }
     }
 
     fn reduce_wound(&mut self, actor: ActorId) {

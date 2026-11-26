@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 
+use super::character_agency::{Ambition, Decision, DecisionReason, ambition_reason, decision_for};
 use super::navigation::{distance, in_reach, moved, next_step};
 use super::{
     ActorId, BREATH_MASTERY, GUARD_BLOCK, IncidentId, KnowledgeSource, PLAYER, Position, Region,
@@ -63,6 +64,8 @@ pub enum Goal {
     MeridianCirculate,
     MeridianCare,
     SeekWoundCare,
+    GatherForCare,
+    SellForCare,
     Report {
         recipient: ActorId,
         incident: IncidentId,
@@ -154,16 +157,25 @@ impl World {
             .npcs
             .values()
             .filter(|npc| npc.alive())
-            .map(|npc| (npc.id(), self.choose_goal(npc)))
+            .map(|npc| (npc.id(), self.choose_decision(npc)))
             .collect();
-        for (id, goal) in plans {
+        for (id, decision) in plans {
             if self
                 .traffic()
                 .is_some_and(|traffic| traffic.was_committed(id))
             {
                 continue;
             }
-            self.execute_goal(id, goal, guarding);
+            self.commit_decision(id, decision);
+            self.execute_goal(id, decision.goal, guarding);
+            if self.character_agency().is_some()
+                && matches!(decision.goal, Goal::Treat(_) | Goal::FieldCare)
+            {
+                self.traffic
+                    .as_mut()
+                    .expect("agency inherits traffic")
+                    .mark_care_committed(id);
+            }
             // A committed NPC may have traded, treated or reported without
             // walking. It still cannot be displaced by a later actor this turn.
             if let Some(traffic) = self.traffic.as_mut() {
@@ -172,7 +184,12 @@ impl World {
         }
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn choose_goal(&self, npc: &Npc) -> Goal {
+        self.choose_decision(npc).goal
+    }
+
+    pub(super) fn choose_decision(&self, npc: &Npc) -> Decision {
         let id = npc.id();
         let threat = self.player.alive()
             && self.perceives(npc.position, self.player.position)
@@ -275,6 +292,27 @@ impl World {
         let martial_goal = self.martial_goal(npc);
         let meridian_goal = self.npc_meridian_goal(id);
         let wound_goal = self.wound_goal(id);
+        let ambition = self
+            .character_agency()
+            .map(|agency| agency.people[&id].ambition);
+        let suspended = self
+            .character_agency()
+            .and_then(|agency| agency.people[&id].suspended);
+        let martial_priority = if ambition == Some(Ambition::MartialMastery) {
+            68
+        } else {
+            64
+        };
+        let cultivation_priority = if ambition == Some(Ambition::Cultivation) {
+            69
+        } else {
+            65
+        };
+        let wound_reason = if matches!(wound_goal, Some(Goal::GatherForCare | Goal::SellForCare)) {
+            DecisionReason::TreatmentFunds
+        } else {
+            DecisionReason::PhysicalRecovery
+        };
         let teaches = self.is_hall_teacher(npc);
         let off_duty = !self.original_rules()
             && self.is_night()
@@ -330,54 +368,113 @@ impl World {
             || audit_goal.is_some()
             || dispute_goal.is_some();
         let plans = [
-            (100, retaliation.then_some(Goal::Retaliate)),
-            (100, (threat && !retaliation).then_some(Goal::Retreat)),
+            (
+                100,
+                retaliation.then_some(Goal::Retaliate),
+                DecisionReason::ImmediateDanger,
+            ),
+            (
+                100,
+                (threat && !retaliation).then_some(Goal::Retreat),
+                DecisionReason::ImmediateDanger,
+            ),
             (
                 99,
                 (recovery.is_some() && npc.fatigue >= 36).then_some(Goal::CampRest),
+                DecisionReason::PhysicalRecovery,
             ),
-            (98, recovery),
-            (97, lot_goal),
-            (if self.severe_wounds(id) { 99 } else { 90 }, wound_goal),
-            (64, martial_goal),
+            (98, recovery, DecisionReason::InstitutionalObligation),
+            (97, lot_goal, DecisionReason::KnownOpportunity),
+            (
+                96,
+                (self.character_agency().is_some() && wound_goal.is_some() && npc.fatigue >= 36)
+                    .then_some(Goal::CampRest),
+                DecisionReason::PhysicalRecovery,
+            ),
+            (
+                if self.severe_wounds(id) { 99 } else { 90 },
+                wound_goal,
+                wound_reason,
+            ),
+            (
+                martial_priority,
+                martial_goal,
+                ambition_reason(npc, martial_goal.unwrap_or(duty)),
+            ),
             (
                 if meridian_goal == Some(Goal::MeridianCare) {
                     89
                 } else {
-                    65
+                    cultivation_priority
                 },
                 meridian_goal,
+                if meridian_goal == Some(Goal::MeridianCare) {
+                    DecisionReason::PhysicalRecovery
+                } else {
+                    DecisionReason::Cultivation
+                },
             ),
             (
                 96,
                 (mission_active && npc.fatigue >= 36).then_some(Goal::CampRest),
+                DecisionReason::PhysicalRecovery,
             ),
-            (95, self.relief_goal(npc)),
-            (94, faction_goal),
-            (95, contract_goal),
-            (91, audit_goal),
-            (88, dispute_goal),
+            (
+                95,
+                self.relief_goal(npc),
+                DecisionReason::InstitutionalObligation,
+            ),
+            (94, faction_goal, DecisionReason::InstitutionalObligation),
+            (95, contract_goal, DecisionReason::InstitutionalObligation),
+            (91, audit_goal, DecisionReason::InstitutionalObligation),
+            (88, dispute_goal, DecisionReason::InstitutionalObligation),
             (
                 86,
                 (care && npc.hp <= npc.definition.hp / 2).then_some(Goal::SeekCare),
+                DecisionReason::PhysicalRecovery,
             ),
-            (80, patient),
-            (expedition_priority, expedition),
-            (76, testimony),
-            (74, news),
-            (70, body_lead),
-            (68, disturbance),
-            (54 + u16::from(npc.fatigue), resting.then_some(Goal::Rest)),
-            (52, care.then_some(Goal::SeekCare)),
-            (20, Some(duty)),
+            (80, patient, DecisionReason::MedicalDuty),
+            (
+                expedition_priority,
+                expedition,
+                if expedition == Some(Goal::FieldCare) {
+                    DecisionReason::MedicalDuty
+                } else {
+                    DecisionReason::KnownOpportunity
+                },
+            ),
+            (76, testimony, DecisionReason::InstitutionalObligation),
+            (74, news, DecisionReason::KnownOpportunity),
+            (70, body_lead, DecisionReason::InstitutionalObligation),
+            (68, disturbance, DecisionReason::InstitutionalObligation),
+            (
+                54 + u16::from(npc.fatigue),
+                resting.then_some(Goal::Rest),
+                DecisionReason::Fatigue,
+            ),
+            (
+                52,
+                care.then_some(Goal::SeekCare),
+                DecisionReason::PhysicalRecovery,
+            ),
+            (20, Some(duty), ambition_reason(npc, duty)),
         ];
-        plans
+        let (score, _, goal, reason) = plans
             .into_iter()
             .enumerate()
-            .filter_map(|(rank, (score, goal))| goal.map(|goal| (score, Reverse(rank), goal)))
-            .max_by_key(|&(score, rank, _)| (score, rank))
-            .expect("duty is always available")
-            .2
+            .filter_map(|(rank, (score, goal, reason))| {
+                goal.map(|goal| {
+                    let score = if suspended == Some(goal) {
+                        score.saturating_add(3)
+                    } else {
+                        score
+                    };
+                    (score, Reverse(rank), goal, reason)
+                })
+            })
+            .max_by_key(|&(score, rank, _, _)| (score, rank))
+            .expect("duty is always available");
+        decision_for(goal, reason, score)
     }
 
     fn report_goal(&self, npc: &Npc) -> Option<Goal> {
@@ -489,6 +586,7 @@ impl World {
                 self.work_meridian(id, goal)
             }
             Goal::SeekWoundCare => self.work_wound_care(id),
+            Goal::GatherForCare | Goal::SellForCare => self.work_for_care(id, goal),
             Goal::Retreat => self.retreat(id),
             Goal::TendClinic => self.travel(id, scenario.clinic, 0),
             Goal::SeekCare => self.travel(id, scenario.clinic, 1),
