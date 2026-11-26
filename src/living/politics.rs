@@ -119,6 +119,7 @@ impl World {
                     .as_mut()
                     .expect("political rules")
                     .hall_supplies += 1;
+                self.note_steward_hall_supply(id);
                 self.record_political_event(PoliticalEventKind::HallSupply, id, sites.hall);
             }
             _ => unreachable!("only Hall economy goals"),
@@ -184,6 +185,7 @@ impl World {
         politics.hall_favor = politics.hall_favor.saturating_sub(2).max(-8);
         self.region.as_mut().expect("regional rules").enrolled = false;
         self.school.as_mut().expect("school rules").duty = Duty::Unassigned;
+        self.remove_hierarchy_player();
         self.social.aided(PLAYER, envoy);
         self.record_political_event(PoliticalEventKind::LodgeOath, PLAYER, position);
         Ok(Outcome::LodgePledged)

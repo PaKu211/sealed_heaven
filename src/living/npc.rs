@@ -99,6 +99,7 @@ pub enum Goal {
         event: super::EventId,
     },
     InvestigateDispute(u32),
+    SectDuty,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -292,6 +293,7 @@ impl World {
         let martial_goal = self.martial_goal(npc);
         let meridian_goal = self.npc_meridian_goal(id);
         let wound_goal = self.wound_goal(id);
+        let sect_duty = self.sect_duty_goal(id);
         let ambition = self
             .character_agency()
             .map(|agency| agency.people[&id].ambition);
@@ -362,11 +364,13 @@ impl World {
         let faction_goal = self.faction_goal(npc);
         let contract_goal = self.contract_goal(npc);
         let audit_goal = self.audit_goal(id);
+        let sect_duty_in_progress = self.sect_duty_active(id) && sect_duty.is_some();
         let mission_active = self.relief_goal(npc).is_some()
             || faction_goal.is_some()
             || contract_goal.is_some()
             || audit_goal.is_some()
-            || dispute_goal.is_some();
+            || dispute_goal.is_some()
+            || sect_duty_in_progress;
         let plans = [
             (
                 100,
@@ -447,6 +451,11 @@ impl World {
             (74, news, DecisionReason::KnownOpportunity),
             (70, body_lead, DecisionReason::InstitutionalObligation),
             (68, disturbance, DecisionReason::InstitutionalObligation),
+            (
+                if sect_duty_in_progress { 90 } else { 67 },
+                sect_duty,
+                DecisionReason::InstitutionalObligation,
+            ),
             (
                 54 + u16::from(npc.fatigue),
                 resting.then_some(Goal::Rest),
@@ -587,6 +596,7 @@ impl World {
             }
             Goal::SeekWoundCare => self.work_wound_care(id),
             Goal::GatherForCare | Goal::SellForCare => self.work_for_care(id, goal),
+            Goal::SectDuty => self.work_sect_duty(id),
             Goal::Retreat => self.retreat(id),
             Goal::TendClinic => self.travel(id, scenario.clinic, 0),
             Goal::SeekCare => self.travel(id, scenario.clinic, 1),

@@ -82,13 +82,24 @@ impl World {
             && !matches!(teacher.activity.goal, Goal::Retaliate | Goal::Retreat)
     }
 
+    fn teacher_form(&self, npc: &Npc) -> Option<Form> {
+        teaching_form(npc).or_else(|| {
+            (self.sect_hierarchy().is_some()
+                && self.is_hall_teacher(npc)
+                && self
+                    .martial()
+                    .is_some_and(|martial| martial.skills[&npc.id()].form == Some(Form::ReedPalm)))
+            .then_some(Form::ReedPalm)
+        })
+    }
+
     pub(super) fn drill(&mut self, teacher: ActorId) -> Result<Outcome, Rejection> {
         let npc = self
             .npcs
             .get(&teacher)
             .filter(|npc| npc.alive())
             .ok_or(Rejection::UnknownActor)?;
-        let form = teaching_form(npc).ok_or(Rejection::Refused)?;
+        let form = self.teacher_form(npc).ok_or(Rejection::Refused)?;
         self.require_reach(npc.position)?;
         if !self.teaching_available(npc) || self.social.relationship(teacher, PLAYER).refuses_aid()
         {
@@ -107,18 +118,21 @@ impl World {
         if skill.strain >= 3 {
             return Err(Rejection::Overtrained);
         }
-        if self.region.as_ref().unwrap().coins < 1 {
-            return Err(Rejection::NotEnoughCoins);
-        }
-        match form {
-            Form::ReedPalm => {
-                self.politics.as_mut().unwrap().hall_coins += 1;
+        let waived = form == Form::ReedPalm && self.hall_tuition_waived();
+        if !waived {
+            if self.region.as_ref().unwrap().coins < 1 {
+                return Err(Rejection::NotEnoughCoins);
             }
-            Form::StoneFist => {
-                self.rivalry.as_mut().unwrap().lodge_coins += 1;
+            match form {
+                Form::ReedPalm => {
+                    self.politics.as_mut().unwrap().hall_coins += 1;
+                }
+                Form::StoneFist => {
+                    self.rivalry.as_mut().unwrap().lodge_coins += 1;
+                }
             }
+            self.region.as_mut().unwrap().coins -= 1;
         }
-        self.region.as_mut().unwrap().coins -= 1;
         self.social.meet(teacher, PLAYER);
         let learned = self.commit_lesson(PLAYER, teacher, form);
         Ok(Outcome::MartialDrilled { teacher, learned })
@@ -174,8 +188,9 @@ impl World {
         self.npcs
             .values()
             .filter(|teacher| {
-                self.teaching_available(teacher)
-                    && teaching_form(teacher) == Some(Form::ReedPalm)
+                teacher.id() != npc.id()
+                    && self.teaching_available(teacher)
+                    && self.teacher_form(teacher) == Some(Form::ReedPalm)
                     && self.perceives(npc.position, teacher.position)
             })
             .min_by_key(|teacher| teacher.id())
@@ -186,7 +201,7 @@ impl World {
         let Some(teacher_npc) = self.npcs.get(&teacher).copied().filter(|npc| npc.alive()) else {
             return;
         };
-        let Some(form) = teaching_form(&teacher_npc) else {
+        let Some(form) = self.teacher_form(&teacher_npc) else {
             return;
         };
         if !self.perceives(self.npcs[&student].position, teacher_npc.position)

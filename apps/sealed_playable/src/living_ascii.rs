@@ -9,11 +9,10 @@ use std::{
 use sealed_sim::living::{
     ActorId, AgencyEventKind, Allegiance, AuditFinding, BREATH_MASTERY, Background, CompanyEvent,
     ContractEventKind, DecisionReason, Direction, DisputePhase, Duty, FORM_QI_COST,
-    FactionEventKind, Goal, HallRank, Holder, InfoLogKind, Intent, Invitation, JourneyEvent,
-    KnowledgeSource, LoadError, LotEventKind, MAX_QI, MAX_SAVE_BYTES, Need, Outcome, PLAYER,
-    PoliticalEventKind, Position, Provenance, Region, Rejection, ReliefEventKind, Role,
-    SectEventKind, StepError,
-    TrafficEventKind, World,
+    FactionEventKind, Goal, HallRank, HierarchyEventKind, Holder, InfoLogKind, Intent, Invitation,
+    JourneyEvent, KnowledgeSource, LoadError, LotEventKind, MAX_QI, MAX_SAVE_BYTES, Need, Outcome,
+    PLAYER, PoliticalEventKind, Position, Provenance, Region, Rejection, ReliefEventKind, Role,
+    SectDuty, SectEventKind, StepError, TrafficEventKind, World,
 };
 
 use crate::{clock, locale::Locale, persistence};
@@ -38,7 +37,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.character_agency().is_some() {
+        if self.world.sect_hierarchy().is_some() {
+            World::sect_hierarchy_campaign(seed)
+        } else if self.world.character_agency().is_some() {
             World::autonomous_agency(seed)
         } else if self.world.injuries().is_some() {
             World::persistent_injury(seed)
@@ -149,6 +150,157 @@ impl Session {
             "circulate" if self.world.meridians().is_some() => Intent::CirculateQi,
             "mend" if self.world.meridians().is_some() => Intent::MendMeridians,
             "treatwounds" if self.world.injuries().is_some() => Intent::TreatWounds,
+            "allocate" if self.world.sect_hierarchy().is_some() => Intent::ClaimHallAllocation,
+            "allocate" => {
+                self.notice = text(
+                    self.locale,
+                    "Hall allocations require a new C3.5 sect hierarchy campaign.",
+                    "Alokasi balai memerlukan kampanye hierarki sekte C3.5 baru.",
+                )
+                .into();
+                return true;
+            }
+            "sect" if self.world.sect_hierarchy().is_some() => {
+                let hierarchy = self.world.sect_hierarchy().unwrap();
+                let mut parts = Vec::new();
+                if let Some(player) = hierarchy.player {
+                    let duty = match player.duty {
+                        SectDuty::Unassigned => text(self.locale, "none", "tidak ada"),
+                        SectDuty::Carrying => text(self.locale, "carrying offering", "membawa titipan"),
+                        SectDuty::Delivered => {
+                            text(self.locale, "awaiting report", "menunggu laporan")
+                        }
+                    };
+                    let allocation = if !matches!(
+                        player.rank,
+                        HallRank::SeniorDisciple | HallRank::Elder
+                    ) {
+                        text(
+                            self.locale,
+                            "requires senior disciple",
+                            "butuh murid senior",
+                        )
+                    } else if player.allocation_claimed {
+                        text(self.locale, "claimed", "sudah diambil")
+                    } else {
+                        text(self.locale, "available", "tersedia")
+                    };
+                    parts.push(format!(
+                        "{}: {} ({} {}); {}: {duty}; {}: {allocation}",
+                        text(self.locale, "Reed Hall", "Balai Alang-alang"),
+                        hall_rank_label(self.locale, player.rank),
+                        player.merit,
+                        text(self.locale, "merit", "jasa"),
+                        text(self.locale, "duty", "tugas"),
+                        text(self.locale, "allocation", "alokasi"),
+                    ));
+                } else {
+                    parts.push(
+                        text(
+                            self.locale,
+                            "Not enrolled in Reed Hall.",
+                            "Belum terdaftar di Balai Alang-alang.",
+                        )
+                        .into(),
+                    );
+                }
+                for (&id, &member) in &hierarchy.members {
+                    if let Some(npc) = self.world.npc(id)
+                        && npc.alive()
+                        && self.world.player_sees(npc.position)
+                    {
+                        parts.push(format!(
+                            "{}: {}",
+                            npc.definition.name,
+                            hall_rank_label(self.locale, member.rank)
+                        ));
+                    }
+                }
+                self.notice = parts.join(" | ");
+                return true;
+            }
+            "sectlog" if self.world.sect_hierarchy().is_some() => {
+                let lines: Vec<_> = self
+                    .world
+                    .sect_hierarchy()
+                    .unwrap()
+                    .history
+                    .iter()
+                    .rev()
+                    .filter(|event| event.witnessed)
+                    .take(12)
+                    .map(|event| {
+                        let actor = actor_name(self.locale, &self.world, event.actor);
+                        let rank = hall_rank_label(self.locale, event.rank);
+                        match event.kind {
+                            HierarchyEventKind::DutyAccepted => format!(
+                                "#{} t{} {actor} {}",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "accepted a Reed Hall duty",
+                                    "menerima tugas Balai Alang-alang"
+                                )
+                            ),
+                            HierarchyEventKind::DutyDelivered => format!(
+                                "#{} t{} {actor} {}",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "delivered a Hall offering to the shrine",
+                                    "mengantar persembahan balai ke kuil"
+                                )
+                            ),
+                            HierarchyEventKind::MeritEarned => format!(
+                                "#{} t{} {actor} {} ({})",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "earned Reed Hall merit",
+                                    "meraih jasa Balai Alang-alang"
+                                ),
+                                event.merit
+                            ),
+                            HierarchyEventKind::Promoted => format!(
+                                "#{} t{} {actor} {} {rank}",
+                                event.id,
+                                event.at,
+                                text(self.locale, "promoted to", "naik pangkat menjadi")
+                            ),
+                            HierarchyEventKind::AllocationClaimed => format!(
+                                "#{} t{} {actor} {}",
+                                event.id,
+                                event.at,
+                                text(
+                                    self.locale,
+                                    "claimed a physical Hall herb allocation",
+                                    "mengambil alokasi herba fisik balai"
+                                )
+                            ),
+                            HierarchyEventKind::OfficeAssumed => format!(
+                                "#{} t{} {actor} {} {rank}",
+                                event.id,
+                                event.at,
+                                text(self.locale, "assumed office as", "menjabat sebagai")
+                            ),
+                        }
+                    })
+                    .collect();
+                self.notice = if lines.is_empty() {
+                    text(
+                        self.locale,
+                        "No witnessed sect hierarchy events.",
+                        "Belum ada peristiwa hierarki sekte yang kamu saksikan.",
+                    )
+                    .into()
+                } else {
+                    lines.join("\n")
+                };
+                return true;
+            }
             "wounds" if self.world.injuries().is_some() => {
                 let state = self.world.injuries().unwrap().people[&PLAYER];
                 self.notice = format!("Arm wounds: {}; leg wounds: {}", state.arms, state.legs);
@@ -819,7 +971,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.character_agency().is_some() {
+                self.notice = if self.world.sect_hierarchy().is_some() {
+                    text(self.locale,
+                        "C3.5: Reed Hall tracks persisted rank and merit for both you and NPC members. Complete shrine duty to reach Disciple (free Reed Hall martial drills, Reed Strike study, and Hall Qi access), and repeat Hall duty from real Hall offerings to reach Senior Disciple and claim one physical herb with allocate. NPC members perform duties, advance, and assume Elder office on succession without you. sect and sectlog inspect known standing and witnessed events. --c34 keeps C3.4.",
+                        "C3.5: Balai Alang-alang mencatat pangkat dan jasa bagi dirimu maupun anggota NPC. Tuntaskan tugas kuil untuk menjadi Murid Dalam (latihan bela diri balai bebas biaya, belajar Jurus Alang-alang, dan akses Qi balai), lalu ulangi tugas dari persembahan nyata balai untuk menjadi Murid Senior dan mengambil satu herba fisik dengan allocate. Anggota NPC menjalankan tugas, naik pangkat, dan menjabat Tetua saat suksesi tanpa bantuanmu. sect dan sectlog memeriksa kedudukan dan peristiwa yang disaksikan. --c34 untuk C3.4.")
+                } else if self.world.character_agency().is_some() {
                     text(self.locale,
                         "C3.4: Injured NPCs without treatment money can gather and sell physical herbs, pay a present medic, recover, and resume interrupted ambitions. agency <visible npc> explains current circumstances; agencylog lists only decisions and transactions you witnessed. --c33 keeps free-care C3.3.",
                         "C3.4: NPC terluka tanpa biaya perawatan dapat memetik dan menjual herba nyata, membayar tabib yang hadir, pulih, lalu melanjutkan ambisi yang terputus. agency <npc terlihat> menjelaskan keadaan saat ini; agencylog hanya mencatat keputusan dan transaksi yang kamu saksikan. --c33 mempertahankan C3.3 dengan perawatan gratis.")
@@ -1578,12 +1734,7 @@ impl Session {
                 );
             }
             if let Some(rank) = world.hall_rank() {
-                let label = match rank {
-                    HallRank::Apprentice => {
-                        tr("Reed Hall apprentice", "Murid pemula Balai Alang-alang")
-                    }
-                    HallRank::Disciple => tr("Reed Hall disciple", "Murid dalam Balai Alang-alang"),
-                };
+                let label = hall_rank_label(self.locale, rank);
                 let _ = writeln!(out, "{label}");
             }
             if world
@@ -2455,7 +2606,15 @@ impl Session {
                 "study with mastered breath and 2 herbs",
                 "study dengan latihan napas tuntas dan 2 herba",
             ),
+            Some(HallRank::Disciple) if self.world.sect_hierarchy().is_some() => tr(
+                "duty for senior rank, brew for a remedy",
+                "duty untuk naik pangkat senior, brew untuk meracik",
+            ),
             Some(HallRank::Disciple) => tr("brew a remedy", "brew untuk meracik obat"),
+            Some(HallRank::SeniorDisciple | HallRank::Elder) => tr(
+                "allocate for Hall herb, duty or brew",
+                "allocate untuk herba balai, duty atau brew",
+            ),
         };
         if let Some(record) = school
             .history
@@ -2552,6 +2711,10 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::SellForCare => (
             "selling work herbs for treatment",
             "menjual herba kerja untuk perawatan",
+        ),
+        Goal::SectDuty => (
+            "carrying out Reed Hall service",
+            "menjalankan tugas Balai Alang-alang",
         ),
         Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
         Goal::Retreat => ("retreating", "mundur"),
@@ -2656,10 +2819,19 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
             "The hall's herb entered shrine stock.",
             "Herba titipan balai masuk ke stok kuil.",
         ),
-        Outcome::DutyReported => (
-            "The teacher recognized you as a disciple.",
-            "Guru mengangkatmu menjadi murid dalam.",
-        ),
+        Outcome::DutyReported => {
+            if world.hall_rank() == Some(HallRank::SeniorDisciple) {
+                (
+                    "The teacher recorded your merit; you stand as a senior disciple.",
+                    "Guru mencatat jasamu; pangkatmu kini murid senior.",
+                )
+            } else {
+                (
+                    "The teacher recognized you as a disciple.",
+                    "Guru mengangkatmu menjadi murid dalam.",
+                )
+            }
+        }
         Outcome::FormLearned => (
             "You learned Reed Strike.",
             "Kamu mempelajari Jurus Alang-alang.",
@@ -2772,6 +2944,10 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
         Outcome::WoundTreated => (
             "One wound was treated using shrine medicine.",
             "Satu luka dirawat memakai obat kuil.",
+        ),
+        Outcome::HallAllocationClaimed => (
+            "You claimed one physical herb from Reed Hall stock.",
+            "Kamu mengambil satu herba fisik dari stok Balai Alang-alang.",
         ),
         Outcome::LotSold { to, id, coins } => {
             return format!(
@@ -2929,10 +3105,21 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 "You already reported the shrine duty.",
                 "Tugas kuil sudah kamu laporkan.",
             ),
-            Rejection::RankRequired => (
-                "Complete your shrine duty and become a disciple first.",
-                "Tuntaskan tugas kuil dan jadilah murid dalam dulu.",
-            ),
+            Rejection::RankRequired => {
+                if world.sect_hierarchy().is_some()
+                    && world.hall_rank() == Some(HallRank::Disciple)
+                {
+                    (
+                        "Earn more merit to reach senior disciple rank first.",
+                        "Raih lebih banyak jasa untuk mencapai pangkat murid senior dulu.",
+                    )
+                } else {
+                    (
+                        "Complete your shrine duty and become a disciple first.",
+                        "Tuntaskan tugas kuil dan jadilah murid dalam dulu.",
+                    )
+                }
+            }
             Rejection::FormAlreadyKnown => (
                 "You already know Reed Strike.",
                 "Kamu sudah menguasai Jurus Alang-alang.",
@@ -2986,7 +3173,20 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 24);
+    run_campaign(debug_world, 25);
+}
+
+fn hall_rank_label(locale: Locale, rank: HallRank) -> &'static str {
+    let (en, id) = match rank {
+        HallRank::Apprentice => ("Reed Hall apprentice", "Murid pemula Balai Alang-alang"),
+        HallRank::Disciple => ("Reed Hall disciple", "Murid dalam Balai Alang-alang"),
+        HallRank::SeniorDisciple => (
+            "Reed Hall senior disciple",
+            "Murid senior Balai Alang-alang",
+        ),
+        HallRank::Elder => ("Reed Hall elder", "Tetua Balai Alang-alang"),
+    };
+    text(locale, en, id)
 }
 
 fn decision_reason_label(locale: Locale, reason: DecisionReason) -> &'static str {
@@ -3011,6 +3211,10 @@ fn decision_reason_label(locale: Locale, reason: DecisionReason) -> &'static str
         ),
     };
     text(locale, en, id)
+}
+
+pub(crate) fn run_c34() {
+    run_campaign(false, 24);
 }
 
 pub(crate) fn run_c33() {
@@ -3111,6 +3315,7 @@ fn run_campaign(debug_world: bool, revision: u16) {
         22 => "checkpoint.c32",
         23 => "checkpoint.c33",
         24 => "checkpoint.c34",
+        25 => "checkpoint.c35",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3135,6 +3340,7 @@ fn run_campaign(debug_world: bool, revision: u16) {
         22 => World::meridian_cultivation(0),
         23 => World::persistent_injury(0),
         24 => World::autonomous_agency(0),
+        25 => World::sect_hierarchy_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
@@ -4353,6 +4559,287 @@ mod tests {
         assert_eq!(u16::from_le_bytes(c33[12..14].try_into().unwrap()), 23);
         assert_eq!(
             u16::from_le_bytes(session.new_seeded_world(7).checkpoint()[12..14].try_into().unwrap()),
+            24
+        );
+    }
+
+    fn ascii_walk_to(session: &mut Session, destination: Position, reach: u32) {
+        use std::collections::{BTreeMap, VecDeque};
+
+        for _ in 0..240 {
+            let start = session.world.player().position;
+            if start.x.abs_diff(destination.x) + start.y.abs_diff(destination.y) <= reach {
+                return;
+            }
+            let scenario = session.world.scenario();
+            let mut queue = VecDeque::from([start]);
+            let mut parent: BTreeMap<(u32, u32), (u32, u32)> = BTreeMap::new();
+            let mut goal = None;
+            while let Some(pos) = queue.pop_front() {
+                if pos.x.abs_diff(destination.x) + pos.y.abs_diff(destination.y) <= reach {
+                    goal = Some(pos);
+                    break;
+                }
+                let neighbors = [
+                    pos.y.checked_sub(1).map(|y| Position { x: pos.x, y }),
+                    pos.x.checked_add(1).map(|x| Position { x, y: pos.y }),
+                    pos.y.checked_add(1).map(|y| Position { x: pos.x, y }),
+                    pos.x.checked_sub(1).map(|x| Position { x, y: pos.y }),
+                ];
+                for next in neighbors.into_iter().flatten() {
+                    if next.x >= scenario.width || next.y >= scenario.height {
+                        continue;
+                    }
+                    let key = (next.x, next.y);
+                    if parent.contains_key(&key) || !session.world.walkable(next) {
+                        continue;
+                    }
+                    if session
+                        .world
+                        .npcs()
+                        .any(|npc| npc.alive() && npc.position == next)
+                    {
+                        continue;
+                    }
+                    parent.insert(key, (pos.x, pos.y));
+                    queue.push_back(next);
+                }
+            }
+            let command = if let Some(mut cur) = goal {
+                while let Some(&prev) = parent.get(&(cur.x, cur.y)) {
+                    if prev == (start.x, start.y) {
+                        break;
+                    }
+                    cur = Position {
+                        x: prev.0,
+                        y: prev.1,
+                    };
+                }
+                if cur.y < start.y {
+                    "w"
+                } else if cur.x > start.x {
+                    "d"
+                } else if cur.y > start.y {
+                    "s"
+                } else if cur.x < start.x {
+                    "a"
+                } else {
+                    "wait"
+                }
+            } else {
+                "wait"
+            };
+            session.input(command);
+        }
+        panic!("could not walk to {destination:?}");
+    }
+
+    fn ascii_wait_for_open_hall(session: &mut Session) {
+        let hall = Region::sites().hall;
+        for _ in 0..1_200 {
+            if !session.world.is_night()
+                && !session
+                    .world
+                    .rivalry()
+                    .unwrap()
+                    .contested(session.world.tick())
+                && session
+                    .world
+                    .school()
+                    .and_then(|school| school.leader)
+                    .and_then(|leader| session.world.npc(leader))
+                    .is_some_and(|npc| npc.alive() && npc.position == hall)
+            {
+                return;
+            }
+            session.input("wait");
+        }
+        panic!("Hall mentor did not return to duty");
+    }
+
+    fn ascii_prepare_hall_offering(session: &mut Session) {
+        let hall = Region::sites().hall;
+        let garden = Region::sites().garden;
+        let patch = session.world.scenario().patch;
+        for _ in 0..3 {
+            ascii_wait_for_open_hall(session);
+            if session.world.region().unwrap().hall_offerings > 0 {
+                return;
+            }
+            ascii_walk_to(session, garden, 1);
+            while session.world.player().herbs < 2
+                && session.world.region().unwrap().garden_herbs > 0
+            {
+                session.input("g");
+            }
+            if session.world.player().herbs == 0 {
+                ascii_walk_to(session, patch, 1);
+                session.input("g");
+            }
+            ascii_walk_to(session, hall, 1);
+            ascii_wait_for_open_hall(session);
+            while session.world.player().herbs > 0
+                && session.world.region().unwrap().hall_offerings < 2
+            {
+                session.input("sponsor");
+            }
+            ascii_wait_for_open_hall(session);
+            if session.world.region().unwrap().hall_offerings > 0 {
+                return;
+            }
+        }
+        panic!("could not stock Hall offerings via public commands");
+    }
+
+    #[test]
+    fn c35_ascii_sect_hierarchy_advancement_and_allocation() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(directory.path().join("sect.c35"));
+        session.world = World::sect_hierarchy_campaign(0);
+
+        let before = session.world.checkpoint();
+        session.input("sect");
+        assert!(session.notice.contains("Not enrolled"));
+        assert!(!session.notice.contains("Ren Zhi"));
+        session.input("sectlog");
+        assert!(session.notice.contains("No witnessed"));
+        assert_eq!(session.world.checkpoint(), before);
+
+        let patch = session.world.scenario().patch;
+        let shrine = session.world.scenario().shrine;
+        let hall = Region::sites().hall;
+
+        ascii_walk_to(&mut session, patch, 1);
+        session.input("g");
+        session.input("g");
+        session.input("g");
+        ascii_walk_to(&mut session, shrine, 1);
+        session.input("m");
+
+        ascii_walk_to(&mut session, hall, 1);
+        ascii_wait_for_open_hall(&mut session);
+        session.input("join");
+        assert_eq!(session.world.hall_rank(), Some(HallRank::Apprentice));
+
+        session.input("drawqi");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::Rejected(Rejection::RankRequired))
+        );
+        session.input("allocate");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::Rejected(Rejection::RankRequired))
+        );
+        assert!(session.frame().contains("disciple"));
+
+        // First duty -> Disciple
+        ascii_prepare_hall_offering(&mut session);
+        session.input("duty");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::DutyAccepted));
+        ascii_walk_to(&mut session, shrine, 1);
+        session.input("duty");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::DutyDelivered));
+        ascii_walk_to(&mut session, hall, 1);
+        ascii_wait_for_open_hall(&mut session);
+        session.input("duty");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::DutyReported));
+        assert_eq!(session.world.hall_rank(), Some(HallRank::Disciple));
+
+        // Disciple unlocks Hall Qi access and free Reed Hall drills, but not Senior allocation.
+        if session.world.player().herbs == 0 {
+            ascii_walk_to(&mut session, patch, 1);
+            session.input("g");
+            ascii_walk_to(&mut session, hall, 1);
+        }
+        session.input("drawqi");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::QiDrawn(1)));
+        ascii_wait_for_open_hall(&mut session);
+        let coins_before = session.world.region().unwrap().coins;
+        session.input("drill 33");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::MartialDrilled {
+                teacher: ActorId::new(33),
+                learned: false
+            })
+        );
+        assert_eq!(session.world.region().unwrap().coins, coins_before);
+        session.input("allocate");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::Rejected(Rejection::RankRequired))
+        );
+        assert!(session.frame().contains("senior disciple"));
+
+        // Second duty -> SeniorDisciple -> claim physical herb allocation
+        ascii_prepare_hall_offering(&mut session);
+        session.input("duty");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::DutyAccepted));
+        ascii_walk_to(&mut session, shrine, 1);
+        session.input("duty");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::DutyDelivered));
+        ascii_walk_to(&mut session, hall, 1);
+        ascii_wait_for_open_hall(&mut session);
+        session.input("duty");
+        assert_eq!(session.world.latest_outcome(), Some(Outcome::DutyReported));
+        assert_eq!(session.world.hall_rank(), Some(HallRank::SeniorDisciple));
+
+        ascii_prepare_hall_offering(&mut session);
+        let herbs_before = session.world.player().herbs;
+        session.input("allocate");
+        assert_eq!(
+            session.world.latest_outcome(),
+            Some(Outcome::HallAllocationClaimed)
+        );
+        assert_eq!(session.world.player().herbs, herbs_before + 1);
+
+        let inspected = session.world.checkpoint();
+        session.input("sect");
+        assert!(session.notice.contains("Reed Hall senior disciple"));
+        assert!(session.notice.contains("2 merit"));
+        assert!(session.notice.contains("claimed"));
+        session.input("sectlog");
+        assert!(session.notice.contains("promoted to"));
+        assert!(session.notice.contains("claimed a physical Hall herb allocation"));
+        session.input("lang id");
+        session.input("sect");
+        assert!(session.notice.contains("Murid senior Balai Alang-alang"));
+        session.input("sectlog");
+        assert!(session.notice.contains("naik pangkat menjadi"));
+        session.input("lang en");
+        assert_eq!(session.world.checkpoint(), inspected);
+
+        session.input("save");
+        session.input("wait");
+        session.input("load");
+        assert_eq!(session.world.checkpoint(), inspected);
+        assert_eq!(
+            u16::from_le_bytes(inspected[12..14].try_into().unwrap()),
+            25
+        );
+        session.input("help");
+        assert!(session.notice.contains("C3.5"));
+
+        assert_eq!(
+            u16::from_le_bytes(
+                session
+                    .new_seeded_world(7)
+                    .checkpoint()[12..14]
+                    .try_into()
+                    .unwrap()
+            ),
+            25
+        );
+
+        let mut legacy = Session::new(directory.path().join("legacy.c34"));
+        legacy.world = World::autonomous_agency(0);
+        let legacy_before = legacy.world.checkpoint();
+        legacy.input("allocate");
+        assert!(legacy.notice.contains("C3.5"));
+        assert_eq!(legacy.world.checkpoint(), legacy_before);
+        assert_eq!(
+            u16::from_le_bytes(legacy_before[12..14].try_into().unwrap()),
             24
         );
     }

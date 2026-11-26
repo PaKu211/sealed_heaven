@@ -66,13 +66,19 @@ impl World {
         self.meridians.as_ref()
     }
 
-    fn sacred_site(&self, site: Position) -> bool {
-        in_reach(site, self.scenario.shrine) || in_reach(site, Region::sites().hall)
-    }
-
     pub(super) fn draw_qi(&mut self) -> Result<Outcome, Rejection> {
-        if !self.sacred_site(self.player.position) {
+        let at_shrine = in_reach(self.player.position, self.scenario.shrine);
+        let at_hall = in_reach(self.player.position, Region::sites().hall);
+        if !at_shrine && !at_hall {
             return Err(Rejection::OutOfReach);
+        }
+        if at_hall && !at_shrine && self.sect_hierarchy().is_some() {
+            if self.hall_rank().is_none() {
+                return Err(Rejection::MembershipRequired);
+            }
+            if !self.may_draw_hall_qi(PLAYER) {
+                return Err(Rejection::RankRequired);
+            }
         }
         let state = self.meridians().unwrap().people[&PLAYER];
         if state.blockage >= BLOCKED {
@@ -209,6 +215,7 @@ impl World {
         }
         if self.npcs[&actor].definition.role != Role::HallDeputy
             || meridian.qi >= MAX_QI
+            || !self.may_draw_hall_qi(actor)
             || self.region()?.hall_offerings == 0
         {
             return None;
@@ -224,7 +231,9 @@ impl World {
                     self.travel(actor, site, 1);
                     return;
                 }
-                if self.region.as_ref().unwrap().hall_offerings == 0 {
+                if !self.may_draw_hall_qi(actor)
+                    || self.region.as_ref().unwrap().hall_offerings == 0
+                {
                     return;
                 }
                 if self.meridians().unwrap().people[&actor].qi >= MAX_QI {

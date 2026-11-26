@@ -35,6 +35,7 @@ mod relief;
 mod relief_tests;
 mod rivalry;
 mod school;
+mod sect_hierarchy;
 mod social;
 #[cfg(test)]
 mod tests;
@@ -71,6 +72,7 @@ pub use region::{Background, MarketQuote, Region, RegionSites};
 pub use relief::{Relief, ReliefCase, ReliefEvent, ReliefEventKind, ReliefPhase};
 pub use rivalry::{Rivalry, SectEvent, SectEventKind};
 pub use school::{Duty, FORM_QI_COST, HallRank, MAX_QI, School, Succession};
+pub use sect_hierarchy::{HierarchyEvent, HierarchyEventKind, SectDuty, SectHierarchy, SectMember};
 pub use social::{
     BodyDiscovery, BodyReport, Incident, IncidentId, Knowledge, KnowledgeSource, RecoveryEvent,
     Relationship, Report, Social,
@@ -152,6 +154,7 @@ pub enum Intent {
     CirculateQi,
     MendMeridians,
     TreatWounds,
+    ClaimHallAllocation,
 }
 
 impl Intent {
@@ -306,6 +309,7 @@ pub enum Outcome {
     },
     MeridiansMended,
     WoundTreated,
+    HallAllocationClaimed,
     Rejected(Rejection),
 }
 
@@ -392,6 +396,7 @@ pub struct World {
     meridians: Option<Meridians>,
     injuries: Option<Injuries>,
     character_agency: Option<CharacterAgency>,
+    sect_hierarchy: Option<SectHierarchy>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -420,6 +425,7 @@ enum Rules {
     MeridianCultivation,
     PersistentInjury,
     AutonomousAgency,
+    SectHierarchy,
 }
 
 impl Rules {
@@ -451,6 +457,7 @@ impl Rules {
                 | Self::MeridianCultivation
                 | Self::PersistentInjury
                 | Self::AutonomousAgency
+                | Self::SectHierarchy
         )
     }
 }
@@ -548,6 +555,10 @@ impl World {
         Self::seeded(seed, Rules::AutonomousAgency)
     }
 
+    pub fn sect_hierarchy_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::SectHierarchy)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -607,6 +618,7 @@ impl World {
                         | Rules::MeridianCultivation
                         | Rules::PersistentInjury
                         | Rules::AutonomousAgency
+                        | Rules::SectHierarchy
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -642,6 +654,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(Company::default),
             rivalry: matches!(
@@ -665,6 +678,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -687,6 +701,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(Politics::new),
             traffic: matches!(
@@ -708,6 +723,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -728,6 +744,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -745,6 +762,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -761,6 +779,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(Information::default),
             contested: matches!(
@@ -771,6 +790,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(|| {
                 Contested::new(matches!(
@@ -780,6 +800,7 @@ impl World {
                         | Rules::MeridianCultivation
                         | Rules::PersistentInjury
                         | Rules::AutonomousAgency
+                        | Rules::SectHierarchy
                 ))
             }),
             martial: matches!(
@@ -788,17 +809,25 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
                 rules,
-                Rules::MeridianCultivation | Rules::PersistentInjury | Rules::AutonomousAgency
+                Rules::MeridianCultivation
+                    | Rules::PersistentInjury
+                    | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
             .then(|| Meridians::new(scenario)),
-            injuries: matches!(rules, Rules::PersistentInjury | Rules::AutonomousAgency)
-                .then(|| Injuries::new(scenario)),
-            character_agency: (rules == Rules::AutonomousAgency)
+            injuries: matches!(
+                rules,
+                Rules::PersistentInjury | Rules::AutonomousAgency | Rules::SectHierarchy
+            )
+            .then(|| Injuries::new(scenario)),
+            character_agency: matches!(rules, Rules::AutonomousAgency | Rules::SectHierarchy)
                 .then(|| CharacterAgency::new(scenario)),
+            sect_hierarchy: (rules == Rules::SectHierarchy).then(|| SectHierarchy::new(scenario)),
         }
     }
 
@@ -867,6 +896,9 @@ impl World {
     }
 
     pub fn hall_rank(&self) -> Option<HallRank> {
+        if let Some(hierarchy) = self.sect_hierarchy() {
+            return hierarchy.player.map(|member| member.rank);
+        }
         self.region()?.enrolled.then(|| {
             if self
                 .school()
@@ -950,6 +982,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -969,6 +1002,7 @@ impl World {
                     | Rules::MeridianCultivation
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -986,6 +1020,9 @@ impl World {
         }
         if intent == Intent::TreatWounds && self.injuries.is_none() {
             return Err(StepError::ContestedCampaignRequired);
+        }
+        if intent == Intent::ClaimHallAllocation && self.sect_hierarchy.is_none() {
+            return Err(StepError::SchoolCampaignRequired);
         }
 
         self.tick += 1;
@@ -1008,6 +1045,7 @@ impl World {
         self.advance_faction_agency();
         self.advance_contracts();
         self.update_succession();
+        self.sync_hierarchy_office();
         self.update_journey();
         // 3. Decide from one snapshot; resolve movement, work and combat by actor ID.
         self.advance_npcs(intent == Intent::Guard && outcome == Outcome::Guarded);
@@ -1022,6 +1060,7 @@ impl World {
         self.queue_reports();
         self.queue_info_reports();
         self.reconcile_character_agency_inventory();
+        self.reconcile_sect_hierarchy_inventory();
         if let Some(traffic) = self.traffic.as_mut() {
             traffic.finish_tick();
         }
@@ -1140,6 +1179,7 @@ impl World {
             Intent::CirculateQi => self.circulate_qi(),
             Intent::MendMeridians => self.mend_meridians(),
             Intent::TreatWounds => self.treat_wounds(),
+            Intent::ClaimHallAllocation => self.claim_hall_allocation(),
         }
     }
 
@@ -1157,6 +1197,7 @@ impl World {
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
+                | Rules::SectHierarchy
         )
     }
 
@@ -1173,6 +1214,7 @@ impl World {
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
+                | Rules::SectHierarchy
         )
     }
 
@@ -1188,6 +1230,7 @@ impl World {
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
+                | Rules::SectHierarchy
         )
     }
 
@@ -1202,6 +1245,7 @@ impl World {
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
+                | Rules::SectHierarchy
         )
     }
 
@@ -1215,6 +1259,7 @@ impl World {
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
+                | Rules::SectHierarchy
         )
     }
 
@@ -1226,6 +1271,7 @@ impl World {
                 | Rules::MeridianCultivation
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
+                | Rules::SectHierarchy
         )
     }
 

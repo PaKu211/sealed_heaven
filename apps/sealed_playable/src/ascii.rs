@@ -103,6 +103,10 @@ pub fn run_c33() {
     crate::living_ascii::run_c33();
 }
 
+pub fn run_c34() {
+    crate::living_ascii::run_c34();
+}
+
 #[cfg(feature = "desktop")]
 pub fn run_regional_window() {
     crate::living_pixel::run();

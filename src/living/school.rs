@@ -12,6 +12,8 @@ const FORM_HERBS: u32 = 2;
 pub enum HallRank {
     Apprentice,
     Disciple,
+    SeniorDisciple,
+    Elder,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -161,6 +163,7 @@ impl World {
             self.supply.shrine += 1;
             self.supply.player_deliveries += 1;
             self.school.as_mut().expect("school rules").duty = Duty::Delivered;
+            self.note_player_duty_delivered();
             return Ok(Outcome::DutyDelivered);
         }
         let mentor = self.hall_mentor()?;
@@ -172,13 +175,16 @@ impl World {
                 }
                 region.hall_offerings -= 1;
                 self.school.as_mut().expect("school rules").duty = Duty::Carrying;
+                self.note_player_duty_accepted();
                 Ok(Outcome::DutyAccepted)
             }
             Duty::Delivered => {
                 self.school.as_mut().expect("school rules").duty = Duty::Reported;
                 self.social.aided(PLAYER, mentor);
+                self.complete_player_hierarchy_duty();
                 Ok(Outcome::DutyReported)
             }
+            Duty::Reported if self.sect_hierarchy().is_some() => self.accept_repeat_player_duty(),
             Duty::Reported => Err(Rejection::DutyComplete),
             Duty::Carrying => unreachable!("cargo is handled at the shrine"),
         }
@@ -186,7 +192,10 @@ impl World {
 
     pub(super) fn study_form(&mut self) -> Result<Outcome, Rejection> {
         self.hall_mentor()?;
-        if self.hall_rank() != Some(HallRank::Disciple) {
+        if !matches!(
+            self.hall_rank(),
+            Some(HallRank::Disciple | HallRank::SeniorDisciple | HallRank::Elder)
+        ) {
             return Err(Rejection::RankRequired);
         }
         let school = self.school.as_mut().expect("school rules");

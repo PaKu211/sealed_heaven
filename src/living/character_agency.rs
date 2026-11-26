@@ -371,6 +371,7 @@ fn resumable(goal: Goal) -> bool {
             | Goal::MeridianCirculate
             | Goal::TeachAtHall
             | Goal::Patrol
+            | Goal::SectDuty
     )
 }
 

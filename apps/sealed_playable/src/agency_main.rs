@@ -54,6 +54,8 @@ fn main() {
         sealed_playable::ascii::run_c32();
     } else if options.iter().any(|arg| arg == "--c33") {
         sealed_playable::ascii::run_c33();
+    } else if options.iter().any(|arg| arg == "--c34") {
+        sealed_playable::ascii::run_c34();
     } else if options.iter().any(|arg| arg == "--c22") {
         sealed_playable::ascii::run_c22();
     } else if options.iter().any(|arg| arg == "--debug-world") {

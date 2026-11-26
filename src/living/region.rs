@@ -284,6 +284,7 @@ impl World {
         region.hall_offerings += 1;
         region.enrolled = true;
         self.social.meet(mentor, PLAYER);
+        self.enroll_hierarchy_player();
         Ok(Outcome::Enrolled)
     }
 
