@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 35 {
+        if self.world.checkpoint_revision() == 36 {
+            World::encounter_campaign(seed)
+        } else if self.world.checkpoint_revision() == 35 {
             World::reciprocal_bonds_campaign(seed)
         } else if self.world.checkpoint_revision() == 34 {
             World::personal_favors_campaign(seed)
@@ -152,6 +154,7 @@ impl Session {
                         | "questlog"
                         | "favors"
                         | "favorlog"
+                        | "contacts"
                         | "bonds"
                         | "aidlog"
                         | "requestaid"
@@ -1104,6 +1107,14 @@ impl Session {
                 };
                 return true;
             }
+            "contacts" if self.world.encounters().is_some() => {
+                let count = argument
+                    .and_then(|n| n.parse::<usize>().ok())
+                    .unwrap_or(12)
+                    .clamp(1, 48);
+                self.notice = self.contact_lines(count).join("\n");
+                return true;
+            }
             "bonds" | "aidlog" if self.world.reciprocity().is_some() => {
                 let count = argument
                     .and_then(|n| n.parse::<usize>().ok())
@@ -1499,6 +1510,11 @@ impl Session {
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
                     }
+                }
+                if self.world.encounters().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.contact.help"));
                 }
                 if self.world.reciprocity().is_some() {
                     self.notice.push(' ');
@@ -2126,6 +2142,41 @@ impl Session {
             ],
         )
     }
+    pub(crate) fn contact_lines(&self, count: usize) -> Vec<String> {
+        use sealed_sim::living::encounters::Kind;
+        let mut rows = self
+            .world
+            .known_contacts()
+            .into_iter()
+            .take(count)
+            .map(|e| {
+                let kind = living_text(
+                    self.locale,
+                    match e.last_kind {
+                        Kind::Talk => "living.contact.talk",
+                        Kind::Care => "living.contact.care",
+                    },
+                );
+                living_format(
+                    self.locale,
+                    "living.contact.line",
+                    &[
+                        ("actor", actor_name(self.locale, &self.world, e.actor)),
+                        ("at", &e.last_at.to_string()),
+                        ("x", &e.last_place.x.to_string()),
+                        ("y", &e.last_place.y.to_string()),
+                        ("visits", &e.visits.to_string()),
+                        ("kind", kind),
+                    ],
+                )
+            })
+            .collect::<Vec<_>>();
+        if rows.is_empty() {
+            rows.push(living_text(self.locale, "living.contact.empty").into());
+        }
+        rows
+    }
+
     fn aid_line(&self, e: &sealed_sim::living::reciprocity::ObservedAid) -> String {
         use sealed_sim::living::reciprocity::Kind;
         let kind = living_text(
@@ -4491,6 +4542,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         33 => "checkpoint.c46",
         34 => "checkpoint.c47",
         35 => "checkpoint.c48",
+        36 => "checkpoint.c49",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -4526,10 +4578,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         33 => World::emergent_requests_campaign(0),
         34 => World::personal_favors_campaign(0),
         35 => World::reciprocal_bonds_campaign(0),
+        36 => World::encounter_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn encounter_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 36);
+    if seed != 0 {
+        session.world = World::encounter_campaign(seed);
+    }
+    session
+}
+
+pub(crate) fn run_encounter_campaign(seed: u32, debug_world: bool) {
+    run_session(encounter_session(seed, debug_world));
 }
 
 pub(crate) fn bonds_session(seed: u32, debug_world: bool) -> Session {

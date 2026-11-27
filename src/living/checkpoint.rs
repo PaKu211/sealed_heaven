@@ -71,6 +71,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::EmergentRequests => super::requests::REVISION,
         Rules::PersonalFavors => super::favors::REVISION,
         Rules::ReciprocalBonds => super::reciprocity::REVISION,
+        Rules::EncounterMemory => super::encounters::REVISION,
     }
 }
 
@@ -136,6 +137,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::requests::REVISION => Rules::EmergentRequests,
         super::favors::REVISION => Rules::PersonalFavors,
         super::reciprocity::REVISION => Rules::ReciprocalBonds,
+        super::encounters::REVISION => Rules::EncounterMemory,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -243,6 +245,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::Invite(actor)
@@ -281,6 +284,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::Provision(actor)
@@ -319,6 +323,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::Part(actor)
@@ -356,6 +361,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::OfferAccord
@@ -393,6 +399,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::SupportHall
@@ -429,6 +436,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::PledgeLodge
@@ -465,6 +473,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::AidLodge
@@ -501,6 +510,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::RenounceLodge
@@ -530,6 +540,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::Ask(actor)
@@ -559,6 +570,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::Examine
@@ -588,6 +600,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -617,6 +630,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::Take(actor)
@@ -643,6 +657,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -671,6 +686,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::ClaimLot(value)
@@ -695,6 +711,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -719,6 +736,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::AttuneLot(value)
@@ -742,6 +760,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -764,6 +783,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::Drill(actor)
@@ -786,6 +806,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -815,6 +836,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::DrawQi
@@ -833,6 +855,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::CirculateQi
@@ -851,6 +874,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::MendMeridians
@@ -869,6 +893,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::TreatWounds
@@ -887,6 +912,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -898,6 +924,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::RecoverCache(id)
@@ -909,6 +936,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::EntrustCache(id)
@@ -916,7 +944,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (44, id)
             if matches!(
                 rules,
-                Rules::EmergentRequests | Rules::PersonalFavors | Rules::ReciprocalBonds
+                Rules::EmergentRequests
+                    | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::AcceptRequest(id)
@@ -924,7 +955,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (45, id)
             if matches!(
                 rules,
-                Rules::EmergentRequests | Rules::PersonalFavors | Rules::ReciprocalBonds
+                Rules::EmergentRequests
+                    | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::DeclineRequest(id)
@@ -932,26 +966,55 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (46, id)
             if matches!(
                 rules,
-                Rules::EmergentRequests | Rules::PersonalFavors | Rules::ReciprocalBonds
+                Rules::EmergentRequests
+                    | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) =>
         {
             Intent::AbandonRequest(id)
         }
-        (47, id) if matches!(rules, Rules::PersonalFavors | Rules::ReciprocalBonds) => {
+        (47, id)
+            if matches!(
+                rules,
+                Rules::PersonalFavors | Rules::ReciprocalBonds | Rules::EncounterMemory
+            ) =>
+        {
             Intent::AcceptFavor(id)
         }
-        (48, id) if matches!(rules, Rules::PersonalFavors | Rules::ReciprocalBonds) => {
+        (48, id)
+            if matches!(
+                rules,
+                Rules::PersonalFavors | Rules::ReciprocalBonds | Rules::EncounterMemory
+            ) =>
+        {
             Intent::DeclineFavor(id)
         }
-        (49, id) if matches!(rules, Rules::PersonalFavors | Rules::ReciprocalBonds) => {
+        (49, id)
+            if matches!(
+                rules,
+                Rules::PersonalFavors | Rules::ReciprocalBonds | Rules::EncounterMemory
+            ) =>
+        {
             Intent::WithdrawFavor(id)
         }
-        (50, id) if matches!(rules, Rules::PersonalFavors | Rules::ReciprocalBonds) => {
+        (50, id)
+            if matches!(
+                rules,
+                Rules::PersonalFavors | Rules::ReciprocalBonds | Rules::EncounterMemory
+            ) =>
+        {
             Intent::FundFavor(id)
         }
-        (51, id) if rules == Rules::ReciprocalBonds => Intent::RequestAid(ActorId::new(id)),
-        (52, id) if rules == Rules::ReciprocalBonds => Intent::RepayAid(ActorId::new(id)),
-        (53, id) if rules == Rules::ReciprocalBonds => Intent::WaiveAid(ActorId::new(id)),
+        (51, id) if matches!(rules, Rules::ReciprocalBonds | Rules::EncounterMemory) => {
+            Intent::RequestAid(ActorId::new(id))
+        }
+        (52, id) if matches!(rules, Rules::ReciprocalBonds | Rules::EncounterMemory) => {
+            Intent::RepayAid(ActorId::new(id))
+        }
+        (53, id) if matches!(rules, Rules::ReciprocalBonds | Rules::EncounterMemory) => {
+            Intent::WaiveAid(ActorId::new(id))
+        }
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -959,7 +1022,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::ReciprocalBonds {
+        let mut bytes = if world.rules == Rules::EncounterMemory {
+            b"SH:C49:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::ReciprocalBonds {
             b"SH:C48:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::PersonalFavors {
             b"SH:C47:SCENARIO:v1\0".to_vec()
@@ -1036,6 +1101,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::EmergentRequests => b"SH:C10:RULES:v33".to_vec(),
         Rules::PersonalFavors => b"SH:C10:RULES:v34".to_vec(),
         Rules::ReciprocalBonds => b"SH:C10:RULES:v35".to_vec(),
+        Rules::EncounterMemory => b"SH:C10:RULES:v36".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -1132,6 +1198,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::EmergentRequests
             | Rules::PersonalFavors
             | Rules::ReciprocalBonds
+            | Rules::EncounterMemory
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -1183,6 +1250,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::EmergentRequests => b"SH:C10:STATE:v33".to_vec(),
         Rules::PersonalFavors => b"SH:C10:STATE:v34".to_vec(),
         Rules::ReciprocalBonds => b"SH:C10:STATE:v35".to_vec(),
+        Rules::EncounterMemory => b"SH:C10:STATE:v36".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1299,6 +1367,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
+                | Rules::EncounterMemory
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1384,6 +1453,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::EmergentRequests
             | Rules::PersonalFavors
             | Rules::ReciprocalBonds
+            | Rules::EncounterMemory
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1425,6 +1495,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1473,6 +1544,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::EmergentRequests
             | Rules::PersonalFavors
             | Rules::ReciprocalBonds
+            | Rules::EncounterMemory
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1562,6 +1634,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
+                | Rules::EncounterMemory
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1741,6 +1814,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(reciprocity) = world.reciprocity() {
         let bytes = reciprocity.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(encounters) = world.encounters() {
+        let bytes = encounters.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }

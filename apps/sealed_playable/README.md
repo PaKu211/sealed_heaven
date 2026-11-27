@@ -1,5 +1,9 @@
 # Sealed Heaven — First Playable
 
+## Current regional campaign
+
+C4.9: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c49 --pixel`. Omit `--pixel` for ASCII. `contacts` / Ctrl+F2 show last confirmed conversations and clinic visits; save slot `checkpoint.c49`. See the [C4.9 specification](../../C4_9_ENCOUNTER_MEMORY.md). The C0.4 material below is retained as historical documentation.
+
 **Current acceptance: C0.4 independent audit PASS.**
 Native evidence is `../../docs/evidence/c04-native-acceptance/`. The verdict is
 `../../C0_4_FINAL_INDEPENDENT_AUDIT.md`. This does not accept the 30-day or R2 gate.

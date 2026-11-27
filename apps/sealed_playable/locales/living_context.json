@@ -3764,6 +3764,49 @@
     },
     "surface": "living_ascii.rs"
   },
+  "living.contact.care": {
+    "active": true,
+    "context": "C4.9 directly confirmed encounter memory, not live actor tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.contact.empty": {
+    "active": true,
+    "context": "C4.9 directly confirmed encounter memory, not live actor tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.contact.help": {
+    "active": true,
+    "context": "C4.9 directly confirmed encounter memory, not live actor tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.contact.line": {
+    "active": true,
+    "context": "C4.9 directly confirmed encounter memory, not live actor tracking",
+    "parameters": {
+      "actor": "known actor name",
+      "at": "last confirmed tick",
+      "kind": "type of last encounter",
+      "visits": "number of successful encounters",
+      "x": "observed tile X",
+      "y": "observed tile Y"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.contact.pixel.hint": {
+    "active": true,
+    "context": "C4.9 encounter journal keyboard shortcut",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.contact.talk": {
+    "active": true,
+    "context": "C4.9 directly confirmed encounter memory, not live actor tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.expansion.depot": {
     "active": true,
     "context": "C4.1 local regional expansion",
