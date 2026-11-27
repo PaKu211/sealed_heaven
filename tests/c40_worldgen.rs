@@ -313,12 +313,22 @@ fn checkpoint_binds_generated_map_seed_version_and_original_rules() {
     wrong_rev[12..14].copy_from_slice(&26u16.to_le_bytes());
     rechecksum(&mut wrong_rev);
     assert_eq!(World::restore(&wrong_rev), Err(LoadError::ScenarioMismatch));
+    // Revision 36 now exists; a C4.0 checkpoint relabeled as C4.9 is
+    // still invalid even with a recomputed envelope checksum.
+    let mut wrong_current = original.clone();
+    wrong_current[12..14].copy_from_slice(&sealed_sim::living::encounters::REVISION.to_le_bytes());
+    rechecksum(&mut wrong_current);
+    assert_eq!(
+        World::restore(&wrong_current),
+        Err(LoadError::ScenarioMismatch)
+    );
+    // Reserve an actually unknown revision for forward-version rejection.
     let mut future = original.clone();
-    future[12..14].copy_from_slice(&36u16.to_le_bytes());
+    future[12..14].copy_from_slice(&u16::MAX.to_le_bytes());
     rechecksum(&mut future);
     assert_eq!(
         World::restore(&future),
-        Err(LoadError::UnsupportedRevision(36))
+        Err(LoadError::UnsupportedRevision(u16::MAX))
     );
     let mut broken = original.clone();
     broken[50] ^= 1;
