@@ -241,6 +241,9 @@ impl World {
             .as_mut()
             .unwrap()
             .record(self.tick, helper, recipient, kind, b, seen);
+        if kind != Kind::Released {
+            self.remember_npc_aid(helper, recipient, a, b);
+        }
     }
     fn local_partner(&self, id: ActorId) -> Result<(), Rejection> {
         self.npc(id)
@@ -465,7 +468,9 @@ mod tests {
         .unwrap()
     }
     fn fixture() -> World {
-        let mut w = World::reciprocal_bonds_campaign(7);
+        fixture_for(World::reciprocal_bonds_campaign(7))
+    }
+    fn fixture_for(mut w: World) -> World {
         let clinic = w.scenario.clinic;
         w.npcs.get_mut(&MEDIC).unwrap().position = clinic;
         let p = adjacent(&w, clinic, None);
@@ -672,6 +677,41 @@ mod tests {
         assert_eq!(w.social, social);
         assert_eq!(total_coins(&w), total);
     }
+    #[test]
+    fn c50_real_npc_aid_updates_pair_memory_without_double_regard_or_minting() {
+        use crate::living::social_network::Kind as NetworkKind;
+        let mut w = fixture_for(World::social_network_campaign(7));
+        w.npcs.get_mut(&MEDIC).unwrap().hp -= 1;
+        w.injuries
+            .as_mut()
+            .unwrap()
+            .people
+            .insert(MEDIC, Wounds { arms: 1, legs: 0 });
+        w.social.link(PARTNER, MEDIC);
+        w.social.link(PARTNER, MEDIC);
+        fund(&mut w, PARTNER, 2);
+        let money = total_coins(&w);
+        let regard = w.social.relationship(MEDIC, PARTNER).regard;
+        w.tick = 1;
+        w.advance_reciprocity();
+        assert_eq!(total_coins(&w), money);
+        assert_eq!(w.character_agency().unwrap().people[&PARTNER].coins, 1);
+        assert_eq!(w.character_agency().unwrap().people[&MEDIC].coins, 1);
+        assert_eq!(
+            w.social.relationship(MEDIC, PARTNER).regard,
+            (regard + 1).min(8)
+        );
+        let n = w.social_network().unwrap();
+        let m = n.memory(PARTNER, MEDIC).unwrap();
+        assert_eq!(m.aid_a_to_b + m.aid_b_to_a, 1);
+        assert_eq!(n.history().back().unwrap().actor, PARTNER);
+        assert_eq!(n.history().back().unwrap().kind, NetworkKind::Aid);
+        assert_eq!(w.witnessed_social().count(), 1);
+        let snapshot = w.clone();
+        w.advance_reciprocity();
+        assert_eq!(w, snapshot);
+    }
+
     #[test]
     fn autonomous_npc_repayment_pays_real_clinic_fee_without_an_extra_debt() {
         let mut w = fixture();

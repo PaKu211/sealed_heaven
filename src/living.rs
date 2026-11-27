@@ -47,6 +47,7 @@ pub mod road_history;
 mod school;
 mod sect_hierarchy;
 mod social;
+pub mod social_network;
 #[cfg(test)]
 mod tests;
 mod traffic;
@@ -432,6 +433,7 @@ pub struct World {
     favors: Option<favors::Favors>,
     reciprocity: Option<reciprocity::Reciprocity>,
     encounters: Option<encounters::Encounters>,
+    social_network: Option<social_network::SocialNetwork>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -498,6 +500,7 @@ enum Rules {
     PersonalFavors,
     ReciprocalBonds,
     EncounterMemory,
+    SocialNetworks,
 }
 
 impl Rules {
@@ -515,6 +518,7 @@ impl Rules {
                 | Self::PersonalFavors
                 | Self::ReciprocalBonds
                 | Self::EncounterMemory
+                | Self::SocialNetworks
         )
     }
 
@@ -558,6 +562,7 @@ impl Rules {
                 | Self::PersonalFavors
                 | Self::ReciprocalBonds
                 | Self::EncounterMemory
+                | Self::SocialNetworks
         )
     }
 }
@@ -714,6 +719,11 @@ impl World {
         Self::seeded(seed, Rules::EncounterMemory)
     }
 
+    /// C5.0: local autonomous greetings and causal NPC social memory.
+    pub fn social_network_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::SocialNetworks)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -728,6 +738,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
@@ -741,6 +752,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -763,6 +775,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         ) {
             world.road_history = Some(road_history::RoadHistory::new(&mut world, seed));
             world.observe_road_history();
@@ -777,6 +790,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         ) {
             world.init_regional_news();
         }
@@ -789,6 +803,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         ) {
             world.scheduler = Some(lod::Scheduler::new(&world));
         }
@@ -800,6 +815,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         ) {
             world.production = Some(production::Production::new(&world));
         }
@@ -809,21 +825,31 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         ) {
             world.requests = Some(requests::Requests::default());
             world.advance_requests();
         }
         if matches!(
             rules,
-            Rules::PersonalFavors | Rules::ReciprocalBonds | Rules::EncounterMemory
+            Rules::PersonalFavors
+                | Rules::ReciprocalBonds
+                | Rules::EncounterMemory
+                | Rules::SocialNetworks
         ) {
             world.favors = Some(favors::Favors::default());
         }
-        if matches!(rules, Rules::ReciprocalBonds | Rules::EncounterMemory) {
+        if matches!(
+            rules,
+            Rules::ReciprocalBonds | Rules::EncounterMemory | Rules::SocialNetworks
+        ) {
             world.reciprocity = Some(reciprocity::Reciprocity::default());
         }
-        if rules == Rules::EncounterMemory {
+        if matches!(rules, Rules::EncounterMemory | Rules::SocialNetworks) {
             world.encounters = Some(encounters::Encounters::default());
+        }
+        if rules == Rules::SocialNetworks {
+            world.social_network = Some(social_network::SocialNetwork::default());
         }
         world
     }
@@ -851,6 +877,7 @@ impl World {
             favors: None,
             reciprocity: None,
             encounters: None,
+            social_network: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -898,6 +925,7 @@ impl World {
                         | Rules::PersonalFavors
                         | Rules::ReciprocalBonds
                         | Rules::EncounterMemory
+                        | Rules::SocialNetworks
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -945,6 +973,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(Company::default),
             rivalry: matches!(
@@ -980,6 +1009,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -1014,6 +1044,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(Politics::new),
             traffic: matches!(
@@ -1047,6 +1078,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -1079,6 +1111,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -1108,6 +1141,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -1136,6 +1170,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(Information::default),
             contested: matches!(
@@ -1158,6 +1193,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(|| {
                 Contested::new(matches!(
@@ -1179,6 +1215,7 @@ impl World {
                         | Rules::PersonalFavors
                         | Rules::ReciprocalBonds
                         | Rules::EncounterMemory
+                        | Rules::SocialNetworks
                 ))
             }),
             martial: matches!(
@@ -1199,6 +1236,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -1218,6 +1256,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -1236,6 +1275,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -1253,6 +1293,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -1269,6 +1310,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1454,6 +1496,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1485,6 +1528,7 @@ impl World {
                     | Rules::PersonalFavors
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
+                    | Rules::SocialNetworks
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1542,6 +1586,7 @@ impl World {
         self.advance_npcs(intent == Intent::Guard && outcome == Outcome::Guarded);
         self.retire_scheduled_dead();
         self.advance_reciprocity();
+        self.advance_social_network();
         self.observe_road_history();
         self.advance_requests();
         self.advance_favors();
@@ -1726,6 +1771,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         )
     }
 
@@ -1754,6 +1800,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         )
     }
 
@@ -1781,6 +1828,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         )
     }
 
@@ -1807,6 +1855,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         )
     }
 
@@ -1832,6 +1881,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         )
     }
 
@@ -1855,6 +1905,7 @@ impl World {
                 | Rules::PersonalFavors
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
+                | Rules::SocialNetworks
         )
     }
 

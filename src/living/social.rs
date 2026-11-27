@@ -518,6 +518,7 @@ impl World {
                     | super::Rules::PersonalFavors
                     | super::Rules::ReciprocalBonds
                     | super::Rules::EncounterMemory
+                    | super::Rules::SocialNetworks
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {
@@ -555,6 +556,7 @@ impl World {
             retaliation,
         };
         self.social.incidents.push(incident);
+        self.remember_npc_conflict(source, target, source_position, position);
         for actor in observed {
             self.social
                 .learn(actor, incident, self.tick, KnowledgeSource::Observed);

@@ -4165,6 +4165,60 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.network.aid": {
+    "active": true,
+    "context": "C5.0 witnessed NPC social interaction; no private scores or remote tracking",
+    "parameters": {
+      "actor": "first known actor name",
+      "at": "event tick",
+      "other": "second known actor name",
+      "x": "observed tile X",
+      "y": "observed tile Y"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.network.conflict": {
+    "active": true,
+    "context": "C5.0 witnessed NPC social interaction; no private scores or remote tracking",
+    "parameters": {
+      "actor": "first known actor name",
+      "at": "event tick",
+      "other": "second known actor name",
+      "x": "observed tile X",
+      "y": "observed tile Y"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.network.empty": {
+    "active": true,
+    "context": "C5.0 witnessed NPC social interaction; no private scores or remote tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.network.greeting": {
+    "active": true,
+    "context": "C5.0 witnessed NPC social interaction; no private scores or remote tracking",
+    "parameters": {
+      "actor": "first known actor name",
+      "at": "event tick",
+      "other": "second known actor name",
+      "x": "observed tile X",
+      "y": "observed tile Y"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.network.help": {
+    "active": true,
+    "context": "C5.0 witnessed NPC social interaction; no private scores or remote tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.network.pixel.hint": {
+    "active": true,
+    "context": "C5.0 witnessed NPC social interaction; no private scores or remote tracking",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
   "living.pixel.draw.4_pledge_5_supply_stonebank_6_renounce": {
     "active": true,
     "context": "pixel.draw",

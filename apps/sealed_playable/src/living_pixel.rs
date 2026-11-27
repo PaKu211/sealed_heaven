@@ -9,7 +9,7 @@ use crate::{
     living_ascii::{
         Session, bonds_session, campaign_session, encounter_session, expanded_session,
         favors_session, generated_session, history_session, knowledge_session, lod_session,
-        outcome_label, production_session, requests_session,
+        outcome_label, production_session, requests_session, social_network_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -65,6 +65,10 @@ pub(crate) fn run_requests(seed: u32) {
 
 pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
+}
+
+pub(crate) fn run_social_network(seed: u32) {
+    run_session(social_network_session(seed, false));
 }
 
 pub(crate) fn run_encounters(seed: u32) {
@@ -160,6 +164,11 @@ fn keyboard(
         game.session.input("contacts 2");
     } else if keys.just_pressed(KeyCode::F2) && game.session.world.generated_region().is_some() {
         game.session.input("survey");
+    } else if game.session.world.social_network().is_some()
+        && keys.just_pressed(KeyCode::F3)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+    {
+        game.session.input("sociallog 2");
     } else if keys.just_pressed(KeyCode::F3) && game.session.world.regional_news().is_some() {
         game.session.input("newsnext");
     } else if keys.just_pressed(KeyCode::F4) && game.session.world.production().is_some() {
@@ -405,7 +414,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     if world.favors().is_some() {
         label(
             &mut commands,
-            tr(if world.encounters().is_some() {
+            tr(if world.social_network().is_some() {
+                "living.network.pixel.hint"
+            } else if world.encounters().is_some() {
                 "living.contact.pixel.hint"
             } else if world.reciprocity().is_some() {
                 "living.bond.pixel.hint"
@@ -1613,6 +1624,57 @@ mod tests {
         assert!(text(&mut app).contains("terakhir ditemui t30"));
         press(&mut app, KeyCode::F2, false);
         assert!(!text(&mut app).contains("terakhir ditemui t30"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+    }
+
+    #[test]
+    fn witnessed_social_keyboard_projection_and_locale_are_read_only() {
+        let mut session = social_network_session(0, false);
+        for _ in 0..120 {
+            assert!(session.input("wait"));
+        }
+        assert!(session.world.witnessed_social().next().is_some());
+        let before = session.world.checkpoint();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let press = |app: &mut App, key, ctrl: bool| {
+            {
+                let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                keys.clear();
+                keys.release(KeyCode::ControlLeft);
+                if ctrl {
+                    keys.press(KeyCode::ControlLeft);
+                }
+                keys.release(key);
+                keys.press(key);
+            }
+            app.update();
+        };
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("Ctrl+F3 social log"));
+        press(&mut app, KeyCode::F3, true);
+        assert!(text(&mut app).contains("greeted at"));
+        press(&mut app, KeyCode::Tab, false);
+        press(&mut app, KeyCode::F3, true);
+        assert!(text(&mut app).contains("bertegur sapa di"));
+        press(&mut app, KeyCode::F3, false);
+        assert!(!text(&mut app).contains("bertegur sapa di"));
         assert_eq!(
             app.world().resource::<Game>().session.world.checkpoint(),
             before

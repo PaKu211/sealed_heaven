@@ -104,6 +104,7 @@ pub fn launch(args: &[String]) -> Result<(), String> {
             "--c47" if revision.is_none() => revision = Some(34),
             "--c48" if revision.is_none() => revision = Some(35),
             "--c49" if revision.is_none() => revision = Some(36),
+            "--c50" if revision.is_none() => revision = Some(37),
             "--pixel" if !pixel => pixel = true,
             "--debug-world" if !debug => debug = true,
             "--seed" if selected_seed.is_none() => {
@@ -120,14 +121,16 @@ pub fn launch(args: &[String]) -> Result<(), String> {
     }
     if revision.is_none() || (pixel && debug) {
         return Err(
-            "usage: --c40 | --c41 | --c42 | --c43 | --c44 | --c45 | --c46 | --c47 | --c48 | --c49 [--seed N] [--pixel | --debug-world]"
+            "usage: --c40 | --c41 | --c42 | --c43 | --c44 | --c45 | --c46 | --c47 | --c48 | --c49 | --c50 [--seed N] [--pixel | --debug-world]"
                 .into(),
         );
     }
     let seed = selected_seed.unwrap_or(0);
     if pixel {
         #[cfg(feature = "desktop")]
-        if revision == Some(36) {
+        if revision == Some(37) {
+            sealed_playable::ascii::run_social_network_window(seed);
+        } else if revision == Some(36) {
             sealed_playable::ascii::run_encounter_window(seed);
         } else if revision == Some(35) {
             sealed_playable::ascii::run_bonds_window(seed);
@@ -151,7 +154,9 @@ pub fn launch(args: &[String]) -> Result<(), String> {
         #[cfg(not(feature = "desktop"))]
         return Err("The window requires the desktop feature.".into());
     } else {
-        if revision == Some(36) {
+        if revision == Some(37) {
+            sealed_playable::ascii::run_social_network_campaign(seed, debug);
+        } else if revision == Some(36) {
             sealed_playable::ascii::run_encounter_campaign(seed, debug);
         } else if revision == Some(35) {
             sealed_playable::ascii::run_bonds_campaign(seed, debug);
