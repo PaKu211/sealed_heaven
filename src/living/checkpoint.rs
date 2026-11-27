@@ -61,6 +61,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::PersistentInjury => 23,
         Rules::AutonomousAgency => 24,
         Rules::SectHierarchy => 25,
+        Rules::DutyCoherence => 26,
     }
 }
 
@@ -116,6 +117,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         23 => Rules::PersistentInjury,
         24 => Rules::AutonomousAgency,
         25 => Rules::SectHierarchy,
+        26 => Rules::DutyCoherence,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -212,6 +214,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::Invite(actor)
@@ -240,6 +243,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::Provision(actor)
@@ -268,6 +272,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::Part(actor)
@@ -295,6 +300,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::OfferAccord
@@ -322,6 +328,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::SupportHall
@@ -348,6 +355,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::PledgeLodge
@@ -374,6 +382,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::AidLodge
@@ -400,6 +409,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::RenounceLodge
@@ -419,6 +429,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::Ask(actor)
@@ -438,6 +449,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::Examine
@@ -457,6 +469,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -476,6 +489,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::Take(actor)
@@ -492,6 +506,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -510,6 +525,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::ClaimLot(value)
@@ -524,6 +540,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -538,6 +555,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::AttuneLot(value)
@@ -551,6 +569,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -563,6 +582,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::Drill(actor)
@@ -575,6 +595,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -590,11 +611,19 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (38, 0) if rules == Rules::AutonomousAgency => Intent::CirculateQi,
         (39, 0) if rules == Rules::AutonomousAgency => Intent::MendMeridians,
         (40, 0) if rules == Rules::AutonomousAgency => Intent::TreatWounds,
-        (37, 0) if rules == Rules::SectHierarchy => Intent::DrawQi,
-        (38, 0) if rules == Rules::SectHierarchy => Intent::CirculateQi,
-        (39, 0) if rules == Rules::SectHierarchy => Intent::MendMeridians,
-        (40, 0) if rules == Rules::SectHierarchy => Intent::TreatWounds,
-        (41, 0) if rules == Rules::SectHierarchy => Intent::ClaimHallAllocation,
+        (37, 0) if matches!(rules, Rules::SectHierarchy | Rules::DutyCoherence) => Intent::DrawQi,
+        (38, 0) if matches!(rules, Rules::SectHierarchy | Rules::DutyCoherence) => {
+            Intent::CirculateQi
+        }
+        (39, 0) if matches!(rules, Rules::SectHierarchy | Rules::DutyCoherence) => {
+            Intent::MendMeridians
+        }
+        (40, 0) if matches!(rules, Rules::SectHierarchy | Rules::DutyCoherence) => {
+            Intent::TreatWounds
+        }
+        (41, 0) if matches!(rules, Rules::SectHierarchy | Rules::DutyCoherence) => {
+            Intent::ClaimHallAllocation
+        }
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -628,6 +657,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::PersistentInjury => b"SH:C10:RULES:v23".to_vec(),
         Rules::AutonomousAgency => b"SH:C10:RULES:v24".to_vec(),
         Rules::SectHierarchy => b"SH:C10:RULES:v25".to_vec(),
+        Rules::DutyCoherence => b"SH:C10:RULES:v26".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -712,6 +742,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::PersistentInjury
             | Rules::AutonomousAgency
             | Rules::SectHierarchy
+            | Rules::DutyCoherence
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -753,6 +784,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::PersistentInjury => b"SH:C10:STATE:v23".to_vec(),
         Rules::AutonomousAgency => b"SH:C10:STATE:v24".to_vec(),
         Rules::SectHierarchy => b"SH:C10:STATE:v25".to_vec(),
+        Rules::DutyCoherence => b"SH:C10:STATE:v26".to_vec(),
     });
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.u64(world.tick);
@@ -845,6 +877,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -920,6 +953,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::PersistentInjury
             | Rules::AutonomousAgency
             | Rules::SectHierarchy
+            | Rules::DutyCoherence
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -951,6 +985,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -989,6 +1024,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::PersistentInjury
             | Rules::AutonomousAgency
             | Rules::SectHierarchy
+            | Rules::DutyCoherence
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1068,6 +1104,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);

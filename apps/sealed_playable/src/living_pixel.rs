@@ -29,7 +29,7 @@ struct Projection;
 pub(crate) fn run() {
     App::new()
         .insert_resource(Game {
-            session: campaign_session(false, 25),
+            session: campaign_session(false, 26),
             target: None,
         })
         .insert_resource(ClearColor(Color::srgb(0.048, 0.062, 0.065)))

@@ -37,7 +37,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.sect_hierarchy().is_some() {
+        if self.world.checkpoint_revision() == 26 {
+            World::duty_coherence_campaign(seed)
+        } else if self.world.sect_hierarchy().is_some() {
             World::sect_hierarchy_campaign(seed)
         } else if self.world.character_agency().is_some() {
             World::autonomous_agency(seed)
@@ -972,7 +974,11 @@ impl Session {
                 return true;
             }
             "help" => {
-                self.notice = if self.world.sect_hierarchy().is_some() {
+                self.notice = if self.world.checkpoint_revision() == 26 {
+                    text(self.locale,
+                        "C3.5.1: Reed Hall members finish active shrine deliveries and reports before joining your company. They cannot accept new Hall delivery duties while accompanying you. sect and sectlog inspect known rank and witnessed events; duty, drill, drawqi, study and allocate retain their C3.5 rules. Use --c35 for the original C3.5 save.",
+                        "C3.5.1: Anggota Balai Alang-alang menuntaskan pengantaran dan laporan tugas kuil sebelum bergabung dengan rombonganmu. Mereka tidak menerima tugas pengantaran balai baru saat menemanimu. sect dan sectlog menampilkan pangkat yang diketahui serta peristiwa yang disaksikan; duty, drill, drawqi, study dan allocate tetap mengikuti aturan C3.5. Gunakan --c35 untuk simpanan C3.5 asli.")
+                } else if self.world.sect_hierarchy().is_some() {
                     text(self.locale,
                         "C3.5: Reed Hall tracks persisted rank and merit for both you and NPC members. Complete shrine duty to reach Disciple (free Reed Hall martial drills, Reed Strike study, and Hall Qi access), and repeat Hall duty from real Hall offerings to reach Senior Disciple and claim one physical herb with allocate. NPC members perform duties, advance, and assume Elder office on succession without you. sect and sectlog inspect known standing and witnessed events. --c34 keeps C3.4.",
                         "C3.5: Balai Alang-alang mencatat pangkat dan jasa bagi dirimu maupun anggota NPC. Tuntaskan tugas kuil untuk menjadi Murid Dalam (latihan bela diri balai bebas biaya, belajar Jurus Alang-alang, dan akses Qi balai), lalu ulangi tugas dari persembahan nyata balai untuk menjadi Murid Senior dan mengambil satu herba fisik dengan allocate. Anggota NPC menjalankan tugas, naik pangkat, dan menjabat Tetua saat suksesi tanpa bantuanmu. sect dan sectlog memeriksa kedudukan dan peristiwa yang disaksikan. --c34 untuk C3.4.")
@@ -3215,7 +3221,7 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
 }
 
 pub(crate) fn run(debug_world: bool) {
-    run_campaign(debug_world, 25);
+    run_campaign(debug_world, 26);
 }
 
 fn hall_rank_label(locale: Locale, rank: HallRank) -> &'static str {
@@ -3252,6 +3258,10 @@ fn decision_reason_label(locale: Locale, reason: DecisionReason) -> &'static str
         ),
     };
     text(locale, en, id)
+}
+
+pub(crate) fn run_c35() {
+    run_campaign(false, 25);
 }
 
 pub(crate) fn run_c34() {
@@ -3357,6 +3367,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         23 => "checkpoint.c33",
         24 => "checkpoint.c34",
         25 => "checkpoint.c35",
+        26 => "checkpoint.c351",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3382,6 +3393,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         23 => World::persistent_injury(0),
         24 => World::autonomous_agency(0),
         25 => World::sect_hierarchy_campaign(0),
+        26 => World::duty_coherence_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
@@ -3470,6 +3482,35 @@ mod tests {
         let session = campaign_session(false, 25);
         assert_eq!(session.world.checkpoint_revision(), 25);
         assert_eq!(session.save_path.file_name().unwrap(), "checkpoint.c35");
+    }
+
+    #[test]
+    fn recovery_revision26_isolates_save_slot_and_preserves_revision_on_reset() {
+        let mut session = campaign_session(false, 26);
+        assert_eq!(session.world.checkpoint_revision(), 26);
+        assert_eq!(session.save_path.file_name().unwrap(), "checkpoint.c351");
+        session.input("seed 7");
+        assert_eq!(session.world.checkpoint_revision(), 26);
+        assert_eq!(session.world.region().unwrap().seed, 7);
+        session.input("wait");
+        session.input("reset");
+        assert_eq!(session.world.checkpoint_revision(), 26);
+        assert_eq!(session.world.region().unwrap().seed, 7);
+        assert_eq!(session.world.tick(), 0);
+        let legacy = campaign_session(false, 25);
+        assert_eq!(legacy.save_path.file_name().unwrap(), "checkpoint.c35");
+        assert_eq!(legacy.world.checkpoint_revision(), 25);
+        let dir = tempfile::tempdir().unwrap();
+        session.save_path = dir.path().join("checkpoint.c351");
+        let foreign = legacy.world.checkpoint();
+        std::fs::write(&session.save_path, &foreign).unwrap();
+        let before = session.world.checkpoint();
+        session.input("load");
+        assert!(session.notice.contains("Load failed"));
+        assert_eq!(session.world.checkpoint(), before);
+        session.input("save");
+        assert!(session.notice.contains("Save failed"));
+        assert_eq!(std::fs::read(&session.save_path).unwrap(), foreign);
     }
 
     #[test]

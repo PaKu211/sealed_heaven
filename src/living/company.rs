@@ -109,6 +109,12 @@ impl World {
         if relation.familiarity == 0 {
             return Err(Rejection::IntroductionRequired);
         }
+        // A pledged physical delivery/report is not compatible with joining a
+        // travelling party. Reject without changing duty, inventory or company.
+        // Keep revision 25's valid historical command outcomes unchanged.
+        if self.rules == super::Rules::DutyCoherence && self.sect_duty_active(id) {
+            return Err(Rejection::BoundToDuty);
+        }
         let company = self.company.as_mut().expect("company campaign");
         if company.journey.is_some() {
             return Err(Rejection::CompanyFull);

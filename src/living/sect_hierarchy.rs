@@ -290,6 +290,10 @@ impl World {
         let hall = Region::sites().hall;
         match member.duty {
             SectDuty::Unassigned => {
+                // Defensive revalidation of a duty plan at execution time.
+                if self.rules == super::Rules::DutyCoherence && self.companion(actor).is_some() {
+                    return;
+                }
                 if !self.hall_leader_on_duty_for(actor) {
                     return;
                 }
@@ -1022,5 +1026,209 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn ready_to_invite_deputy(mut world: World) -> World {
+        world.player.position = super::super::Position { x: 26, y: 7 };
+        world.npcs.get_mut(&DEPUTY).unwrap().position = super::super::Position { x: 27, y: 7 };
+        world.region.as_mut().unwrap().enrolled = true;
+        world.sect_hierarchy.as_mut().unwrap().player = Some(SectMember {
+            rank: HallRank::Apprentice,
+            merit: 0,
+            duty: SectDuty::Unassigned,
+            allocation_claimed: false,
+        });
+        world.social.meet(DEPUTY, PLAYER);
+        world
+    }
+
+    #[test]
+    fn revision26_refuses_both_active_duty_phases_but_revision25_preserves_legacy_behavior() {
+        for duty in [SectDuty::Carrying, SectDuty::Delivered] {
+            let mut current = ready_to_invite_deputy(World::duty_coherence_campaign(0));
+            let mut old = ready_to_invite_deputy(World::sect_hierarchy_campaign(0));
+            for world in [&mut current, &mut old] {
+                world
+                    .sect_hierarchy
+                    .as_mut()
+                    .unwrap()
+                    .members
+                    .get_mut(&DEPUTY)
+                    .unwrap()
+                    .duty = duty;
+                if duty == SectDuty::Carrying {
+                    world.npcs.get_mut(&DEPUTY).unwrap().herbs += 1;
+                    world.supply.source -= 1;
+                }
+            }
+            let before = current.clone();
+            assert_eq!(current.invite(DEPUTY), Err(Rejection::BoundToDuty));
+            assert_eq!(current, before);
+            assert_eq!(old.invite(DEPUTY), Ok(Outcome::JoinedCompany(DEPUTY)));
+            assert!(old.companion(DEPUTY).is_some());
+            assert_eq!(old.sect_member(DEPUTY).unwrap().duty, duty);
+            assert_eq!(
+                turn(&mut current, Intent::Invite(DEPUTY)),
+                Outcome::Rejected(Rejection::BoundToDuty)
+            );
+            assert!(current.companion(DEPUTY).is_none());
+        }
+    }
+
+    #[test]
+    fn revision26_companion_cannot_pick_up_new_duty_and_dismissal_reenables_it() {
+        let mut world = ready_to_invite_deputy(World::duty_coherence_campaign(0));
+        let hall = Region::sites().hall;
+        world.npcs.get_mut(&MENTOR).unwrap().position = hall;
+        world.npcs.get_mut(&DEPUTY).unwrap().position = super::super::Position {
+            x: hall.x,
+            y: hall.y + 1,
+        };
+        world.player.position = super::super::Position {
+            x: hall.x - 1,
+            y: hall.y + 1,
+        };
+        while world.is_night() {
+            world.tick += 1;
+        }
+        world.region.as_mut().unwrap().hall_offerings = 1;
+        world.npcs.get_mut(&DEPUTY).unwrap().fatigue = 0;
+        assert!(world.hall_leader_on_duty_for(DEPUTY));
+        assert_eq!(world.sect_duty_goal(DEPUTY), Some(Goal::SectDuty));
+        assert_eq!(world.invite(DEPUTY), Ok(Outcome::JoinedCompany(DEPUTY)));
+        assert_eq!(world.sect_duty_goal(DEPUTY), None);
+        let before = world.clone();
+        world.work_sect_duty(DEPUTY);
+        assert_eq!(
+            world, before,
+            "a stale duty plan must not acquire offerings"
+        );
+        assert_eq!(world.part(DEPUTY), Ok(Outcome::Parted(DEPUTY)));
+        assert_eq!(world.sect_duty_goal(DEPUTY), Some(Goal::SectDuty));
+        let total = material_total(&world);
+        world.work_sect_duty(DEPUTY);
+        assert_eq!(world.sect_member(DEPUTY).unwrap().duty, SectDuty::Carrying);
+        assert_eq!(world.region().unwrap().hall_offerings, 0);
+        assert_eq!(material_total(&world), total);
+    }
+
+    #[test]
+    fn authentic_revision25_fixtures_and_40_turn_continuations_are_byte_exact() {
+        let fixtures: [(&[u8], &[u8]); 2] = [
+            (
+                include_bytes!("../../tests/fixtures/living/revision25.bin"),
+                include_bytes!("../../tests/fixtures/living/revision25_plus40.bin"),
+            ),
+            (
+                include_bytes!("../../tests/fixtures/living/revision25_mixed.bin"),
+                include_bytes!("../../tests/fixtures/living/revision25_mixed_plus40.bin"),
+            ),
+        ];
+        for (initial, continuation) in fixtures {
+            let mut world = World::restore(initial).unwrap();
+            assert_eq!(world.checkpoint_revision(), 25);
+            assert_eq!(world.checkpoint(), initial);
+            for _ in 0..40 {
+                turn(&mut world, Intent::Wait);
+            }
+            assert_eq!(world.checkpoint(), continuation);
+        }
+    }
+
+    #[test]
+    fn revision26_preserves_hierarchy_resource_and_replay_invariants_across_four_seeds() {
+        for seed in [0, 1, 2, 7] {
+            let mut left = World::duty_coherence_campaign(seed);
+            let mut right = World::duty_coherence_campaign(seed);
+            assert_eq!(left.checkpoint_revision(), 26);
+            assert_ne!(
+                left.checkpoint(),
+                World::sect_hierarchy_campaign(seed).checkpoint()
+            );
+            let total = material_total(&left);
+            for i in 1..=1000 {
+                assert_eq!(
+                    turn(&mut left, Intent::Wait),
+                    turn(&mut right, Intent::Wait)
+                );
+                if matches!(i, 200 | 500 | 1000) {
+                    assert_eq!(left.checkpoint(), right.checkpoint());
+                    left = World::restore(&left.checkpoint()).unwrap();
+                    assert_eq!(left, right);
+                    assert_eq!(
+                        material_total(&left),
+                        total + left.supply.regrown + left.region().unwrap().garden_regrown
+                    );
+                    assert!(left.sect_hierarchy().unwrap().history.len() <= HISTORY_CAP);
+                    for (&actor, member) in &left.sect_hierarchy().unwrap().members {
+                        if member.duty == SectDuty::Carrying {
+                            assert!(left.npcs[&actor].herbs > 0);
+                        }
+                        if member.duty != SectDuty::Unassigned {
+                            assert!(left.companion(actor).is_none());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Unlike the isolated branch-level fixtures, every state in this test is
+    // reached using public commands from a real scenario seed.
+    #[test]
+    fn revision26_real_campaign_refuses_invitation_during_duty_and_replays() {
+        let mut world = World::duty_coherence_campaign(0);
+        let patch = world.scenario.patch;
+        let shrine = world.scenario.shrine;
+        walk_to(&mut world, patch, 1);
+        for _ in 0..4 {
+            assert_eq!(turn(&mut world, Intent::Gather), Outcome::Gathered);
+        }
+        walk_to(&mut world, shrine, 1);
+        assert_eq!(
+            turn(&mut world, Intent::Practice),
+            Outcome::Practiced { progress: 1 }
+        );
+        walk_to(&mut world, Region::sites().hall, 1);
+        wait_for_open_hall(&mut world);
+        assert_eq!(turn(&mut world, Intent::JoinHall), Outcome::Enrolled);
+        for _ in 0..800 {
+            let npc = world.npcs[&DEPUTY];
+            assert!(npc.alive() && world.player.alive());
+            let from = world.player.position;
+            let to = npc.position;
+            if in_reach(from, to) {
+                if world.social.relationship(DEPUTY, PLAYER).familiarity == 0 {
+                    turn(&mut world, Intent::Talk(DEPUTY));
+                } else if world.sect_duty_active(DEPUTY) {
+                    assert_eq!(
+                        turn(&mut world, Intent::Invite(DEPUTY)),
+                        Outcome::Rejected(Rejection::BoundToDuty)
+                    );
+                    assert!(world.companion(DEPUTY).is_none());
+                    let bytes = world.checkpoint();
+                    assert_eq!(World::restore(&bytes).unwrap(), world);
+                    assert_eq!(World::restore(&bytes).unwrap().checkpoint(), bytes);
+                    println!("Active duty invitation refused at turn {}", world.tick());
+                    return;
+                } else {
+                    turn(&mut world, Intent::Wait);
+                }
+            } else {
+                let next =
+                    super::super::navigation::next_step(world.scenario, from, to, 1, |site| {
+                        world.walkable(site) && !world.occupied(site)
+                    });
+                let intent = match next {
+                    Some(site) if site.x > from.x => Intent::Move(Direction::East),
+                    Some(site) if site.x < from.x => Intent::Move(Direction::West),
+                    Some(site) if site.y > from.y => Intent::Move(Direction::South),
+                    Some(_) => Intent::Move(Direction::North),
+                    None => Intent::Wait,
+                };
+                turn(&mut world, intent);
+            }
+        }
+        panic!("No active duty invitation opportunity in seeded scenario");
     }
 }

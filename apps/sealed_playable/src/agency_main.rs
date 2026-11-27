@@ -6,7 +6,7 @@ fn main() {
     let options: Vec<_> = std::env::args().skip(1).collect();
     if options.iter().any(|arg| arg == "--pixel") {
         if options.len() != 1 {
-            eprintln!("--pixel currently supports only the default C3.5 campaign.");
+            eprintln!("--pixel currently supports only the default C3.5.1 campaign.");
             std::process::exit(2);
         }
         #[cfg(feature = "desktop")]
@@ -64,6 +64,8 @@ fn main() {
         sealed_playable::ascii::run_c32();
     } else if options.iter().any(|arg| arg == "--c33") {
         sealed_playable::ascii::run_c33();
+    } else if options.iter().any(|arg| arg == "--c35") {
+        sealed_playable::ascii::run_c35();
     } else if options.iter().any(|arg| arg == "--c34") {
         sealed_playable::ascii::run_c34();
     } else if options.iter().any(|arg| arg == "--c22") {

@@ -103,6 +103,10 @@ pub fn run_c33() {
     crate::living_ascii::run_c33();
 }
 
+pub fn run_c35() {
+    crate::living_ascii::run_c35();
+}
+
 pub fn run_c34() {
     crate::living_ascii::run_c34();
 }

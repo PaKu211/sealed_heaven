@@ -397,6 +397,7 @@ pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
             | Rules::PersistentInjury
             | Rules::AutonomousAgency
             | Rules::SectHierarchy
+            | Rules::DutyCoherence
     ) {
         return if seed & 1 == 0 {
             &RIDGE_POLITICS

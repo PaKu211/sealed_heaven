@@ -427,6 +427,7 @@ enum Rules {
     PersistentInjury,
     AutonomousAgency,
     SectHierarchy,
+    DutyCoherence,
 }
 
 impl Rules {
@@ -459,6 +460,7 @@ impl Rules {
                 | Self::PersistentInjury
                 | Self::AutonomousAgency
                 | Self::SectHierarchy
+                | Self::DutyCoherence
         )
     }
 }
@@ -560,6 +562,11 @@ impl World {
         Self::seeded(seed, Rules::SectHierarchy)
     }
 
+    /// C3.5.1: a new rules revision, not a silent change to C3.5 replay.
+    pub fn duty_coherence_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::DutyCoherence)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         assert!(
@@ -620,6 +627,7 @@ impl World {
                         | Rules::PersistentInjury
                         | Rules::AutonomousAgency
                         | Rules::SectHierarchy
+                        | Rules::DutyCoherence
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -656,6 +664,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(Company::default),
             rivalry: matches!(
@@ -680,6 +689,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -703,6 +713,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(Politics::new),
             traffic: matches!(
@@ -725,6 +736,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -746,6 +758,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -764,6 +777,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -781,6 +795,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(Information::default),
             contested: matches!(
@@ -792,6 +807,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(|| {
                 Contested::new(matches!(
@@ -802,6 +818,7 @@ impl World {
                         | Rules::PersistentInjury
                         | Rules::AutonomousAgency
                         | Rules::SectHierarchy
+                        | Rules::DutyCoherence
                 ))
             }),
             martial: matches!(
@@ -811,6 +828,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -819,16 +837,24 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
                 rules,
-                Rules::PersistentInjury | Rules::AutonomousAgency | Rules::SectHierarchy
+                Rules::PersistentInjury
+                    | Rules::AutonomousAgency
+                    | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
             .then(|| Injuries::new(scenario)),
-            character_agency: matches!(rules, Rules::AutonomousAgency | Rules::SectHierarchy)
-                .then(|| CharacterAgency::new(scenario)),
-            sect_hierarchy: (rules == Rules::SectHierarchy).then(|| SectHierarchy::new(scenario)),
+            character_agency: matches!(
+                rules,
+                Rules::AutonomousAgency | Rules::SectHierarchy | Rules::DutyCoherence
+            )
+            .then(|| CharacterAgency::new(scenario)),
+            sect_hierarchy: matches!(rules, Rules::SectHierarchy | Rules::DutyCoherence)
+                .then(|| SectHierarchy::new(scenario)),
         }
     }
 
@@ -984,6 +1010,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1004,6 +1031,7 @@ impl World {
                     | Rules::PersistentInjury
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
+                    | Rules::DutyCoherence
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1204,6 +1232,7 @@ impl World {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         )
     }
 
@@ -1221,6 +1250,7 @@ impl World {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         )
     }
 
@@ -1237,6 +1267,7 @@ impl World {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         )
     }
 
@@ -1252,6 +1283,7 @@ impl World {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         )
     }
 
@@ -1266,6 +1298,7 @@ impl World {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         )
     }
 
@@ -1278,6 +1311,7 @@ impl World {
                 | Rules::PersistentInjury
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
+                | Rules::DutyCoherence
         )
     }
 
