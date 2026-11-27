@@ -6,6 +6,7 @@ mod checkpoint;
 mod company;
 #[cfg(test)]
 mod consequences_tests;
+pub mod content;
 mod contested;
 mod contract_memory;
 #[cfg(test)]
@@ -1371,7 +1372,7 @@ impl World {
         self.require_reach(target.position)?;
         let (damage, outcome) = if with_form {
             self.spend_form_qi()?;
-            (STRIKE + 1, Outcome::FormStruck(id))
+            (content::FORM_DAMAGE, Outcome::FormStruck(id))
         } else {
             (STRIKE, Outcome::Struck(id))
         };

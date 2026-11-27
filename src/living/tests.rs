@@ -2003,3 +2003,95 @@ fn seeded_player_exchange_survives_replay_with_its_witnessed_history() {
     let checkpoint = world.checkpoint();
     assert_eq!(World::restore(&checkpoint).unwrap(), world);
 }
+
+// This exact test driver is appended to the isolated C3.6 baseline's
+// living/tests.rs for provenance. It also drives the C3.7 acceptance matrix.
+#[test]
+fn c37_golden_content_matrix() {
+    use sha2::{Digest, Sha256};
+    let rules = [
+        Rules::Original,
+        Rules::Qinghe,
+        Rules::Riverlands,
+        Rules::ReedHall,
+        Rules::RoadCompany,
+        Rules::SectRivalry,
+        Rules::SectPolitics,
+        Rules::TrafficCourtesy,
+        Rules::LivingAgency,
+        Rules::FactionAgency,
+        Rules::InstitutionalAgency,
+        Rules::ContractAccountability,
+        Rules::InformationDisputes,
+        Rules::PlayerAgency,
+        Rules::Consequences,
+        Rules::ViolenceLogistics,
+        Rules::PlayerReporting,
+        Rules::PhysicalRecovery,
+        Rules::ContestedResources,
+        Rules::SectCultivation,
+        Rules::MartialMentorship,
+        Rules::MeridianCultivation,
+        Rules::PersistentInjury,
+        Rules::AutonomousAgency,
+        Rules::SectHierarchy,
+        Rules::DutyCoherence,
+    ];
+    let mut rows = Vec::new();
+    for (index, rule) in rules.into_iter().enumerate() {
+        let rev = index + 1;
+        let seeds: &[u32] = if rev <= 2 { &[0] } else { &[0, 1, 2, 7] };
+        for &seed in seeds {
+            let mut world = if rev <= 2 {
+                World::with_rules(&qinghe::QINGHE, rule)
+            } else {
+                World::seeded(seed, rule)
+            };
+            assert_eq!(usize::from(world.checkpoint_revision()), rev);
+            let mut checkpoint_rows = Vec::new();
+            for tick in 0..=1000 {
+                if matches!(tick, 0 | 40 | 1000) {
+                    let bytes = world.checkpoint();
+                    let hash = Sha256::digest(&bytes)
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<String>();
+                    assert_eq!(World::restore(&bytes).unwrap().checkpoint(), bytes);
+                    checkpoint_rows.push((tick, hash));
+                }
+                if tick == 1000 {
+                    break;
+                }
+                let intent = match tick % 19 {
+                    0 => Intent::Move(Direction::East),
+                    1 => Intent::Move(Direction::South),
+                    2 => Intent::Talk(ActorId::new(1)),
+                    3 => Intent::Gather,
+                    4 => Intent::Move(Direction::North),
+                    5 => Intent::Guard,
+                    6 => Intent::Deliver,
+                    7 if rev >= 2 => Intent::Practice,
+                    8 if rev >= 3 => Intent::BuyHerb,
+                    9 if rev >= 3 => Intent::SellHerb,
+                    10 if rev >= 4 => Intent::Brew,
+                    11 if rev >= 4 => Intent::JoinHall,
+                    12 if rev >= 5 => Intent::Invite(ActorId::new(22)),
+                    13 if rev >= 6 => Intent::OfferAccord,
+                    14 if rev >= 19 => Intent::ClaimLot(0),
+                    15 if rev >= 21 => Intent::Drill(ActorId::new(33)),
+                    16 => Intent::Move(Direction::West),
+                    _ => Intent::Wait,
+                };
+                world.step(world.tick(), intent).unwrap();
+            }
+            for (tick, hash) in checkpoint_rows {
+                rows.push(format!("{rev},{seed},{tick},{hash}"));
+            }
+        }
+    }
+    let expected = include_str!("../../tests/fixtures/living/c36_registry_golden.csv");
+    let mut lines = expected.lines();
+    assert_eq!(lines.next(), Some("revision,seed,tick,checkpoint_sha256"));
+    assert_eq!(rows.len(), 294);
+    assert_eq!(rows, lines.collect::<Vec<_>>());
+}

@@ -3,13 +3,11 @@
 use super::navigation::in_reach;
 use super::{ActorId, Outcome, PLAYER, PLAYER_HP, Position, Rejection, Role, World};
 
-const GARDEN_CAPACITY: u32 = 10;
-const MARKET_TARGET: u32 = 6;
-const MARKET_RESERVE: u32 = 2;
-const COIN_BUDGET: u32 = 24;
-const REMEDY_HERBS: u32 = 2;
-const ORDER_INTERVAL: u64 = 48;
-const ORDER_TRAVEL: u64 = 30;
+use super::content::{
+    COIN_BUDGET, GARDEN_CAPACITY, GARDEN_REGROW_EVERY, MARKET_RESERVE, MARKET_TARGET, NORMAL_BUY,
+    NORMAL_SELL, OPENING_ORDER, ORDER_INTERVAL, ORDER_TRAVEL, REGION_SITES, REMEDY_HERBS,
+    REMEDY_HP, REMEDY_OUTPUT, SCARCE_BUY, SCARCE_SELL, STOCK_BASE, STOCK_VARIANTS, starting_coins,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Background {
@@ -20,11 +18,7 @@ pub enum Background {
 
 impl Background {
     fn starting_coins(self) -> u32 {
-        match self {
-            Self::Wanderer => 3,
-            Self::Herbalist => 1,
-            Self::Peddler => 6,
-        }
+        starting_coins(self)
     }
 }
 
@@ -81,29 +75,25 @@ impl Region {
             remedies: 0,
             remedies_used: 0,
             // Qinghe's opening order was sent before the campaign begins.
-            order_remaining: 2,
+            order_remaining: OPENING_ORDER,
             order_in_transit: None,
         }
     }
 
     fn initial_stock(seed: u32) -> u32 {
         // The next seed bits govern stock independently of which road is open.
-        4 + (seed >> 1) % 3
+        STOCK_BASE + (seed >> 1) % STOCK_VARIANTS
     }
 
     pub fn sites() -> RegionSites {
-        RegionSites {
-            market: Position { x: 25, y: 4 },
-            garden: Position { x: 27, y: 2 },
-            hall: Position { x: 27, y: 6 },
-        }
+        REGION_SITES
     }
 
     pub fn quote(self) -> MarketQuote {
         let scarce = self.market_herbs <= MARKET_RESERVE;
         MarketQuote {
-            buy: if scarce { 3 } else { 2 },
-            sell: if scarce { 2 } else { 1 },
+            buy: if scarce { SCARCE_BUY } else { NORMAL_BUY },
+            sell: if scarce { SCARCE_SELL } else { NORMAL_SELL },
         }
     }
 }
@@ -185,7 +175,9 @@ impl World {
             None
         };
         if let Some(region) = &mut self.region {
-            if self.tick.is_multiple_of(16) && region.garden_herbs < GARDEN_CAPACITY {
+            if self.tick.is_multiple_of(GARDEN_REGROW_EVERY)
+                && region.garden_herbs < GARDEN_CAPACITY
+            {
                 region.garden_herbs += 1;
                 region.garden_regrown += 1;
             }
@@ -298,7 +290,7 @@ impl World {
             return Err(Rejection::NoCargo);
         }
         self.player.herbs -= REMEDY_HERBS;
-        region.remedies += 1;
+        region.remedies += REMEDY_OUTPUT;
         Ok(Outcome::Brewed)
     }
 
@@ -307,7 +299,7 @@ impl World {
         if region.remedies == 0 {
             return Err(Rejection::NoRemedy);
         }
-        let healed = (PLAYER_HP - self.player.hp).min(2);
+        let healed = (PLAYER_HP - self.player.hp).min(REMEDY_HP);
         if healed == 0 {
             return Err(Rejection::Uninjured);
         }

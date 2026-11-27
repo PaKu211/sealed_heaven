@@ -8,8 +8,7 @@ use super::{
 };
 
 const HISTORY_CAP: usize = 256;
-const DISCIPLE_MERIT: u8 = 1;
-const SENIOR_MERIT: u8 = 2;
+use super::content::{DISCIPLE_MERIT, SENIOR_MERIT, hall_rank_for_role};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SectDuty {
@@ -61,12 +60,7 @@ impl SectHierarchy {
             .npcs
             .iter()
             .filter_map(|npc| {
-                let rank = match npc.role {
-                    Role::Mentor => HallRank::Elder,
-                    Role::HallDeputy => HallRank::Apprentice,
-                    Role::HallSteward => HallRank::Disciple,
-                    _ => return None,
-                };
+                let rank = hall_rank_for_role(npc.role)?;
                 Some((
                     npc.id,
                     SectMember {

@@ -1,0 +1,52 @@
+{
+  "header": {
+    "schema_version": 1,
+    "pack_id": "core",
+    "content_version": 1,
+    "dependencies": []
+  },
+  "items": [
+    {
+      "id": "core:spirit_herb",
+      "kind": "Herb"
+    },
+    {
+      "id": "core:coin",
+      "kind": "Coin"
+    },
+    {
+      "id": "core:remedy",
+      "kind": "Remedy"
+    },
+    {
+      "id": "core:spirit_ore",
+      "kind": "SpiritOre"
+    },
+    {
+      "id": "core:jade_script",
+      "kind": "JadeScript"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "core:open_ground",
+      "glyph": ".",
+      "walkable": true
+    },
+    {
+      "id": "core:wall",
+      "glyph": "#",
+      "walkable": false
+    }
+  ],
+  "recipes": [
+    {
+      "id": "core:brew_remedy",
+      "input": "core:spirit_herb",
+      "input_count": 2,
+      "output": "core:remedy",
+      "output_count": 1,
+      "effect_hp": 2
+    }
+  ]
+}

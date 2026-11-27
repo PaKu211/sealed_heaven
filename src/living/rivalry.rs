@@ -5,10 +5,9 @@
 use super::navigation::in_reach;
 use super::{ActorId, Goal, Outcome, PLAYER, Position, Region, Rejection, Role, World};
 
-const OPENING_COINS: u32 = 16;
-const CONTEST_THRESHOLD: u8 = 4;
-const MAX_PRESSURE: u8 = 8;
-const ACCORD_TURNS: u64 = 48;
+use super::content::{
+    ACCORD_TURNS, CONTEST_THRESHOLD, LODGE_OPENING_COINS as OPENING_COINS, MAX_PRESSURE,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SectEventKind {

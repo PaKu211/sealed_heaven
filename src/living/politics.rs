@@ -5,7 +5,7 @@
 use super::navigation::in_reach;
 use super::{ActorId, Duty, Goal, Outcome, PLAYER, Position, Region, Rejection, Role, World};
 
-const HALL_OPENING_COINS: u32 = 18;
+use super::content::HALL_OPENING_COINS;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Allegiance {

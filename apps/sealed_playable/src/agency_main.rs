@@ -4,6 +4,14 @@ mod agency_desktop;
 
 fn main() {
     let options: Vec<_> = std::env::args().skip(1).collect();
+    if options.iter().any(|arg| arg == "--content-info") {
+        if options.len() != 1 {
+            eprintln!("--content-info must be used alone");
+            std::process::exit(2);
+        }
+        println!("{}", sealed_sim::living::content::manifest_json());
+        return;
+    }
     if options.iter().any(|arg| arg == "--pixel") {
         if options.len() != 1 {
             eprintln!("--pixel currently supports only the default C3.5.1 campaign.");

@@ -1,0 +1,1208 @@
+{
+  "header": {
+    "schema_version": 1,
+    "pack_id": "sealed_heaven",
+    "content_version": 1,
+    "dependencies": [
+      {
+        "pack_id": "core",
+        "content_version": 1
+      }
+    ]
+  },
+  "actors": [
+    {
+      "id": "sealed_heaven:yao_lian",
+      "wire_id": 1,
+      "name": "Yao Lian",
+      "glyph": "Y",
+      "role": "Medic",
+      "spawn": [
+        3,
+        3
+      ],
+      "home": [
+        2,
+        3
+      ],
+      "route": [],
+      "hp": 6,
+      "rest_threshold": 16,
+      "responds_to_attack": false,
+      "shares_news": true,
+      "report_to": null
+    },
+    {
+      "id": "sealed_heaven:shen_wei",
+      "wire_id": 2,
+      "name": "Shen Wei",
+      "glyph": "G",
+      "role": "Watch",
+      "spawn": [
+        5,
+        4
+      ],
+      "home": [
+        4,
+        3
+      ],
+      "route": [
+        [
+          5,
+          4
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      "hp": 6,
+      "rest_threshold": 14,
+      "responds_to_attack": true,
+      "shares_news": true,
+      "report_to": "sealed_heaven:yao_lian"
+    },
+    {
+      "id": "sealed_heaven:lin_su",
+      "wire_id": 3,
+      "name": "Lin Su",
+      "glyph": "H",
+      "role": "Supplier",
+      "spawn": [
+        8,
+        2
+      ],
+      "home": [
+        8,
+        1
+      ],
+      "route": [
+        [
+          8,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          9,
+          5
+        ]
+      ],
+      "hp": 6,
+      "rest_threshold": 22,
+      "responds_to_attack": false,
+      "shares_news": true,
+      "report_to": "sealed_heaven:shen_wei"
+    },
+    {
+      "id": "sealed_heaven:road_outrider",
+      "wire_id": 22,
+      "name": "Road outrider",
+      "glyph": "R",
+      "role": "Traveler",
+      "spawn": [
+        9,
+        4
+      ],
+      "home": [
+        10,
+        6
+      ],
+      "route": [
+        [
+          9,
+          4
+        ],
+        [
+          10,
+          4
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          4
+        ]
+      ],
+      "hp": 4,
+      "rest_threshold": 18,
+      "responds_to_attack": true,
+      "shares_news": false,
+      "report_to": null
+    },
+    {
+      "id": "sealed_heaven:mei_fen",
+      "wire_id": 31,
+      "name": "Mei Fen",
+      "glyph": "F",
+      "role": "Grower",
+      "spawn": [
+        27,
+        2
+      ],
+      "home": [
+        28,
+        2
+      ],
+      "route": [],
+      "hp": 6,
+      "rest_threshold": 26,
+      "responds_to_attack": false,
+      "shares_news": true,
+      "report_to": "sealed_heaven:bao_jun"
+    },
+    {
+      "id": "sealed_heaven:bao_jun",
+      "wire_id": 32,
+      "name": "Bao Jun",
+      "glyph": "C",
+      "role": "Courier",
+      "spawn": [
+        23,
+        4
+      ],
+      "home": [
+        22,
+        5
+      ],
+      "route": [],
+      "hp": 6,
+      "rest_threshold": 40,
+      "responds_to_attack": true,
+      "shares_news": true,
+      "report_to": "sealed_heaven:shen_wei"
+    },
+    {
+      "id": "sealed_heaven:ren_zhi",
+      "wire_id": 33,
+      "name": "Ren Zhi",
+      "glyph": "M",
+      "role": "Mentor",
+      "spawn": [
+        27,
+        6
+      ],
+      "home": [
+        28,
+        6
+      ],
+      "route": [],
+      "hp": 6,
+      "rest_threshold": 22,
+      "responds_to_attack": true,
+      "shares_news": true,
+      "report_to": "sealed_heaven:bao_jun"
+    },
+    {
+      "id": "sealed_heaven:luo_xiu",
+      "wire_id": 34,
+      "name": "Luo Xiu",
+      "glyph": "X",
+      "role": "HallDeputy",
+      "spawn": [
+        27,
+        7
+      ],
+      "home": [
+        29,
+        7
+      ],
+      "route": [
+        [
+          27,
+          7
+        ],
+        [
+          28,
+          7
+        ],
+        [
+          28,
+          5
+        ]
+      ],
+      "hp": 6,
+      "rest_threshold": 24,
+      "responds_to_attack": true,
+      "shares_news": true,
+      "report_to": "sealed_heaven:bao_jun"
+    },
+    {
+      "id": "sealed_heaven:stonebank_envoy",
+      "wire_id": 35,
+      "name": "Stonebank lodge envoy",
+      "glyph": "V",
+      "role": "RivalEnvoy",
+      "spawn": [
+        25,
+        5
+      ],
+      "home": [
+        26,
+        6
+      ],
+      "route": [
+        [
+          25,
+          5
+        ],
+        [
+          26,
+          5
+        ]
+      ],
+      "hp": 6,
+      "rest_threshold": 25,
+      "responds_to_attack": true,
+      "shares_news": true,
+      "report_to": "sealed_heaven:mei_fen"
+    },
+    {
+      "id": "sealed_heaven:qiao_lin",
+      "wire_id": 36,
+      "name": "Qiao Lin, Hall steward",
+      "glyph": "Q",
+      "role": "HallSteward",
+      "spawn": [
+        29,
+        4
+      ],
+      "home": [
+        29,
+        5
+      ],
+      "route": [
+        [
+          29,
+          4
+        ],
+        [
+          29,
+          5
+        ]
+      ],
+      "hp": 6,
+      "rest_threshold": 24,
+      "responds_to_attack": true,
+      "shares_news": true,
+      "report_to": "sealed_heaven:ren_zhi"
+    }
+  ],
+  "maps": [
+    {
+      "id": "sealed_heaven:qinghe_map",
+      "rows": [
+        "............",
+        "......#.....",
+        "......#.....",
+        "......#.....",
+        "............",
+        "......#.....",
+        "......#.....",
+        "......#.....",
+        "............"
+      ]
+    },
+    {
+      "id": "sealed_heaven:ridge_map",
+      "rows": [
+        "............#########.........",
+        "......#.....####...##.........",
+        "......#.....####...##.........",
+        "......#.......................",
+        "..............................",
+        "......#.....####...##.........",
+        "......#.....####...##.........",
+        "......#.....####...##.........",
+        "............#########........."
+      ]
+    },
+    {
+      "id": "sealed_heaven:lower_map",
+      "rows": [
+        "............#########.........",
+        "......#.....####...##.........",
+        "......#.....####...##.........",
+        "......#.....####...##.........",
+        "............####...##.........",
+        "......#.....####...##.........",
+        "......#.......................",
+        "......#.......................",
+        "............#########........."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "sealed_heaven:qinghe",
+      "name": "Qinghe",
+      "map": "sealed_heaven:qinghe_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ]
+      ],
+      "recruits": [],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:ridge_road",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:ridge_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ]
+      ],
+      "recruits": [],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:lower_road",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:lower_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ]
+      ],
+      "recruits": [],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:ridge_hall",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:ridge_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi",
+        "sealed_heaven:luo_xiu"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:luo_xiu"
+        ],
+        [
+          "sealed_heaven:luo_xiu",
+          "sealed_heaven:bao_jun"
+        ]
+      ],
+      "recruits": [
+        {
+          "actor": "sealed_heaven:road_outrider",
+          "invitation": "OpenRoad"
+        },
+        {
+          "actor": "sealed_heaven:luo_xiu",
+          "invitation": "SchoolMember"
+        }
+      ],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:lower_hall",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:lower_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi",
+        "sealed_heaven:luo_xiu"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:luo_xiu"
+        ],
+        [
+          "sealed_heaven:luo_xiu",
+          "sealed_heaven:bao_jun"
+        ]
+      ],
+      "recruits": [
+        {
+          "actor": "sealed_heaven:road_outrider",
+          "invitation": "OpenRoad"
+        },
+        {
+          "actor": "sealed_heaven:luo_xiu",
+          "invitation": "SchoolMember"
+        }
+      ],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:ridge_rivalry",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:ridge_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi",
+        "sealed_heaven:luo_xiu",
+        "sealed_heaven:stonebank_envoy"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:luo_xiu"
+        ],
+        [
+          "sealed_heaven:luo_xiu",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:stonebank_envoy",
+          "sealed_heaven:mei_fen"
+        ]
+      ],
+      "recruits": [
+        {
+          "actor": "sealed_heaven:road_outrider",
+          "invitation": "OpenRoad"
+        },
+        {
+          "actor": "sealed_heaven:luo_xiu",
+          "invitation": "SchoolMember"
+        }
+      ],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:lower_rivalry",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:lower_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi",
+        "sealed_heaven:luo_xiu",
+        "sealed_heaven:stonebank_envoy"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:luo_xiu"
+        ],
+        [
+          "sealed_heaven:luo_xiu",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:stonebank_envoy",
+          "sealed_heaven:mei_fen"
+        ]
+      ],
+      "recruits": [
+        {
+          "actor": "sealed_heaven:road_outrider",
+          "invitation": "OpenRoad"
+        },
+        {
+          "actor": "sealed_heaven:luo_xiu",
+          "invitation": "SchoolMember"
+        }
+      ],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:ridge_politics",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:ridge_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi",
+        "sealed_heaven:luo_xiu",
+        "sealed_heaven:stonebank_envoy",
+        "sealed_heaven:qiao_lin"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:luo_xiu"
+        ],
+        [
+          "sealed_heaven:luo_xiu",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:stonebank_envoy",
+          "sealed_heaven:mei_fen"
+        ],
+        [
+          "sealed_heaven:qiao_lin",
+          "sealed_heaven:ren_zhi"
+        ],
+        [
+          "sealed_heaven:qiao_lin",
+          "sealed_heaven:luo_xiu"
+        ]
+      ],
+      "recruits": [
+        {
+          "actor": "sealed_heaven:road_outrider",
+          "invitation": "OpenRoad"
+        },
+        {
+          "actor": "sealed_heaven:luo_xiu",
+          "invitation": "SchoolMember"
+        },
+        {
+          "actor": "sealed_heaven:stonebank_envoy",
+          "invitation": "LodgeMember"
+        },
+        {
+          "actor": "sealed_heaven:qiao_lin",
+          "invitation": "SchoolMember"
+        }
+      ],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    },
+    {
+      "id": "sealed_heaven:lower_politics",
+      "name": "Qinghe and Willowford",
+      "map": "sealed_heaven:lower_map",
+      "actors": [
+        "sealed_heaven:yao_lian",
+        "sealed_heaven:shen_wei",
+        "sealed_heaven:lin_su",
+        "sealed_heaven:road_outrider",
+        "sealed_heaven:mei_fen",
+        "sealed_heaven:bao_jun",
+        "sealed_heaven:ren_zhi",
+        "sealed_heaven:luo_xiu",
+        "sealed_heaven:stonebank_envoy",
+        "sealed_heaven:qiao_lin"
+      ],
+      "contacts": [
+        [
+          "sealed_heaven:shen_wei",
+          "sealed_heaven:yao_lian"
+        ],
+        [
+          "sealed_heaven:lin_su",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:mei_fen",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:bao_jun",
+          "sealed_heaven:shen_wei"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:ren_zhi",
+          "sealed_heaven:luo_xiu"
+        ],
+        [
+          "sealed_heaven:luo_xiu",
+          "sealed_heaven:bao_jun"
+        ],
+        [
+          "sealed_heaven:stonebank_envoy",
+          "sealed_heaven:mei_fen"
+        ],
+        [
+          "sealed_heaven:qiao_lin",
+          "sealed_heaven:ren_zhi"
+        ],
+        [
+          "sealed_heaven:qiao_lin",
+          "sealed_heaven:luo_xiu"
+        ]
+      ],
+      "recruits": [
+        {
+          "actor": "sealed_heaven:road_outrider",
+          "invitation": "OpenRoad"
+        },
+        {
+          "actor": "sealed_heaven:luo_xiu",
+          "invitation": "SchoolMember"
+        },
+        {
+          "actor": "sealed_heaven:stonebank_envoy",
+          "invitation": "LodgeMember"
+        },
+        {
+          "actor": "sealed_heaven:qiao_lin",
+          "invitation": "SchoolMember"
+        }
+      ],
+      "entrance": [
+        0,
+        4
+      ],
+      "patch": [
+        9,
+        2
+      ],
+      "shrine": [
+        3,
+        5
+      ],
+      "clinic": [
+        3,
+        3
+      ],
+      "shrine_target": 5,
+      "initial_source": 12,
+      "regrow_every": 12
+    }
+  ],
+  "region": {
+    "id": "sealed_heaven:riverlands",
+    "market": [
+      25,
+      4
+    ],
+    "garden": [
+      27,
+      2
+    ],
+    "hall": [
+      27,
+      6
+    ],
+    "garden_capacity": 10,
+    "market_target": 6,
+    "market_reserve": 2,
+    "coin_budget": 24,
+    "stock_base": 4,
+    "stock_variants": 3,
+    "garden_regrow_every": 16,
+    "order_interval": 48,
+    "order_travel": 30,
+    "opening_order": 2,
+    "normal_buy": 2,
+    "normal_sell": 1,
+    "scarce_buy": 3,
+    "scarce_sell": 2
+  },
+  "backgrounds": [
+    {
+      "id": "sealed_heaven:wanderer",
+      "kind": "Wanderer",
+      "coins": 3
+    },
+    {
+      "id": "sealed_heaven:herbalist",
+      "kind": "Herbalist",
+      "coins": 1
+    },
+    {
+      "id": "sealed_heaven:peddler",
+      "kind": "Peddler",
+      "coins": 6
+    }
+  ],
+  "institutions": [
+    {
+      "id": "sealed_heaven:reed_hall",
+      "kind": "Hall",
+      "opening_coins": 18,
+      "offices": [
+        {
+          "actor": "sealed_heaven:ren_zhi",
+          "rank": "Elder"
+        },
+        {
+          "actor": "sealed_heaven:luo_xiu",
+          "rank": "Apprentice"
+        },
+        {
+          "actor": "sealed_heaven:qiao_lin",
+          "rank": "Disciple"
+        }
+      ]
+    },
+    {
+      "id": "sealed_heaven:stonebank",
+      "kind": "Lodge",
+      "opening_coins": 16,
+      "offices": []
+    }
+  ],
+  "sect": {
+    "contest_threshold": 4,
+    "max_pressure": 8,
+    "accord_turns": 48,
+    "disciple_merit": 1,
+    "senior_merit": 2,
+    "max_qi": 3
+  },
+  "techniques": [
+    {
+      "id": "sealed_heaven:reed_strike",
+      "kind": "ReedStrike",
+      "teacher": "sealed_heaven:ren_zhi",
+      "institution": "sealed_heaven:reed_hall",
+      "herb_cost": 2,
+      "qi_cost": 2,
+      "damage": 3,
+      "exertion": 0,
+      "parry": 0,
+      "lessons": 0,
+      "tuition": 0
+    },
+    {
+      "id": "sealed_heaven:reed_palm",
+      "kind": "ReedPalm",
+      "teacher": "sealed_heaven:ren_zhi",
+      "institution": "sealed_heaven:reed_hall",
+      "herb_cost": 0,
+      "qi_cost": 0,
+      "damage": 2,
+      "exertion": 1,
+      "parry": 1,
+      "lessons": 2,
+      "tuition": 1
+    },
+    {
+      "id": "sealed_heaven:stone_fist",
+      "kind": "StoneFist",
+      "teacher": "sealed_heaven:stonebank_envoy",
+      "institution": "sealed_heaven:stonebank",
+      "herb_cost": 0,
+      "qi_cost": 0,
+      "damage": 3,
+      "exertion": 2,
+      "parry": 0,
+      "lessons": 2,
+      "tuition": 1
+    }
+  ],
+  "lots": [
+    {
+      "id": "sealed_heaven:ore_west",
+      "wire_id": 0,
+      "item": "core:spirit_ore",
+      "position": [
+        8,
+        4
+      ],
+      "minimum_revision": 19
+    },
+    {
+      "id": "sealed_heaven:ore_east",
+      "wire_id": 1,
+      "item": "core:spirit_ore",
+      "position": [
+        26,
+        4
+      ],
+      "minimum_revision": 19
+    },
+    {
+      "id": "sealed_heaven:script_east",
+      "wire_id": 2,
+      "item": "core:jade_script",
+      "position": [
+        29,
+        6
+      ],
+      "minimum_revision": 19
+    },
+    {
+      "id": "sealed_heaven:script_west",
+      "wire_id": 3,
+      "item": "core:jade_script",
+      "position": [
+        5,
+        4
+      ],
+      "minimum_revision": 20
+    }
+  ],
+  "campaigns": [
+    {
+      "first": 1,
+      "last": 2,
+      "even": "sealed_heaven:qinghe",
+      "odd": "sealed_heaven:qinghe"
+    },
+    {
+      "first": 3,
+      "last": 3,
+      "even": "sealed_heaven:ridge_road",
+      "odd": "sealed_heaven:lower_road"
+    },
+    {
+      "first": 4,
+      "last": 5,
+      "even": "sealed_heaven:ridge_hall",
+      "odd": "sealed_heaven:lower_hall"
+    },
+    {
+      "first": 6,
+      "last": 6,
+      "even": "sealed_heaven:ridge_rivalry",
+      "odd": "sealed_heaven:lower_rivalry"
+    },
+    {
+      "first": 7,
+      "last": 26,
+      "even": "sealed_heaven:ridge_politics",
+      "odd": "sealed_heaven:lower_politics"
+    }
+  ]
+}

@@ -4,9 +4,9 @@ use super::{
     ActorId, BREATH_MASTERY, IncidentId, Npc, Outcome, PLAYER, Rejection, Role, Scenario, World,
 };
 
-pub const MAX_QI: u8 = 3;
-pub const FORM_QI_COST: u8 = 2;
-const FORM_HERBS: u32 = 2;
+pub const MAX_QI: u8 = super::content::MAX_QI;
+pub const FORM_QI_COST: u8 = super::content::FORM_QI_COST;
+use super::content::FORM_HERBS;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HallRank {

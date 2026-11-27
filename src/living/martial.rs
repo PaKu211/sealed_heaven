@@ -40,11 +40,7 @@ pub struct Martial {
 }
 
 fn teaching_form(npc: &Npc) -> Option<Form> {
-    match npc.definition.role {
-        Role::Mentor => Some(Form::ReedPalm),
-        Role::RivalEnvoy => Some(Form::StoneFist),
-        _ => None,
-    }
+    super::content::teaching_form(npc.definition.role)
 }
 
 impl Martial {
@@ -53,11 +49,7 @@ impl Martial {
         skills.insert(PLAYER, MartialSkill::default());
         for definition in scenario.npcs {
             let state = MartialSkill {
-                form: match definition.role {
-                    Role::Mentor => Some(Form::ReedPalm),
-                    Role::RivalEnvoy => Some(Form::StoneFist),
-                    _ => None,
-                },
+                form: super::content::teaching_form(definition.role),
                 ..MartialSkill::default()
             };
             skills.insert(definition.id, state);
@@ -120,18 +112,19 @@ impl World {
         }
         let waived = form == Form::ReedPalm && self.hall_tuition_waived();
         if !waived {
-            if self.region.as_ref().unwrap().coins < 1 {
+            let tuition = super::content::martial_profile(form).tuition;
+            if self.region.as_ref().unwrap().coins < tuition {
                 return Err(Rejection::NotEnoughCoins);
             }
             match form {
                 Form::ReedPalm => {
-                    self.politics.as_mut().unwrap().hall_coins += 1;
+                    self.politics.as_mut().unwrap().hall_coins += tuition;
                 }
                 Form::StoneFist => {
-                    self.rivalry.as_mut().unwrap().lodge_coins += 1;
+                    self.rivalry.as_mut().unwrap().lodge_coins += tuition;
                 }
             }
-            self.region.as_mut().unwrap().coins -= 1;
+            self.region.as_mut().unwrap().coins -= tuition;
         }
         self.social.meet(teacher, PLAYER);
         let learned = self.commit_lesson(PLAYER, teacher, form);
@@ -152,7 +145,7 @@ impl World {
         }
         skill.lessons += 1;
         skill.strain += 1;
-        let learned = skill.lessons >= 2;
+        let learned = skill.lessons >= super::content::martial_profile(form).lessons;
         if learned {
             skill.form = Some(form);
         }
@@ -236,10 +229,8 @@ impl World {
         if self.meridians().is_some() {
             self.use_martial_qi(PLAYER)?;
         }
-        let (damage, exertion, parry) = match form {
-            Form::ReedPalm => (2, 1, 1),
-            Form::StoneFist => (3, 2, 0),
-        };
+        let profile = super::content::martial_profile(form);
+        let (damage, exertion, parry) = (profile.damage, profile.exertion, profile.parry);
         let skill = self
             .martial
             .as_mut()
@@ -277,17 +268,13 @@ impl World {
             .skills
             .get_mut(&actor)
             .unwrap();
-        match form {
-            Form::ReedPalm => {
-                state.strain += 1;
-                state.parry = 1;
-                2
-            }
-            Form::StoneFist => {
-                state.strain += 2;
-                3
-            }
+        let profile = super::content::martial_profile(form);
+        state.strain += profile.exertion;
+        // Preserve an existing parry for the NPC Stone Fist action.
+        if profile.parry != 0 {
+            state.parry = profile.parry;
         }
+        profile.damage
     }
 
     pub(super) fn martial_block(&mut self, target: ActorId) -> u16 {

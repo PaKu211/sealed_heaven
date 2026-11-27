@@ -60,33 +60,22 @@ pub struct Contested {
 
 impl Contested {
     pub(super) fn new(cultivation: bool) -> Self {
-        let mut lots: BTreeMap<_, _> = [
-            (0, Good::SpiritOre, Position { x: 8, y: 4 }),
-            (1, Good::SpiritOre, Position { x: 26, y: 4 }),
-            (2, Good::JadeScript, Position { x: 29, y: 6 }),
-        ]
-        .into_iter()
-        .map(|(id, good, position)| {
-            (
-                id,
-                Lot {
+        let revision = if cultivation { 20 } else { 19 };
+        let lots = super::content::LOTS
+            .iter()
+            .copied()
+            .filter(|&(_, _, _, minimum)| minimum <= revision)
+            .map(|(id, good, position, _)| {
+                (
                     id,
-                    good,
-                    holder: Holder::Ground(position),
-                },
-            )
-        })
-        .collect();
-        if cultivation {
-            lots.insert(
-                3,
-                Lot {
-                    id: 3,
-                    good: Good::JadeScript,
-                    holder: Holder::Ground(Position { x: 5, y: 4 }),
-                },
-            );
-        }
+                    Lot {
+                        id,
+                        good,
+                        holder: Holder::Ground(position),
+                    },
+                )
+            })
+            .collect();
         Self {
             lots,
             known: BTreeMap::new(),
