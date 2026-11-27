@@ -737,6 +737,7 @@ impl World {
                 if self.supply.shrine > 0 && self.can_treat(&npc, &self.npcs[&patient]) {
                     self.treat(patient);
                     self.social.aided(id, patient);
+                    self.remember_aid(id, patient, super::reciprocity::Kind::ClinicCare);
                 }
             }
             Goal::Treat(_) => self.travel(id, scenario.clinic, 0),

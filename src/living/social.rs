@@ -516,6 +516,7 @@ impl World {
                     | super::Rules::RoadHistory
                     | super::Rules::EmergentRequests
                     | super::Rules::PersonalFavors
+                    | super::Rules::ReciprocalBonds
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

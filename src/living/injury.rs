@@ -121,15 +121,19 @@ impl World {
         if !self.injuries().unwrap().people[&PLAYER].injured() {
             return Err(Rejection::Uninjured);
         }
-        let medic = self.npcs.values().any(|npc| {
-            npc.alive()
-                && npc.definition.role == Role::Medic
-                && npc.position == self.scenario.clinic
-                && !self.social.relationship(npc.id(), PLAYER).refuses_aid()
-        });
-        if !medic {
+        let medic = self
+            .npcs
+            .values()
+            .find(|npc| {
+                npc.alive()
+                    && npc.definition.role == Role::Medic
+                    && npc.position == self.scenario.clinic
+                    && !self.social.relationship(npc.id(), PLAYER).refuses_aid()
+            })
+            .map(|npc| npc.id());
+        let Some(medic) = medic else {
             return Err(Rejection::HealerAway);
-        }
+        };
         if self.supply.shrine == 0 {
             return Err(Rejection::Empty);
         }
@@ -137,6 +141,7 @@ impl World {
         self.supply.consumed += 1;
         self.player.hp = (self.player.hp + 1).min(super::PLAYER_HP);
         self.reduce_wound(PLAYER);
+        self.remember_aid(medic, PLAYER, super::reciprocity::Kind::ClinicCare);
         Ok(Outcome::WoundTreated)
     }
 

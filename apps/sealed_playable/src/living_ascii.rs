@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 34 {
+        if self.world.checkpoint_revision() == 35 {
+            World::reciprocal_bonds_campaign(seed)
+        } else if self.world.checkpoint_revision() == 34 {
             World::personal_favors_campaign(seed)
         } else if self.world.checkpoint_revision() == 33 {
             World::emergent_requests_campaign(seed)
@@ -150,6 +152,11 @@ impl Session {
                         | "questlog"
                         | "favors"
                         | "favorlog"
+                        | "bonds"
+                        | "aidlog"
+                        | "requestaid"
+                        | "repayaid"
+                        | "waiveaid"
                         | "acceptfavor"
                         | "declinefavor"
                         | "withdrawfavor"
@@ -1097,6 +1104,32 @@ impl Session {
                 };
                 return true;
             }
+            "bonds" | "aidlog" if self.world.reciprocity().is_some() => {
+                let count = argument
+                    .and_then(|n| n.parse::<usize>().ok())
+                    .unwrap_or(12)
+                    .clamp(1, 48);
+                self.notice = self.bond_lines(command == "aidlog", count).join("\n");
+                return true;
+            }
+            "bonddebug" if self.debug_world && self.world.reciprocity().is_some() => {
+                self.notice = format!("{:?}", self.world.reciprocity().unwrap());
+                return true;
+            }
+            "requestaid" | "repayaid" | "waiveaid" if self.world.reciprocity().is_some() => {
+                let id = match self.target(argument) {
+                    Ok(id) => id,
+                    Err(message) => {
+                        self.notice = message.into();
+                        return true;
+                    }
+                };
+                match command {
+                    "requestaid" => Intent::RequestAid(id),
+                    "repayaid" => Intent::RepayAid(id),
+                    _ => Intent::WaiveAid(id),
+                }
+            }
             "favors" | "favorlog" if self.world.favors().is_some() => {
                 let count = argument
                     .and_then(|n| n.parse::<usize>().ok())
@@ -1465,6 +1498,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.reciprocity().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.bond.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" bonddebug");
                     }
                 }
                 return true;
@@ -2084,6 +2125,115 @@ impl Session {
                 ("days", &d.days_ago.to_string()),
             ],
         )
+    }
+    fn aid_line(&self, e: &sealed_sim::living::reciprocity::ObservedAid) -> String {
+        use sealed_sim::living::reciprocity::Kind;
+        let kind = living_text(
+            self.locale,
+            match e.kind {
+                Kind::Provision => "living.bond.provision",
+                Kind::CareFunding => "living.bond.funding",
+                Kind::ClinicCare => "living.bond.clinic",
+                Kind::FieldCare => "living.bond.field",
+                Kind::ReturnedCoin => "living.bond.return_coin",
+                Kind::ReturnedHerb => "living.bond.return_herb",
+                Kind::RepaidCoin => "living.bond.repay",
+                Kind::Released => "living.bond.release",
+                Kind::NeighborCoin => "living.bond.neighbor_coin",
+                Kind::NeighborHerb => "living.bond.neighbor_herb",
+            },
+        );
+        let at = e.at.to_string();
+        let common = [
+            ("at", at.as_str()),
+            ("helper", actor_name(self.locale, &self.world, e.helper)),
+            (
+                "recipient",
+                actor_name(self.locale, &self.world, e.recipient),
+            ),
+            ("kind", kind),
+        ];
+        if let (Some(balance), Some(change)) = (e.balance, e.change) {
+            let balance = format!("{balance:+}");
+            let change = format!("{change:+}");
+            let mut args = common.to_vec();
+            args.extend([("balance", balance.as_str()), ("change", change.as_str())]);
+            living_format(self.locale, "living.bond.event", &args)
+        } else {
+            living_format(self.locale, "living.bond.witness", &common)
+        }
+    }
+    #[cfg(feature = "desktop")]
+    pub(crate) fn known_bond_line(&self, actor: ActorId) -> Option<String> {
+        self.world
+            .known_bonds()
+            .into_iter()
+            .find(|(a, _)| *a == actor)
+            .map(|(actor, n)| {
+                living_format(
+                    self.locale,
+                    if n > 0 {
+                        "living.bond.owed"
+                    } else {
+                        "living.bond.owe"
+                    },
+                    &[
+                        ("actor", actor_name(self.locale, &self.world, actor)),
+                        ("amount", &n.unsigned_abs().to_string()),
+                    ],
+                )
+            })
+    }
+    pub(crate) fn bond_lines(&self, log: bool, count: usize) -> Vec<String> {
+        let mut rows = if log {
+            self.world
+                .known_aid()
+                .rev()
+                .take(count)
+                .map(|e| self.aid_line(e))
+                .collect::<Vec<_>>()
+        } else {
+            self.world
+                .known_bonds()
+                .into_iter()
+                .take(count)
+                .map(|(actor, n)| {
+                    living_format(
+                        self.locale,
+                        if n > 0 {
+                            "living.bond.owed"
+                        } else {
+                            "living.bond.owe"
+                        },
+                        &[
+                            ("actor", actor_name(self.locale, &self.world, actor)),
+                            ("amount", &n.unsigned_abs().to_string()),
+                        ],
+                    )
+                })
+                .collect()
+        };
+        if rows.is_empty() {
+            rows.push(
+                living_text(
+                    self.locale,
+                    if log {
+                        "living.bond.no_history"
+                    } else {
+                        "living.bond.none"
+                    },
+                )
+                .into(),
+            );
+        }
+        rows
+    }
+    pub(crate) fn latest_aid_notice(&self) -> Option<String> {
+        self.world
+            .known_aid()
+            .next_back()
+            .filter(|e| e.at == self.world.tick())
+            .map(|e| self.aid_line(e))
     }
     fn favor_line(&self, s: sealed_sim::living::favors::Seen) -> String {
         use sealed_sim::living::favors::{Need, Status};
@@ -2944,6 +3094,9 @@ impl Session {
         }
         if let Some(receipt) = self.latest_favor_notice() {
             let _ = writeln!(out, "{receipt}");
+        }
+        if let Some(aid) = self.latest_aid_notice() {
+            let _ = writeln!(out, "{aid}");
         }
         for incident in world
             .social()
@@ -3964,6 +4117,21 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
             };
             return living_format(locale, key, &[("id", &id.to_string())]);
         }
+        Outcome::ReciprocalAid { actor, asset } => {
+            let key = match asset {
+                sealed_sim::living::reciprocity::Asset::Coin => "living.bond.received_coin",
+                sealed_sim::living::reciprocity::Asset::Herb => "living.bond.received_herb",
+            };
+            return living_format(locale, key, &[("actor", actor_name(locale, world, actor))]);
+        }
+        Outcome::AidRepaid(actor) | Outcome::AidWaived(actor) => {
+            let key = if matches!(outcome, Outcome::AidRepaid(_)) {
+                "living.bond.repaid"
+            } else {
+                "living.bond.waived"
+            };
+            return living_format(locale, key, &[("actor", actor_name(locale, world, actor))]);
+        }
         Outcome::FavorAccepted(id) | Outcome::FavorDeclined(id) | Outcome::FavorWithdrawn(id) => {
             let key = match outcome {
                 Outcome::FavorAccepted(_) => "living.favor.accepted",
@@ -4322,6 +4490,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         32 => "checkpoint.c45",
         33 => "checkpoint.c46",
         34 => "checkpoint.c47",
+        35 => "checkpoint.c48",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -4356,10 +4525,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         32 => World::road_history_campaign(0),
         33 => World::emergent_requests_campaign(0),
         34 => World::personal_favors_campaign(0),
+        35 => World::reciprocal_bonds_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn bonds_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 35);
+    if seed != 0 {
+        session.world = World::reciprocal_bonds_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_bonds_campaign(seed: u32, debug_world: bool) {
+    run_session(bonds_session(seed, debug_world));
 }
 
 pub(crate) fn favors_session(seed: u32, debug_world: bool) -> Session {

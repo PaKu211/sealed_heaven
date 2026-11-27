@@ -3594,6 +3594,176 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.bond.clinic": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.event": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {
+      "at": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt",
+      "balance": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt",
+      "change": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt",
+      "helper": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt",
+      "kind": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt",
+      "recipient": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.field": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.funding": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.help": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.neighbor_coin": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.neighbor_herb": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.no_history": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.none": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.owe": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {
+      "actor": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt",
+      "amount": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.owed": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {
+      "actor": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt",
+      "amount": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.pixel.controls": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.bond.pixel.hint": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.bond.provision": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.received_coin": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {
+      "actor": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.received_herb": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {
+      "actor": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.release": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.repaid": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {
+      "actor": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.repay": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.return_coin": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.return_herb": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.select": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.waived": {
+    "active": true,
+    "context": "C4.8 bilateral voluntary reciprocity and observed aid memory",
+    "parameters": {
+      "actor": "Known aid participant, witnessed time or signed helper-oriented gratitude; never a currency debt"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.bond.witness": {
+    "active": true,
+    "context": "C4.8 observed physical assistance, private third-party balances redacted",
+    "parameters": {
+      "at": "Visible aid detail",
+      "helper": "Visible aid detail",
+      "kind": "Visible aid detail",
+      "recipient": "Visible aid detail"
+    },
+    "surface": "living_ascii.rs"
+  },
   "living.expansion.depot": {
     "active": true,
     "context": "C4.1 local regional expansion",

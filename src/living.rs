@@ -33,6 +33,7 @@ mod player_agency_tests;
 mod politics;
 pub mod production;
 mod qinghe;
+pub mod reciprocity;
 mod recovery;
 mod region;
 pub mod regional_news;
@@ -173,6 +174,9 @@ pub enum Intent {
     DeclineFavor(u32),
     WithdrawFavor(u32),
     FundFavor(u32),
+    RequestAid(ActorId),
+    RepayAid(ActorId),
+    WaiveAid(ActorId),
 }
 
 impl Intent {
@@ -348,6 +352,12 @@ pub enum Outcome {
         actor: ActorId,
         coins: u32,
     },
+    ReciprocalAid {
+        actor: ActorId,
+        asset: reciprocity::Asset,
+    },
+    AidRepaid(ActorId),
+    AidWaived(ActorId),
     Rejected(Rejection),
 }
 
@@ -419,6 +429,7 @@ pub struct World {
     road_history: Option<road_history::RoadHistory>,
     requests: Option<requests::Requests>,
     favors: Option<favors::Favors>,
+    reciprocity: Option<reciprocity::Reciprocity>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -483,6 +494,7 @@ enum Rules {
     RoadHistory,
     EmergentRequests,
     PersonalFavors,
+    ReciprocalBonds,
 }
 
 impl Rules {
@@ -498,6 +510,7 @@ impl Rules {
                 | Self::RoadHistory
                 | Self::EmergentRequests
                 | Self::PersonalFavors
+                | Self::ReciprocalBonds
         )
     }
 
@@ -539,6 +552,7 @@ impl Rules {
                 | Self::RoadHistory
                 | Self::EmergentRequests
                 | Self::PersonalFavors
+                | Self::ReciprocalBonds
         )
     }
 }
@@ -685,6 +699,11 @@ impl World {
         Self::seeded(seed, Rules::PersonalFavors)
     }
 
+    /// C4.8: voluntary bilateral gratitude and material reciprocity.
+    pub fn reciprocal_bonds_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::ReciprocalBonds)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -697,6 +716,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
@@ -708,6 +728,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -725,7 +746,10 @@ impl World {
         world.region = Some(Region::new(seed));
         if matches!(
             rules,
-            Rules::RoadHistory | Rules::EmergentRequests | Rules::PersonalFavors
+            Rules::RoadHistory
+                | Rules::EmergentRequests
+                | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         ) {
             world.road_history = Some(road_history::RoadHistory::new(&mut world, seed));
             world.observe_road_history();
@@ -738,6 +762,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         ) {
             world.init_regional_news();
         }
@@ -748,6 +773,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         ) {
             world.scheduler = Some(lod::Scheduler::new(&world));
         }
@@ -757,15 +783,22 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         ) {
             world.production = Some(production::Production::new(&world));
         }
-        if matches!(rules, Rules::EmergentRequests | Rules::PersonalFavors) {
+        if matches!(
+            rules,
+            Rules::EmergentRequests | Rules::PersonalFavors | Rules::ReciprocalBonds
+        ) {
             world.requests = Some(requests::Requests::default());
             world.advance_requests();
         }
-        if rules == Rules::PersonalFavors {
+        if matches!(rules, Rules::PersonalFavors | Rules::ReciprocalBonds) {
             world.favors = Some(favors::Favors::default());
+        }
+        if rules == Rules::ReciprocalBonds {
+            world.reciprocity = Some(reciprocity::Reciprocity::default());
         }
         world
     }
@@ -791,6 +824,7 @@ impl World {
             road_history: None,
             requests: None,
             favors: None,
+            reciprocity: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -836,6 +870,7 @@ impl World {
                         | Rules::RoadHistory
                         | Rules::EmergentRequests
                         | Rules::PersonalFavors
+                        | Rules::ReciprocalBonds
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -881,6 +916,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(Company::default),
             rivalry: matches!(
@@ -914,6 +950,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -946,6 +983,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(Politics::new),
             traffic: matches!(
@@ -977,6 +1015,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -1007,6 +1046,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -1034,6 +1074,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -1060,6 +1101,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(Information::default),
             contested: matches!(
@@ -1080,6 +1122,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(|| {
                 Contested::new(matches!(
@@ -1099,6 +1142,7 @@ impl World {
                         | Rules::RoadHistory
                         | Rules::EmergentRequests
                         | Rules::PersonalFavors
+                        | Rules::ReciprocalBonds
                 ))
             }),
             martial: matches!(
@@ -1117,6 +1161,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -1134,6 +1179,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -1150,6 +1196,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -1165,6 +1212,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -1179,6 +1227,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1362,6 +1411,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1391,6 +1441,7 @@ impl World {
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
                     | Rules::PersonalFavors
+                    | Rules::ReciprocalBonds
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1447,6 +1498,7 @@ impl World {
         // 3. Decide from one snapshot; resolve movement, work and combat by actor ID.
         self.advance_npcs(intent == Intent::Guard && outcome == Outcome::Guarded);
         self.retire_scheduled_dead();
+        self.advance_reciprocity();
         self.observe_road_history();
         self.advance_requests();
         self.advance_favors();
@@ -1599,6 +1651,9 @@ impl World {
             Intent::DeclineFavor(id) => self.choose_favor(id, false),
             Intent::WithdrawFavor(id) => self.withdraw_favor(id),
             Intent::FundFavor(id) => self.fund_favor(id),
+            Intent::RequestAid(id) => self.request_aid(id),
+            Intent::RepayAid(id) => self.repay_aid(id),
+            Intent::WaiveAid(id) => self.waive_aid(id),
         }
     }
 
@@ -1626,6 +1681,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         )
     }
 
@@ -1652,6 +1708,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         )
     }
 
@@ -1677,6 +1734,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         )
     }
 
@@ -1701,6 +1759,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         )
     }
 
@@ -1724,6 +1783,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         )
     }
 
@@ -1745,6 +1805,7 @@ impl World {
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
                 | Rules::PersonalFavors
+                | Rules::ReciprocalBonds
         )
     }
 
@@ -1831,6 +1892,7 @@ impl World {
             }
             let healed = self.treat(PLAYER);
             self.social.aided(id, PLAYER);
+            self.remember_aid(id, PLAYER, reciprocity::Kind::ClinicCare);
             return Ok(Outcome::Treated { by: id, healed });
         }
         self.social.meet(id, PLAYER);

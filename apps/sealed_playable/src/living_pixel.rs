@@ -7,9 +7,9 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 use crate::{
     clock,
     living_ascii::{
-        Session, campaign_session, expanded_session, favors_session, generated_session,
-        history_session, knowledge_session, lod_session, outcome_label, production_session,
-        requests_session,
+        Session, bonds_session, campaign_session, expanded_session, favors_session,
+        generated_session, history_session, knowledge_session, lod_session, outcome_label,
+        production_session, requests_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -65,6 +65,10 @@ pub(crate) fn run_requests(seed: u32) {
 
 pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
+}
+
+pub(crate) fn run_bonds(seed: u32) {
+    run_session(bonds_session(seed, false));
 }
 
 fn run_session(session: Session) {
@@ -171,6 +175,47 @@ fn keyboard(
         game.session.input("abandonquest market");
     } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::Digit0) {
         game.session.input("questlog 2");
+    } else if game.session.world.reciprocity().is_some()
+        && keys.just_pressed(KeyCode::F1)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+    {
+        let log = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+        let mut lines = if !log {
+            game.target
+                .and_then(|a| game.session.known_bond_line(a))
+                .map(|s| vec![s])
+                .unwrap_or_else(|| game.session.bond_lines(false, 1))
+        } else {
+            game.session.bond_lines(true, 1)
+        };
+        lines.push(living_text(game.session.locale, "living.bond.pixel.controls").into());
+        game.session.notice = lines.join("\n");
+    } else if game.session.world.reciprocity().is_some()
+        && [KeyCode::Comma, KeyCode::Slash, KeyCode::Semicolon]
+            .into_iter()
+            .any(|k| keys.just_pressed(k))
+    {
+        let command = if keys.just_pressed(KeyCode::Comma) {
+            "requestaid"
+        } else if keys.just_pressed(KeyCode::Slash) {
+            "repayaid"
+        } else {
+            "waiveaid"
+        };
+        let local = nearby(&game.session);
+        // Never silently choose an arbitrary debtor if multiple people are nearby.
+        let target = game.target.filter(|a| local.contains(a)).or_else(|| {
+            if local.len() == 1 {
+                local.first().copied()
+            } else {
+                None
+            }
+        });
+        if let Some(id) = target {
+            game.session.input(&format!("{command} {}", id.get()));
+        } else {
+            game.session.notice = living_text(game.session.locale, "living.bond.select").into();
+        }
     } else if game.session.world.favors().is_some() && keys.just_pressed(KeyCode::F1) {
         game.session.input(
             if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
@@ -351,7 +396,12 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     if world.favors().is_some() {
         label(
             &mut commands,
-            tr("living.favor.pixel.hint").into(),
+            tr(if world.reciprocity().is_some() {
+                "living.bond.pixel.hint"
+            } else {
+                "living.favor.pixel.hint"
+            })
+            .into(),
             172.0,
             12.0,
             OCHRE,
@@ -461,6 +511,12 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     }
     if session.notice.is_empty()
         && let Some(line) = session.latest_favor_notice()
+    {
+        message = line;
+    }
+    if session.notice.is_empty()
+        && world.latest_outcome() == Some(sealed_sim::living::Outcome::Waited)
+        && let Some(line) = session.latest_aid_notice()
     {
         message = line;
     }
@@ -1389,6 +1445,106 @@ mod tests {
             assert_eq!(
                 i64::from(reference.social().relationship(actor, PLAYER).regard),
                 row["regard"].as_i64().unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn reciprocal_keys_match_seven_canonical_endpoints_and_inspection_is_read_only() {
+        use sealed_sim::living::{ActorId, Intent, PLAYER, World};
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/living/c48_branch_trace_v1.json"
+        ))
+        .unwrap();
+        for row in fixture["rows"].as_array().unwrap() {
+            let seed = row["seed"].as_u64().unwrap().try_into().unwrap();
+            let actor = ActorId::new(row["actor"].as_u64().unwrap().try_into().unwrap());
+            let mut session = bonds_session(seed, false);
+            let commands = row["commands"].as_array().unwrap();
+            let last = commands.len() - 1;
+            for c in &commands[..last] {
+                assert!(session.input(c.as_str().unwrap()));
+            }
+            let before = session.world.checkpoint();
+            let mut reference = World::restore(&before).unwrap();
+            let mut app = App::new();
+            app.insert_resource(Game {
+                session,
+                target: Some(actor),
+            })
+            .init_resource::<ButtonInput<KeyCode>>()
+            .add_systems(Update, (keyboard, draw).chain());
+            app.world_mut().spawn((Window::default(), PrimaryWindow));
+            app.update();
+            let press = |app: &mut App, key, ctrl: bool, shift: bool| {
+                {
+                    let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                    keys.clear();
+                    keys.release(KeyCode::ControlLeft);
+                    keys.release(KeyCode::ShiftLeft);
+                    if ctrl {
+                        keys.press(KeyCode::ControlLeft);
+                    }
+                    if shift {
+                        keys.press(KeyCode::ShiftLeft);
+                    }
+                    keys.release(key);
+                    keys.press(key);
+                }
+                app.update();
+            };
+            let text = |app: &mut App| {
+                let mut q = app.world_mut().query::<&Text2d>();
+                q.iter(app.world())
+                    .map(|t| t.0.clone())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            assert!(text(&mut app).contains("Ctrl+F1 bonds"));
+            press(&mut app, KeyCode::F1, true, false);
+            assert!(text(&mut app).contains("Ctrl+Shift+F1 aid log"));
+            press(&mut app, KeyCode::F1, true, true);
+            assert!(text(&mut app).contains("Ctrl+Shift+F1 aid log"));
+            press(&mut app, KeyCode::Tab, false, false);
+            press(&mut app, KeyCode::F1, true, false);
+            assert!(text(&mut app).contains("Ctrl+Shift+F1 riwayat"));
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                before
+            );
+            let (key, intent) = match commands[last].as_str().unwrap() {
+                "requestaid 22" => (KeyCode::Comma, Intent::RequestAid(actor)),
+                "waiveaid 22" => (KeyCode::Semicolon, Intent::WaiveAid(actor)),
+                "repayaid 1" => (KeyCode::Slash, Intent::RepayAid(actor)),
+                "part 22" => (KeyCode::KeyR, Intent::Part(actor)),
+                "pack 22" => (KeyCode::KeyO, Intent::Provision(actor)),
+                c => panic!("unexpected final command {c}"),
+            };
+            reference.step(reference.tick(), intent).unwrap();
+            press(&mut app, key, false, false);
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                reference.checkpoint()
+            );
+            press(&mut app, KeyCode::F1, true, false);
+            let memory = text(&mut app);
+            let balance = row["balance"].as_i64().unwrap();
+            if balance == 0 {
+                assert!(memory.contains("Tidak ada utang budi tersisa."), "{memory}");
+            } else {
+                assert!(
+                    memory.contains(&format!("berutang budi {balance} kepadamu")),
+                    "{memory}"
+                );
+            }
+            press(&mut app, KeyCode::F1, true, true);
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                reference.checkpoint()
+            );
+            assert_eq!(
+                i64::from(reference.reciprocity().unwrap().net(PLAYER, actor)),
+                balance
             );
         }
     }

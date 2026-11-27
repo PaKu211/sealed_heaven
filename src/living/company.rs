@@ -145,6 +145,7 @@ impl World {
         self.player.herbs -= 1;
         self.npcs.get_mut(&id).expect("adjacent actor").packed_herbs += 1;
         self.provisioned_for_favor(id);
+        self.remember_aid(PLAYER, id, super::reciprocity::Kind::Provision);
         Ok(Outcome::Provisioned(id))
     }
 
@@ -251,6 +252,7 @@ impl World {
         self.player.hp = (self.player.hp + 2).min(PLAYER_HP);
         self.company.as_mut().expect("company campaign").herbs_used += 1;
         self.social.aided(id, PLAYER);
+        self.remember_aid(id, PLAYER, super::reciprocity::Kind::FieldCare);
         self.record_company(id, JourneyEvent::FieldCare);
     }
 }

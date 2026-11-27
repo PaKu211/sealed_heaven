@@ -406,6 +406,7 @@ impl World {
             .unwrap()
             .coins += CLINIC_FEE;
         self.fulfill_favor(f);
+        self.remember_aid(PLAYER, f.actor, super::reciprocity::Kind::CareFunding);
         Ok(Outcome::FavorFunded {
             id,
             actor: f.actor,
