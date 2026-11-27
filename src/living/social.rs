@@ -533,6 +533,7 @@ impl World {
                     | super::Rules::DynamicObligations
                     | super::Rules::SituatedCommunication
                     | super::Rules::InformationNetworks
+                    | super::Rules::CausalNarratives
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

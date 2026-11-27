@@ -191,19 +191,18 @@ impl World {
         } else {
             c.delivered += 1;
         }
-        c.event(
-            Event {
-                project: m.project,
-                at: self.tick,
-                origin: m.origin,
-                recipient: m.recipient,
-                holder,
-                kind,
-                result: r.result,
-                place,
-            },
-            seen,
-        );
+        let event = Event {
+            project: m.project,
+            at: self.tick,
+            origin: m.origin,
+            recipient: m.recipient,
+            holder,
+            kind,
+            result: r.result,
+            place,
+        };
+        c.event(event, seen);
+        self.story_report(event, seen);
     }
     fn eligible_messenger(&self, n: &Npc) -> bool {
         n.alive()
@@ -379,19 +378,18 @@ impl World {
             msg.dwell = 0;
             msg.retry_at = 0;
             c.handoffs += 1;
-            c.event(
-                Event {
-                    project: m.project,
-                    at: self.tick,
-                    origin: m.origin,
-                    recipient: m.recipient,
-                    holder,
-                    kind: Kind::Handoff,
-                    result: r.result,
-                    place,
-                },
-                seen,
-            );
+            let event = Event {
+                project: m.project,
+                at: self.tick,
+                origin: m.origin,
+                recipient: m.recipient,
+                holder,
+                kind: Kind::Handoff,
+                result: r.result,
+                place,
+            };
+            c.event(event, seen);
+            self.story_report(event, seen);
         }
     }
 }

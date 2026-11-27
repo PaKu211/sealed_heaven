@@ -315,17 +315,25 @@ impl World {
         Some(self.rumors()?.view(PLAYER, site, self.tick))
     }
     pub(super) fn observe_rumor(&mut self, actor: ActorId, site: Site, scarce: bool, phase: u8) {
+        let sample = Sample {
+            site,
+            scarce,
+            origin: actor,
+            observed_at: self.tick,
+            phase,
+        };
+        let uncertain = self.narrative.is_some()
+            && self.rumors().is_some_and(|r| {
+                matches!(
+                    r.view(actor, site, self.tick).status,
+                    Status::Reported | Status::Contested
+                )
+            });
         if let Some(r) = self.rumors.as_mut() {
-            r.observe(
-                actor,
-                Sample {
-                    site,
-                    scarce,
-                    origin: actor,
-                    observed_at: self.tick,
-                    phase,
-                },
-            );
+            r.observe(actor, sample);
+        }
+        if uncertain {
+            self.story_check(actor, sample);
         }
     }
     fn gossip_position(&self, a: ActorId) -> Option<super::Position> {
@@ -415,12 +423,23 @@ impl World {
         // Both offers are made from the pre-conversation snapshot.
         let a = self.rumor_offer(id, PLAYER, true);
         let b = self.rumor_offer(PLAYER, id, true);
-        let r = self.rumors.as_mut().unwrap();
-        if let Some(a) = a {
-            r.receive(PLAYER, id, a, self.tick);
+        if let Some(a) = a
+            && self
+                .rumors
+                .as_mut()
+                .unwrap()
+                .receive(PLAYER, id, a, self.tick)
+        {
+            self.story_account(PLAYER, a);
         }
-        if let Some(b) = b {
-            r.receive(id, PLAYER, b, self.tick);
+        if let Some(b) = b
+            && self
+                .rumors
+                .as_mut()
+                .unwrap()
+                .receive(id, PLAYER, b, self.tick)
+        {
+            self.story_account(id, b);
         }
     }
     pub(super) fn advance_rumors(&mut self) {
@@ -457,14 +476,19 @@ impl World {
         proposals
             .sort_by_key(|&(a, b, r)| (Reverse(r.sample.scarce), Reverse(r.sample.stamp()), a, b));
         let mut used = BTreeSet::new();
-        let r = self.rumors.as_mut().unwrap();
         for (a, b, report) in proposals {
             if used.contains(&a) || used.contains(&b) {
                 continue;
             }
-            if r.receive(b, a, report, self.tick) {
+            if self
+                .rumors
+                .as_mut()
+                .unwrap()
+                .receive(b, a, report, self.tick)
+            {
                 used.insert(a);
                 used.insert(b);
+                self.story_account(b, report);
             }
         }
     }
@@ -560,6 +584,69 @@ mod tests {
         let now = w.tick;
         assert!(w.rumors.as_mut().unwrap().receive(to, from, a, now));
         a
+    }
+
+    #[test]
+    fn c55_actual_conversations_open_player_local_inquiries_and_visits_close_them() {
+        use crate::living::narrative::InquiryEnd;
+        let mut w = World::narrative_campaign(3);
+        w.rumors = Some(Rumors::default());
+        let site = S.position(&w);
+        w.tick = 10;
+        w.region.as_mut().unwrap().market_herbs = 0;
+        place(&mut w, A, site);
+        w.observe_regional(0);
+        place(&mut w, A, row(1));
+        place(&mut w, B, row(2));
+        w.tick = 20;
+        w.region.as_mut().unwrap().market_herbs = 20;
+        place(&mut w, C, site);
+        w.observe_regional(0);
+        place(&mut w, C, row(3));
+        // Establish a separate private inquiry; it cannot affect the
+        // player's local episode ID or publish itself.
+        w.social.meet(A, B);
+        let private = transfer(&mut w, A, B);
+        w.story_account(B, private);
+        assert_eq!(w.known_story_inquiries().count(), 0);
+        place(&mut w, PLAYER, row(2));
+        w.rumor_conversation(A);
+        let i = *w
+            .known_story_inquiries()
+            .next()
+            .expect("player heard account");
+        assert_eq!((i.id, i.actor, i.opened), (0, PLAYER, 20));
+        assert_eq!(i.first.sample.origin, A);
+        assert!(i.conflict.is_none() && i.end.is_none());
+        w.tick = 21;
+        w.rumor_conversation(C);
+        let i = *w.known_story_inquiries().next().unwrap();
+        assert_eq!(i.id, 0);
+        let conflict = i.conflict.unwrap();
+        assert!(conflict.low.scarce && !conflict.adequate.scarce);
+        assert_eq!(
+            (conflict.low.observed_at, conflict.adequate.observed_at),
+            (10, 20)
+        );
+        assert_eq!(w.known_story_inquiries().count(), 1);
+        w.tick = 22;
+        place(&mut w, PLAYER, site);
+        w.observe_regional(1);
+        let closed = *w.known_story_inquiries().next().unwrap();
+        assert!(
+            matches!(closed.end,Some(InquiryEnd::Checked(s)) if s.origin==PLAYER&&s.observed_at==22&&!s.scarce)
+        );
+        assert_eq!(w.narrative().unwrap().career(PLAYER).checked, 1);
+        assert!(
+            !w.narrative()
+                .unwrap()
+                .active_inquiries()
+                .contains_key(&(PLAYER, S))
+        );
+        let before = w.narrative().unwrap().clone();
+        w.observe_regional(1);
+        assert_eq!(w.narrative().unwrap(), &before);
+        assert_eq!(w.known_story_inquiries().count(), 1);
     }
 
     #[test]

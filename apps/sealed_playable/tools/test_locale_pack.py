@@ -11,7 +11,7 @@ class LocalePackTests(unittest.TestCase):
         cls.base=cls.catalogs["living"]["en"]
 
     def test_source_parity(self):
-        self.assertEqual(len(self.base),742)
+        self.assertEqual(len(self.base),755)
         expected_contacts = {
             "living.contact.care", "living.contact.talk",
             "living.contact.empty", "living.contact.help",
@@ -23,6 +23,7 @@ class LocalePackTests(unittest.TestCase):
         self.assertEqual({key for key in self.base if key.startswith("living.obligation.")},{'living.obligation.expired', 'living.obligation.lost', 'living.obligation.fulfilled', 'living.obligation.empty', 'living.obligation.changed', 'living.obligation.pixel.hint', 'living.obligation.released', 'living.obligation.help'})
         self.assertEqual({key for key in self.base if key.startswith("living.message.")},{'living.message.goal', 'living.message.result.fulfilled', 'living.message.result.released', 'living.message.help', 'living.message.empty', 'living.message.handoff', 'living.message.result.expired', 'living.message.direct', 'living.message.result.changed', 'living.message.relayed', 'living.message.pixel.hint', 'living.message.result.lost'})
         self.assertEqual({key for key in self.base if key.startswith("living.rumor.")},{'living.rumor.contested', 'living.rumor.verified', 'living.rumor.account', 'living.rumor.line', 'living.rumor.adequate', 'living.rumor.empty', 'living.rumor.goal', 'living.rumor.help', 'living.rumor.reported', 'living.rumor.pixel.hint', 'living.rumor.low', 'living.rumor.local'})
+        self.assertEqual({key for key in self.base if key.startswith("living.story.")},{'living.story.empty', 'living.story.help', 'living.story.pixel.hint', 'living.story.checked', 'living.story.dispatch', 'living.story.conflict', 'living.story.register', 'living.story.followup', 'living.story.delivery', 'living.story.lapsed', 'living.story.inquiry', 'living.story.witnessed', 'living.story.opportunity'})
         self.assertEqual(self.base.keys(),self.catalogs["living"]["id"].keys())
         self.assertEqual(len(self.catalogs["ui"]["en"]),203)
 

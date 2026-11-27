@@ -30,6 +30,7 @@ pub(crate) struct Session {
     debug_world: bool,
     news_cursor: usize,
     rumor_cursor: usize,
+    story_cursor: usize,
 }
 
 impl Session {
@@ -42,11 +43,14 @@ impl Session {
             debug_world: false,
             news_cursor: 0,
             rumor_cursor: 0,
+            story_cursor: 0,
         }
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 41 {
+        if self.world.checkpoint_revision() == 42 {
+            World::narrative_campaign(seed)
+        } else if self.world.checkpoint_revision() == 41 {
             World::rumor_campaign(seed)
         } else if self.world.checkpoint_revision() == 40 {
             World::communication_campaign(seed)
@@ -1124,6 +1128,21 @@ impl Session {
                 };
                 return true;
             }
+            "stories" if self.world.narrative().is_some() => {
+                self.notice = self.story_lines().join("\n");
+                return true;
+            }
+            "storiesnext" if self.world.narrative().is_some() => {
+                let pages = self.story_lines();
+                let page = self.story_cursor % pages.len();
+                self.notice = format!("{}/{}  {}", page + 1, pages.len(), pages[page]);
+                self.story_cursor = (page + 1) % pages.len();
+                return true;
+            }
+            "storydebug" if self.debug_world && self.world.narrative().is_some() => {
+                self.notice = format!("{:?}", self.world.narrative().unwrap());
+                return true;
+            }
             "rumors" if self.world.rumors().is_some() => {
                 self.notice = self.rumor_lines().join("\n");
                 return true;
@@ -1601,6 +1620,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.narrative().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.story.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" storydebug");
                     }
                 }
                 if self.world.rumors().is_some() {
@@ -2274,6 +2301,143 @@ impl Session {
             ],
         )
     }
+    pub(crate) fn story_lines(&self) -> Vec<String> {
+        use sealed_sim::living::{
+            cooperation::{Evidence, Route},
+            narrative::InquiryEnd,
+        };
+        let tr = |key| living_text(self.locale, key);
+        let name = |id| actor_name(self.locale, &self.world, id);
+        let route = |r| {
+            tr(match r {
+                Route::Qinghe => "living.team.qinghe",
+                Route::Willowford => "living.team.willowford",
+            })
+        };
+        let band = |scarce| {
+            tr(if scarce {
+                "living.rumor.low"
+            } else {
+                "living.rumor.adequate"
+            })
+        };
+        let fmt = |key, params: &[(&str, &str)]| living_format(self.locale, key, params);
+        let mut episodes = Vec::new();
+        for p in self.world.known_story_projects() {
+            let id = p.id.to_string();
+            let mut rows = Vec::new();
+            if let Some(d) = p.dispatch {
+                rows.push(fmt(
+                    "living.story.dispatch",
+                    &[
+                        ("id", &id),
+                        ("at", &d.at.to_string()),
+                        ("grower", name(p.grower)),
+                        ("carrier", name(p.carrier)),
+                        ("route", route(d.route)),
+                        ("amount", &d.shipment.to_string()),
+                    ],
+                ));
+            }
+            if let Some(d) = p.delivery {
+                rows.push(fmt(
+                    "living.story.delivery",
+                    &[
+                        ("id", &id),
+                        ("at", &d.at.to_string()),
+                        ("learned", &d.learned_at.to_string()),
+                        ("amount", &d.shipment.to_string()),
+                        ("route", route(d.route)),
+                        (
+                            "evidence",
+                            tr(match d.evidence {
+                                Evidence::Register => "living.story.register",
+                                Evidence::Witnessed => "living.story.witnessed",
+                            }),
+                        ),
+                    ],
+                ));
+            }
+            for m in [p.handoff, p.report].into_iter().flatten() {
+                rows.push(self.message_line(&m));
+            }
+            if p.dispatch.is_some()
+                && p.delivery.is_none()
+                && p.report.is_none()
+                && p.handoff.is_none()
+            {
+                rows.push(fmt("living.story.followup", &[("id", &id)]));
+            }
+            episodes.push((p.updated, 0u8, p.id, rows));
+        }
+        for i in self.world.known_story_inquiries() {
+            let id = i.id.to_string();
+            let site = self.regional_site_name(i.site);
+            let a = i.first;
+            let mut rows = vec![fmt(
+                "living.story.inquiry",
+                &[
+                    ("id", &id),
+                    ("at", &i.opened.to_string()),
+                    ("site", site),
+                    ("band", band(a.sample.scarce)),
+                    ("source", name(a.sample.origin)),
+                    ("via", name(a.via.expect("heard account"))),
+                    ("observed", &a.sample.observed_at.to_string()),
+                ],
+            )];
+            if let Some(c) = i.conflict {
+                rows.push(fmt(
+                    "living.story.conflict",
+                    &[
+                        ("id", &id),
+                        ("at", &c.at.to_string()),
+                        ("low", &c.low.observed_at.to_string()),
+                        ("adequate", &c.adequate.observed_at.to_string()),
+                    ],
+                ));
+            }
+            let updated = match i.end {
+                Some(InquiryEnd::Checked(s)) => {
+                    rows.push(fmt(
+                        "living.story.checked",
+                        &[
+                            ("id", &id),
+                            ("at", &s.observed_at.to_string()),
+                            ("site", site),
+                            ("band", band(s.scarce)),
+                        ],
+                    ));
+                    s.observed_at
+                }
+                Some(InquiryEnd::Lapsed(at)) => {
+                    rows.push(fmt(
+                        "living.story.lapsed",
+                        &[("id", &id), ("at", &at.to_string())],
+                    ));
+                    at
+                }
+                None => {
+                    rows.push(fmt(
+                        "living.story.opportunity",
+                        &[("id", &id), ("site", site)],
+                    ));
+                    i.conflict.map_or(i.opened, |c| c.at)
+                }
+            };
+            episodes.push((updated, 1u8, i.id, rows));
+        }
+        episodes.sort_by_key(|(at, kind, id, _)| std::cmp::Reverse((*at, *kind, *id)));
+        let mut rows = episodes
+            .into_iter()
+            .flat_map(|(_, _, _, r)| r)
+            .collect::<Vec<_>>();
+        if rows.is_empty() {
+            rows.push(tr("living.story.empty").into());
+        }
+        rows
+    }
+
     pub(crate) fn rumor_lines(&self) -> Vec<String> {
         use sealed_sim::living::{regional_news::Site, rumors::Status};
         let mut rows = Vec::new();
@@ -4908,6 +5072,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         39 => "checkpoint.c52",
         40 => "checkpoint.c53",
         41 => "checkpoint.c54",
+        42 => "checkpoint.c55",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -4949,12 +5114,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         39 => World::obligations_campaign(0),
         40 => World::communication_campaign(0),
         41 => World::rumor_campaign(0),
+        42 => World::narrative_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn narrative_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 42);
+    if seed != 0 {
+        session.world = World::narrative_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_narrative_campaign(seed: u32, debug_world: bool) {
+    run_session(narrative_session(seed, debug_world));
+}
 pub(crate) fn rumor_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 41);
     if seed != 0 {

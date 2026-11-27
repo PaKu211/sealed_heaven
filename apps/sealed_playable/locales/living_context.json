@@ -5081,6 +5081,124 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.story.checked": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "at": "dated evidence or episode tick",
+      "band": "observed or reported availability band",
+      "id": "public project ID or actor-local inquiry ID",
+      "site": "known site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.conflict": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "adequate": "tick of adequate account",
+      "at": "dated evidence or episode tick",
+      "id": "public project ID or actor-local inquiry ID",
+      "low": "tick of scarce account"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.delivery": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "amount": "known shipment amount",
+      "at": "dated evidence or episode tick",
+      "evidence": "known evidence type",
+      "id": "public project ID or actor-local inquiry ID",
+      "learned": "tick receipt was acquired",
+      "route": "known freight route"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.dispatch": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "amount": "known shipment amount",
+      "at": "dated evidence or episode tick",
+      "carrier": "known courier",
+      "grower": "known contributor",
+      "id": "public project ID or actor-local inquiry ID",
+      "route": "known freight route"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.empty": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.story.followup": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "id": "public project ID or actor-local inquiry ID"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.help": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.story.inquiry": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "at": "dated evidence or episode tick",
+      "band": "observed or reported availability band",
+      "id": "public project ID or actor-local inquiry ID",
+      "observed": "original observation tick",
+      "site": "known site",
+      "source": "original observing actor",
+      "via": "actual immediate informant"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.lapsed": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "at": "dated evidence or episode tick",
+      "id": "public project ID or actor-local inquiry ID"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.opportunity": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {
+      "id": "public project ID or actor-local inquiry ID",
+      "site": "known site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.story.pixel.hint": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.story.register": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.story.witnessed": {
+    "active": true,
+    "context": "C5.5 evidence-only causal narrative; no hidden outcome, private counters, or invented objective",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.team.delivered": {
     "active": true,
     "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",

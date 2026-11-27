@@ -181,17 +181,18 @@ impl Cooperation {
         }
         self.observed.push_back(receipt);
     }
-    fn read_register(&mut self, route: Route) {
+    fn read_register(&mut self, route: Route) -> Vec<Witnessed> {
         let last = self.last_read.get(&route).copied();
         let receipts: Vec<_> = self
             .register(route)
             .filter(|r| last.is_none_or(|id| r.id > id))
             .copied()
             .collect();
-        for r in receipts {
+        for &r in &receipts {
             self.remember(r);
             self.last_read.insert(route, r.id);
         }
+        receipts
     }
     fn close(&mut self, carrier: ActorId, at: u64, place: Position, outcome: Outcome, seen: bool) {
         let Some(team) = self.active.remove(&carrier) else {
@@ -294,7 +295,10 @@ impl World {
         for route in [Route::Qinghe, Route::Willowford] {
             let site = route.destination(self);
             if in_reach(self.player.position, site) && self.can_see(self.player.position, site) {
-                self.cooperation.as_mut().unwrap().read_register(route);
+                let receipts = self.cooperation.as_mut().unwrap().read_register(route);
+                for r in receipts {
+                    self.story_register(r);
+                }
             }
         }
     }
@@ -592,6 +596,94 @@ mod tests {
         assert_eq!(w.dispatch_amount(route, a, b), Some((2, 2)), "{route:?}");
         assert_eq!(collect, route.goals().1);
         (w, a, b, plans)
+    }
+
+    #[test]
+    fn c55_real_project_has_causal_chain_and_evidence_only_projection() {
+        use crate::living::{communication::Kind, obligations::ResultKind};
+        let (mut w, a, b, plans) = fixture_for(World::narrative_campaign(0), Route::Qinghe);
+        let stock = w.supply.shrine;
+        w.commit_cooperative_dispatches(&plans);
+        let t = w.cooperation().unwrap().active()[&b];
+        let n = w.narrative().unwrap();
+        assert_eq!(n.active_projects()[&t.id].team, t);
+        assert!(n.known_projects()[&t.id].dispatch.is_some());
+        assert!(n.known_projects()[&t.id].delivery.is_none());
+        let known = n.known_projects().clone();
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().position = w.scenario.shrine;
+        // Player remains at the distant dispatch hub, not at delivery.
+        assert!(!w.player_sees(w.scenario.shrine));
+        w.unload_regional_cargo(b, false);
+        assert_eq!(w.supply.shrine, stock + 2);
+        assert_eq!(
+            w.narrative().unwrap().active_projects()[&t.id]
+                .outcome
+                .unwrap()
+                .result,
+            ResultKind::Fulfilled
+        );
+        assert_eq!(w.narrative().unwrap().known_projects(), &known);
+        w.tick += 1;
+        let near = w.npcs[&a].position;
+        let cell = DIRECTIONS
+            .into_iter()
+            .filter_map(|d| navigation::moved(near, d))
+            .find(|&p| w.walkable(p))
+            .unwrap();
+        w.npcs.get_mut(&b).unwrap().position = cell;
+        // Private conversation closes the world arc without disclosing it.
+        w.player.position = w.scenario.shrine;
+        assert!(!w.player_sees(near));
+        w.advance_obligations();
+        let n = w.narrative().unwrap();
+        assert_eq!(n.counts(), (1, 1, 0, 0, 0));
+        assert!(n.active_projects().is_empty());
+        let arc = n.project_history().back().unwrap();
+        assert_eq!(arc.team, t);
+        assert_eq!(arc.outcome.unwrap().at, 11);
+        assert_eq!(arc.end.unwrap().at, 12);
+        assert_eq!(arc.end.unwrap().kind, Kind::Direct);
+        assert_eq!(n.career(b).delivered, 1);
+        assert_eq!(n.career(a).confirmed, 1);
+        assert_eq!(n.known_projects(), &known);
+        // Reading the actual posted manifest learns delivery, not the
+        // private acknowledgement or relationship change.
+        w.observe_cooperation_receipts();
+        let k = w.narrative().unwrap().known_projects()[&t.id];
+        let d = k.delivery.unwrap();
+        assert_eq!(
+            (d.at, d.learned_at, d.shipment, d.evidence),
+            (11, 12, 2, Evidence::Register)
+        );
+        assert!(k.report.is_none() && k.handoff.is_none());
+        let snapshot = w.clone();
+        w.observe_cooperation_receipts();
+        w.advance_obligations();
+        assert_eq!(w, snapshot);
+    }
+
+    #[test]
+    fn c55_loss_is_not_a_public_report() {
+        use crate::living::{communication::Kind, obligations::ResultKind};
+        let (mut w, _a, b, plans) = fixture_for(World::narrative_campaign(0), Route::Qinghe);
+        w.commit_cooperative_dispatches(&plans);
+        let id = w.cooperation().unwrap().active()[&b].id;
+        let known = w.narrative().unwrap().known_projects().clone();
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().hp = 0;
+        w.reconcile_cooperation();
+        let n = w.narrative().unwrap();
+        let p = n.project_history().back().unwrap();
+        assert_eq!(p.team.id, id);
+        assert_eq!(p.outcome.unwrap().result, ResultKind::CarrierLost);
+        let end = p.end.unwrap();
+        assert_eq!(end.kind, Kind::Unreported);
+        assert!(end.place.is_none() && end.holder.is_none());
+        assert!(n.active_projects().is_empty());
+        assert_eq!(n.known_projects(), &known);
+        assert_eq!(n.career(b).unreported, 1);
+        assert!(w.communication().unwrap().messages().is_empty());
     }
 
     #[test]

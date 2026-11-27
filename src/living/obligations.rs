@@ -293,6 +293,7 @@ impl World {
     pub(super) fn open_obligation(&mut self, team: Team) {
         if let Some(o) = self.obligations.as_mut() {
             o.open(team);
+            self.story_open(team);
         }
     }
     pub(super) fn close_obligation(
@@ -309,6 +310,7 @@ impl World {
                 result: ResultKind::from_outcome(outcome),
             };
             o.resolve(resolution);
+            self.story_resolve(resolution);
             self.open_message(resolution);
         }
     }
