@@ -3902,6 +3902,56 @@
     "parameters": {},
     "surface": "living_pixel.rs"
   },
+  "living.production.empty": {
+    "active": true,
+    "context": "C4.4 local production inspection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.production.help": {
+    "active": true,
+    "context": "C4.4 local production inspection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.production.pixel.hint": {
+    "active": true,
+    "context": "C4.4 local production inspection",
+    "parameters": {
+      "seed": "C4.4 site report"
+    },
+    "surface": "living_pixel.rs"
+  },
+  "living.production.report": {
+    "active": true,
+    "context": "C4.4 local production inspection",
+    "parameters": {
+      "capacity": "C4.4 site report",
+      "interval": "C4.4 site report",
+      "site": "C4.4 site report",
+      "stock": "C4.4 site report",
+      "turns": "C4.4 site report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.production.site.garden": {
+    "active": true,
+    "context": "C4.4 local production inspection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.production.site.grove": {
+    "active": true,
+    "context": "C4.4 local production inspection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.production.site.west": {
+    "active": true,
+    "context": "C4.4 local production inspection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.regional.developer": {
     "active": true,
     "context": "C4.2 dated regional evidence; not live remote stock",

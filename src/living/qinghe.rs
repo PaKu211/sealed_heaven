@@ -5,7 +5,10 @@ pub(super) use content::SCENARIO_QINGHE as QINGHE;
 pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
     if matches!(
         rules,
-        Rules::ExpandedRiverlands | Rules::RegionalKnowledge | Rules::ExactLod
+        Rules::ExpandedRiverlands
+            | Rules::RegionalKnowledge
+            | Rules::ExactLod
+            | Rules::SettlementProduction
     ) {
         return super::expansion::scenario(seed);
     }

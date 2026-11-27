@@ -54,7 +54,11 @@ fn overlay_compiler_is_strict_and_pinned() {
         content::definition_for_revision(30, "sealed_heaven:li_wen"),
         content::definition_for_revision(29, "sealed_heaven:li_wen")
     );
-    assert!(content::definition_for_revision(31, "sealed_heaven:li_wen").is_none());
+    assert_eq!(
+        content::definition_for_revision(31, "sealed_heaven:li_wen"),
+        content::definition_for_revision(30, "sealed_heaven:li_wen")
+    );
+    assert!(content::definition_for_revision(32, "sealed_heaven:li_wen").is_none());
     let original: serde_json::Value = serde_json::from_str(PACK).unwrap();
     let equivalent =
         compiler::compile(&original.to_string(), BASE, content::CONTENT_SHA256).unwrap();

@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 30 {
+        if self.world.checkpoint_revision() == 31 {
+            World::settlement_production_campaign(seed)
+        } else if self.world.checkpoint_revision() == 30 {
             World::exact_lod_campaign(seed)
         } else if self.world.checkpoint_revision() == 29 {
             World::regional_knowledge_campaign(seed)
@@ -1077,6 +1079,28 @@ impl Session {
                 };
                 return true;
             }
+            "production" if self.world.production().is_some() => {
+                self.notice = self.production_lines().join("\n");
+                return true;
+            }
+            "productionlog" if self.debug_world && self.world.production().is_some() => {
+                use sealed_sim::living::production::Job;
+                let state = self.world.production().unwrap();
+                let mut lines = vec![format!("PRODUCTION tick={}", self.world.tick())];
+                for job in Job::ALL {
+                    let record = state.record_for(job);
+                    lines.push(format!(
+                        "{job:?} due={:?} cycles={} quantity={} last_tick={} last_amount={}",
+                        state.next_due(job),
+                        record.executions,
+                        record.quantity,
+                        record.last_tick,
+                        record.last_amount
+                    ));
+                }
+                self.notice = lines.join("\n");
+                return true;
+            }
             "lod" if self.debug_world && self.world.scheduler().is_some() => {
                 let scheduler = self.world.scheduler().unwrap();
                 let (full, routine) = scheduler.evaluation_totals();
@@ -1254,6 +1278,14 @@ impl Session {
                     self.notice.push(' ');
                     self.notice
                         .push_str(living_text(self.locale, "living.regional.help"));
+                }
+                if self.world.production().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.production.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" productionlog");
+                    }
                 }
                 return true;
             }
@@ -1851,6 +1883,43 @@ impl Session {
                 ("source", &source),
             ],
         )
+    }
+
+    pub(crate) fn production_lines(&self) -> Vec<String> {
+        use sealed_sim::living::production::Job;
+        let reports = self.world.local_production();
+        if reports.is_empty() {
+            return vec![living_text(self.locale, "living.production.empty").into()];
+        }
+        reports
+            .into_iter()
+            .map(|r| {
+                let site = living_text(
+                    self.locale,
+                    match r.job {
+                        Job::WestGrowth => "living.production.site.west",
+                        Job::GardenGrowth => "living.production.site.garden",
+                        Job::GroveGrowth => "living.production.site.grove",
+                        _ => unreachable!("only growth sites have local reports"),
+                    },
+                );
+                let line = living_format(
+                    self.locale,
+                    "living.production.report",
+                    &[
+                        ("site", site),
+                        ("stock", &r.stock.to_string()),
+                        ("capacity", &r.capacity.to_string()),
+                        (
+                            "turns",
+                            &r.next_cycle.saturating_sub(self.world.tick()).to_string(),
+                        ),
+                        ("interval", &r.interval.to_string()),
+                    ],
+                );
+                line.replace(" | ", "\n")
+            })
+            .collect()
     }
 
     pub(crate) fn regional_news_lines(&self) -> Vec<String> {
@@ -3708,6 +3777,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         28 => "checkpoint.c41",
         29 => "checkpoint.c42",
         30 => "checkpoint.c43",
+        31 => "checkpoint.c44",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3738,10 +3808,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         28 => World::expanded_riverlands(0),
         29 => World::regional_knowledge_campaign(0),
         30 => World::exact_lod_campaign(0),
+        31 => World::settlement_production_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn production_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 31);
+    if seed != 0 {
+        session.world = World::settlement_production_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_production_campaign(seed: u32, debug_world: bool) {
+    run_session(production_session(seed, debug_world));
 }
 
 pub(crate) fn lod_session(seed: u32, debug_world: bool) -> Session {

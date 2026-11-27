@@ -30,6 +30,7 @@ mod npc;
 #[cfg(test)]
 mod player_agency_tests;
 mod politics;
+pub mod production;
 mod qinghe;
 mod recovery;
 mod region;
@@ -382,6 +383,7 @@ pub struct World {
     frontier: Option<expansion::Frontier>,
     regional_news: Option<regional_news::RegionalNews>,
     scheduler: Option<lod::Scheduler>,
+    production: Option<production::Production>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -442,6 +444,7 @@ enum Rules {
     ExpandedRiverlands,
     RegionalKnowledge,
     ExactLod,
+    SettlementProduction,
 }
 
 impl Rules {
@@ -453,6 +456,7 @@ impl Rules {
                 | Self::ExpandedRiverlands
                 | Self::RegionalKnowledge
                 | Self::ExactLod
+                | Self::SettlementProduction
         )
     }
 
@@ -490,6 +494,7 @@ impl Rules {
                 | Self::ExpandedRiverlands
                 | Self::RegionalKnowledge
                 | Self::ExactLod
+                | Self::SettlementProduction
         )
     }
 }
@@ -616,6 +621,11 @@ impl World {
         Self::seeded(seed, Rules::ExactLod)
     }
 
+    /// C4.4: deterministic settlement site production and order scheduling.
+    pub fn settlement_production_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::SettlementProduction)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -624,11 +634,15 @@ impl World {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
                 rules,
-                Rules::ExpandedRiverlands | Rules::RegionalKnowledge | Rules::ExactLod
+                Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
+                    | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -644,11 +658,17 @@ impl World {
                 .all(|site| world.walkable(site))
         );
         world.region = Some(Region::new(seed));
-        if matches!(rules, Rules::RegionalKnowledge | Rules::ExactLod) {
+        if matches!(
+            rules,
+            Rules::RegionalKnowledge | Rules::ExactLod | Rules::SettlementProduction
+        ) {
             world.init_regional_news();
         }
-        if rules == Rules::ExactLod {
+        if matches!(rules, Rules::ExactLod | Rules::SettlementProduction) {
             world.scheduler = Some(lod::Scheduler::new(&world));
+        }
+        if rules == Rules::SettlementProduction {
+            world.production = Some(production::Production::new(&world));
         }
         world
     }
@@ -670,6 +690,7 @@ impl World {
             frontier: None,
             regional_news: None,
             scheduler: None,
+            production: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -711,6 +732,7 @@ impl World {
                         | Rules::ExpandedRiverlands
                         | Rules::RegionalKnowledge
                         | Rules::ExactLod
+                        | Rules::SettlementProduction
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -752,6 +774,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(Company::default),
             rivalry: matches!(
@@ -781,6 +804,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -809,6 +833,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(Politics::new),
             traffic: matches!(
@@ -836,6 +861,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -862,6 +888,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -885,6 +912,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -907,6 +935,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(Information::default),
             contested: matches!(
@@ -923,6 +952,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(|| {
                 Contested::new(matches!(
@@ -938,6 +968,7 @@ impl World {
                         | Rules::ExpandedRiverlands
                         | Rules::RegionalKnowledge
                         | Rules::ExactLod
+                        | Rules::SettlementProduction
                 ))
             }),
             martial: matches!(
@@ -952,6 +983,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -965,6 +997,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -977,6 +1010,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -988,6 +1022,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -998,6 +1033,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1177,6 +1213,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1202,6 +1239,7 @@ impl World {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1239,9 +1277,7 @@ impl World {
         self.deliver_info_reports();
         self.deliver_regional_reports();
         self.advance_information_recovery();
-        self.regrow();
-        self.advance_region();
-        self.advance_frontier();
+        self.advance_production();
         // 2. Apply the player's action and capture observation at the point of contact.
         if self.tick == 1 && !matches!(intent, Intent::ChooseBackground(_)) {
             self.select_default_background();
@@ -1419,6 +1455,7 @@ impl World {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         )
     }
 
@@ -1441,6 +1478,7 @@ impl World {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         )
     }
 
@@ -1462,6 +1500,7 @@ impl World {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         )
     }
 
@@ -1482,6 +1521,7 @@ impl World {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         )
     }
 
@@ -1501,6 +1541,7 @@ impl World {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         )
     }
 
@@ -1518,6 +1559,7 @@ impl World {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         )
     }
 

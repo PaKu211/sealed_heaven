@@ -66,6 +66,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::ExpandedRiverlands => super::expansion::REVISION,
         Rules::RegionalKnowledge => super::regional_news::REVISION,
         Rules::ExactLod => super::lod::REVISION,
+        Rules::SettlementProduction => super::production::REVISION,
     }
 }
 
@@ -126,6 +127,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::expansion::REVISION => Rules::ExpandedRiverlands,
         super::regional_news::REVISION => Rules::RegionalKnowledge,
         super::lod::REVISION => Rules::ExactLod,
+        super::production::REVISION => Rules::SettlementProduction,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -228,6 +230,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::Invite(actor)
@@ -261,6 +264,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::Provision(actor)
@@ -294,6 +298,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::Part(actor)
@@ -326,6 +331,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::OfferAccord
@@ -358,6 +364,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::SupportHall
@@ -389,6 +396,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::PledgeLodge
@@ -420,6 +428,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::AidLodge
@@ -451,6 +460,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::RenounceLodge
@@ -475,6 +485,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::Ask(actor)
@@ -499,6 +510,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::Examine
@@ -523,6 +535,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -547,6 +560,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::Take(actor)
@@ -568,6 +582,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -591,6 +606,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::ClaimLot(value)
@@ -610,6 +626,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -629,6 +646,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::AttuneLot(value)
@@ -647,6 +665,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -664,6 +683,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::Drill(actor)
@@ -681,6 +701,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -705,6 +726,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::DrawQi
@@ -718,6 +740,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::CirculateQi
@@ -731,6 +754,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::MendMeridians
@@ -744,6 +768,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::TreatWounds
@@ -757,6 +782,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -768,7 +794,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::ExactLod {
+        let mut bytes = if world.rules == Rules::SettlementProduction {
+            b"SH:C44:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::ExactLod {
             b"SH:C43:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::RegionalKnowledge {
             b"SH:C42:SCENARIO:v1\0".to_vec()
@@ -827,6 +855,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::ExpandedRiverlands => b"SH:C10:RULES:v28".to_vec(),
         Rules::RegionalKnowledge => b"SH:C10:RULES:v29".to_vec(),
         Rules::ExactLod => b"SH:C10:RULES:v30".to_vec(),
+        Rules::SettlementProduction => b"SH:C10:RULES:v31".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -918,6 +947,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::ExpandedRiverlands
             | Rules::RegionalKnowledge
             | Rules::ExactLod
+            | Rules::SettlementProduction
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -964,6 +994,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::ExpandedRiverlands => b"SH:C10:STATE:v28".to_vec(),
         Rules::RegionalKnowledge => b"SH:C10:STATE:v29".to_vec(),
         Rules::ExactLod => b"SH:C10:STATE:v30".to_vec(),
+        Rules::SettlementProduction => b"SH:C10:STATE:v31".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1075,6 +1106,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1155,6 +1187,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::ExpandedRiverlands
             | Rules::RegionalKnowledge
             | Rules::ExactLod
+            | Rules::SettlementProduction
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1191,6 +1224,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::ExpandedRiverlands
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
+                    | Rules::SettlementProduction
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1234,6 +1268,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::ExpandedRiverlands
             | Rules::RegionalKnowledge
             | Rules::ExactLod
+            | Rules::SettlementProduction
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1318,6 +1353,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::ExpandedRiverlands
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
+                | Rules::SettlementProduction
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1472,6 +1508,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(scheduler) = world.scheduler() {
         let bytes = scheduler.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(production) = world.production() {
+        let bytes = production.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }
