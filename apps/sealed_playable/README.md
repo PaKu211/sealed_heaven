@@ -2,7 +2,7 @@
 
 ## Current regional campaign
 
-C5.3: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c53 --pixel`. Omit `--pixel` for ASCII. `messages` / Ctrl+Shift+F3 show witnessed message exchanges; save slot `checkpoint.c53`. See the [C5.3 specification](../../C5_3_SITUATED_COMMUNICATION.md). The C0.4 material below is retained as historical documentation.
+C5.4: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c54 --pixel`. Omit `--pixel` for ASCII. `rumors` / Ctrl+Shift+F2 show player-known dated accounts; save slot `checkpoint.c54`. See the [C5.4 specification](../../C5_4_DYNAMIC_INFORMATION_NETWORKS.md). The C0.4 material below is retained as historical documentation.
 
 **Current acceptance: C0.4 independent audit PASS.**
 Native evidence is `../../docs/evidence/c04-native-acceptance/`. The verdict is

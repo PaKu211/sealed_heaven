@@ -109,6 +109,7 @@ pub enum Goal {
     SurveyWillowford,
     SurveyPinefordDepot,
     CarryMessage(u32),
+    VerifyRumor(super::regional_news::Site),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -474,6 +475,11 @@ impl World {
                 message.map(|(_, goal)| goal),
                 DecisionReason::KnownOpportunity,
             ),
+            (
+                25,
+                self.rumor_goal(npc, duty),
+                DecisionReason::KnownOpportunity,
+            ),
             (20, Some(duty), ambition_reason(npc, duty)),
         ];
         let (score, _, goal, reason) = plans
@@ -573,6 +579,9 @@ impl World {
         // Role exclusions remove Watch investigation/recovery and Medic
         // treatment; full HP removes care; distance removes player threat.
         let duty = self.livelihood_duty(npc, false);
+        if self.rumor_goal(npc, duty).is_some() {
+            return None;
+        }
         let resting = (self.is_night()
             && matches!(npc.definition.role, Role::Supplier | Role::Grower))
             || npc.fatigue >= npc.definition.rest_threshold
@@ -851,6 +860,7 @@ impl World {
             }
             Goal::InvestigateDispute(dispute_id) => self.investigate_dispute(id, dispute_id),
             Goal::CarryMessage(project) => self.work_message(id, project),
+            Goal::VerifyRumor(site) => self.work_verification(id, site),
         }
     }
 

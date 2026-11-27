@@ -387,6 +387,7 @@ impl World {
                         receipt: Receipt::direct(actor, tick, phase),
                     },
                 );
+                self.observe_rumor(actor, site, scarce, phase);
             }
         }
     }

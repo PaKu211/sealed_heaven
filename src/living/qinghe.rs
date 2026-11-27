@@ -18,6 +18,7 @@ pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
             | Rules::CollectiveAgency
             | Rules::DynamicObligations
             | Rules::SituatedCommunication
+            | Rules::InformationNetworks
     ) {
         return super::expansion::scenario(seed);
     }

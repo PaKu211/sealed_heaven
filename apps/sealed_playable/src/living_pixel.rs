@@ -10,7 +10,7 @@ use crate::{
         Session, bonds_session, campaign_session, communication_session, cooperation_session,
         encounter_session, expanded_session, favors_session, generated_session, history_session,
         knowledge_session, lod_session, obligations_session, outcome_label, production_session,
-        requests_session, social_network_session,
+        requests_session, rumor_session, social_network_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -66,6 +66,10 @@ pub(crate) fn run_requests(seed: u32) {
 
 pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
+}
+
+pub(crate) fn run_rumor(seed: u32) {
+    run_session(rumor_session(seed, false));
 }
 
 pub(crate) fn run_communication(seed: u32) {
@@ -170,6 +174,12 @@ fn keyboard(
         if let Ok(mut window) = windows.single_mut() {
             window.title = living_text(game.session.locale, "living.pixel.window.title").to_owned();
         }
+    } else if game.session.world.rumors().is_some()
+        && keys.just_pressed(KeyCode::F2)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+        && (keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight))
+    {
+        game.session.input("rumorsnext");
     } else if game.session.world.encounters().is_some()
         && keys.just_pressed(KeyCode::F2)
         && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
@@ -444,7 +454,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     if world.favors().is_some() {
         label(
             &mut commands,
-            tr(if world.communication().is_some() {
+            tr(if world.rumors().is_some() {
+                "living.rumor.pixel.hint"
+            } else if world.communication().is_some() {
                 "living.message.pixel.hint"
             } else if world.obligations().is_some() {
                 "living.obligation.pixel.hint"
@@ -1893,6 +1905,81 @@ mod tests {
         press(&mut app, KeyCode::F3, true, true);
         assert!(
             text(&mut app).contains("t71 #0: Bao Jun memberi tahu Mei Fen: pengiriman selesai.")
+        );
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+    }
+
+    #[test]
+    fn c54_natural_rumor_pages_are_bilingual_read_only_and_local() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/living/c54_rumors_golden_v1.json"
+        ))
+        .unwrap();
+        let row = fixture["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["name"].as_str() == Some("heard-account"))
+            .unwrap();
+        let mut session = rumor_session(row["seed"].as_u64().unwrap() as u32, false);
+        for cmd in row["commands"].as_array().unwrap() {
+            assert!(session.input(cmd.as_str().unwrap()));
+        }
+        assert!(session.rumor_lines()[0].contains("source Shen Wei"));
+        let before = session.world.checkpoint();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let press = |app: &mut App, key, ctrl: bool, shift: bool| {
+            {
+                let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                keys.clear();
+                keys.release(KeyCode::ControlLeft);
+                keys.release(KeyCode::ShiftLeft);
+                if ctrl {
+                    keys.press(KeyCode::ControlLeft);
+                }
+                if shift {
+                    keys.press(KeyCode::ShiftLeft);
+                }
+                keys.release(key);
+                keys.press(key);
+            }
+            app.update();
+        };
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("Ctrl+Shift+F2 rumors"));
+        press(&mut app, KeyCode::F2, true, true);
+        assert!(text(&mut app).contains("1/2") && text(&mut app).contains("saw scarce at t21"));
+        press(&mut app, KeyCode::F2, true, true);
+        assert!(
+            text(&mut app).contains("2/2")
+                && text(&mut app)
+                    .contains("source Shen Wei, via Shen Wei, confidence 67/100, hops 1")
+        );
+        press(&mut app, KeyCode::F2, true, false);
+        assert!(!text(&mut app).contains("confidence 67/100"));
+        press(&mut app, KeyCode::Tab, false, false);
+        press(&mut app, KeyCode::F2, true, true);
+        press(&mut app, KeyCode::F2, true, true);
+        assert!(
+            text(&mut app)
+                .contains("sumber Shen Wei, melalui Shen Wei, keyakinan 67/100, perantara 1")
         );
         assert_eq!(
             app.world().resource::<Game>().session.world.checkpoint(),

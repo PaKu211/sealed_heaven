@@ -1,0 +1,17 @@
+# C5.4 - Dynamic information networks and dated rumors
+
+Baseline C5.3 d87c0b4. Rules revision 41, isolated checkpoint.c54. No dependency or authored lore changes.
+
+## Model and boundaries
+Four regional sites retain the existing C4.2 economy and news model. Each actor can directly observe an availability band (scarce/adequate) only at a physical site with line of sight and reach. Each local sample is dated (tick and phase). Each actor retains the latest local check and at most two heard accounts per site, one per availability band. Contradictory dated observations are not evidence of intentional deception. No fabricated lie, reputation damage, resource creation, or authorization of work by rumor. Existing actual inventory remains authoritative.
+
+NPC exchanges require adjacency, sight, a news-sharing sender, nonhostile relations and recipient familiarity. Both parties are rate-limited to one automatic exchange per 16 ticks. Player Talk may exchange one account per direction; merely seeing an NPC is insufficient. Snapshot proposals, stable ordering and commit deduplication prevent an instantaneous multi-hop cascade. Original source/time, immediate sender, hops and acquisition tick persist. Each hop reduces stored credibility by at least 15 and caps it by the listener's directional regard/familiarity. No probability calibration or trust increase from repetition. Reports cannot be forwarded back to the origin or immediate sender, exceed three hops, or replace a local check newer than the account. A sender does not forward a heard account superseded by its own newer local check. Same-band refreshes need 24 ticks of newer evidence (or an improved same-stamp route). Original observation time never resets. Confidence falls one point per four ticks. Accounts retire at age 192 or confidence below 15. Local samples expire at age 192. A newer local check can settle competing accounts while retaining their dated historical context until expiry.
+
+## Verification
+Unknown, reported, contested and locally checked are epistemic states, not global truth. When a fresh local check is at least as recent as received accounts, the site is locally checked. Otherwise two fresh different bands yield contested status. A healthy, empty-handed, news-sharing NPC with idle/patrol livelihood and no companion or sect duty may choose a low-priority verification journey (score 25). Higher-priority duties and fatigue remain superior. The normal path planner moves at most one tile per tick; only the actual local observation barrier verifies the site. Up to 48 chosen verification ticks before a 48-tick yield. No privileged current stock lookup for choosing the journey. State is bounded per actor/site; history capped at 128. Full network is developer-only; normal UI reads player-known reports.
+
+## Controls
+--c54 [--seed N] [--pixel | --debug-world]. ASCII rumors lists player accounts; Ctrl+Shift+F2 cycles compact account pages in the pixel client. Normal Talk learns reports; local visits establish evidence. rumordebug requires developer mode. UI inspection does not advance time. EN/ID. Existing C5.3 and earlier slots stay separate. All rumor state participates in canonical hashing.
+
+## Scope
+The first claim domain is dated regional availability, not generalized gossip, intentional lies, faction reputation, or freeform authored narrative. Thresholds, confidence score, propagation and verification intervals are provisional balancing choices. Human playtest and independent audit are separate from automated testing.

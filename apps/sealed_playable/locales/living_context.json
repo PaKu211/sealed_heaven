@@ -4974,6 +4974,92 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.rumor.account": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {
+      "band": "dated resource availability band, not current fact",
+      "confidence": "decayed credibility score, not probability of truth",
+      "hops": "number of transmission hops",
+      "origin": "original observing actor",
+      "tick": "original observation tick",
+      "via": "immediate source of received account"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.adequate": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.contested": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.empty": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.goal": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.help": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.line": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {
+      "details": "dated local observation and heard accounts",
+      "site": "observed site",
+      "status": "current epistemic status"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.local": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {
+      "band": "dated resource availability band, not current fact",
+      "tick": "original observation tick"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.low": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.pixel.hint": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.rumor.reported": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.rumor.verified": {
+    "active": true,
+    "context": "C5.4 player-known dated resource accounts; no hidden current stock or private NPC trust score",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.save.error": {
     "active": true,
     "context": "save / error",

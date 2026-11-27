@@ -29,6 +29,7 @@ pub(crate) struct Session {
     pub(crate) locale: Locale,
     debug_world: bool,
     news_cursor: usize,
+    rumor_cursor: usize,
 }
 
 impl Session {
@@ -40,11 +41,14 @@ impl Session {
             locale: Locale::default(),
             debug_world: false,
             news_cursor: 0,
+            rumor_cursor: 0,
         }
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 40 {
+        if self.world.checkpoint_revision() == 41 {
+            World::rumor_campaign(seed)
+        } else if self.world.checkpoint_revision() == 40 {
             World::communication_campaign(seed)
         } else if self.world.checkpoint_revision() == 39 {
             World::obligations_campaign(seed)
@@ -162,6 +166,7 @@ impl Session {
                         | "questlog"
                         | "favors"
                         | "favorlog"
+                        | "rumors"
                         | "messages"
                         | "obligations"
                         | "teams"
@@ -1119,6 +1124,33 @@ impl Session {
                 };
                 return true;
             }
+            "rumors" if self.world.rumors().is_some() => {
+                self.notice = self.rumor_lines().join("\n");
+                return true;
+            }
+            "rumorsnext" if self.world.rumors().is_some() => {
+                let pages = self
+                    .rumor_lines()
+                    .into_iter()
+                    .flat_map(|line| {
+                        if let Some((heading, body)) = line.split_once("]: ") {
+                            body.split(" | ")
+                                .map(|detail| format!("{heading}]:\n{detail}"))
+                                .collect::<Vec<_>>()
+                        } else {
+                            vec![line]
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let page = self.rumor_cursor % pages.len();
+                self.notice = format!("{}/{}  {}", page + 1, pages.len(), pages[page]);
+                self.rumor_cursor = (page + 1) % pages.len();
+                return true;
+            }
+            "rumordebug" if self.debug_world && self.world.rumors().is_some() => {
+                self.notice = format!("{:?}", self.world.rumors().unwrap());
+                return true;
+            }
             "messages" if self.world.communication().is_some() => {
                 let count = argument
                     .and_then(|n| n.parse::<usize>().ok())
@@ -1569,6 +1601,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.rumors().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.rumor.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" rumordebug");
                     }
                 }
                 if self.world.communication().is_some() {
@@ -2234,6 +2274,75 @@ impl Session {
             ],
         )
     }
+    pub(crate) fn rumor_lines(&self) -> Vec<String> {
+        use sealed_sim::living::{regional_news::Site, rumors::Status};
+        let mut rows = Vec::new();
+        let tr = |key| living_text(self.locale, key);
+        let band = |scarce| {
+            tr(if scarce {
+                "living.rumor.low"
+            } else {
+                "living.rumor.adequate"
+            })
+        };
+        for site in Site::ALL {
+            let Some(v) = self.world.known_rumor(site) else {
+                continue;
+            };
+            let status = match v.status {
+                Status::Unknown => continue,
+                Status::Reported => "living.rumor.reported",
+                Status::Contested => "living.rumor.contested",
+                Status::Verified => "living.rumor.verified",
+            };
+            let mut details = Vec::new();
+            if let Some(local) = v.local {
+                details.push(living_format(
+                    self.locale,
+                    "living.rumor.local",
+                    &[
+                        ("band", band(local.scarce)),
+                        ("tick", &local.observed_at.to_string()),
+                    ],
+                ));
+            }
+            for account in [v.low, v.adequate].into_iter().flatten() {
+                let via = account.via.expect("received report has a sender");
+                details.push(living_format(
+                    self.locale,
+                    "living.rumor.account",
+                    &[
+                        ("band", band(account.sample.scarce)),
+                        ("tick", &account.sample.observed_at.to_string()),
+                        (
+                            "origin",
+                            actor_name(self.locale, &self.world, account.sample.origin),
+                        ),
+                        ("via", actor_name(self.locale, &self.world, via)),
+                        (
+                            "confidence",
+                            &account.confidence(self.world.tick()).to_string(),
+                        ),
+                        ("hops", &account.hops.to_string()),
+                    ],
+                ));
+            }
+            rows.push(living_format(
+                self.locale,
+                "living.rumor.line",
+                &[
+                    ("site", self.regional_site_name(site)),
+                    ("status", tr(status)),
+                    ("details", &details.join(" | ")),
+                ],
+            ));
+        }
+        if rows.is_empty() {
+            rows.push(tr("living.rumor.empty").into());
+        }
+        rows
+    }
+
     fn message_line(&self, e: &sealed_sim::living::communication::Event) -> String {
         use sealed_sim::living::{communication::Kind, obligations::ResultKind};
         let result = living_text(
@@ -4176,6 +4285,7 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::SurveyWillowford => "living.regional.goal.survey_market",
         Goal::SurveyPinefordDepot => "living.regional.goal.survey_depot",
         Goal::CarryMessage(_) => "living.message.goal",
+        Goal::VerifyRumor(_) => "living.rumor.goal",
         Goal::Report { .. } => "living.ascii.goal_label.seeking_someone_to_report_to",
         Goal::Retreat => "living.ascii.goal_label.retreating",
         Goal::Retaliate => "living.ascii.goal_label.retaliating",
@@ -4797,6 +4907,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         38 => "checkpoint.c51",
         39 => "checkpoint.c52",
         40 => "checkpoint.c53",
+        41 => "checkpoint.c54",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -4837,12 +4948,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         38 => World::cooperation_campaign(0),
         39 => World::obligations_campaign(0),
         40 => World::communication_campaign(0),
+        41 => World::rumor_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn rumor_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 41);
+    if seed != 0 {
+        session.world = World::rumor_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_rumor_campaign(seed: u32, debug_world: bool) {
+    run_session(rumor_session(seed, debug_world));
+}
 pub(crate) fn communication_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 40);
     if seed != 0 {
