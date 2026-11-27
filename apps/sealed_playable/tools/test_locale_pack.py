@@ -11,7 +11,14 @@ class LocalePackTests(unittest.TestCase):
         cls.base=cls.catalogs["living"]["en"]
 
     def test_source_parity(self):
-        self.assertEqual(len(self.base),690)
+        self.assertEqual(len(self.base),696)
+        expected_contacts = {
+            "living.contact.care", "living.contact.talk",
+            "living.contact.empty", "living.contact.help",
+            "living.contact.line", "living.contact.pixel.hint",
+        }
+        self.assertEqual({key for key in self.base if key.startswith("living.contact.")},expected_contacts)
+        self.assertEqual(self.base.keys(),self.catalogs["living"]["id"].keys())
         self.assertEqual(len(self.catalogs["ui"]["en"]),203)
 
     def test_escaped_and_reordered_named_parameters(self):
