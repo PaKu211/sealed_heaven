@@ -209,14 +209,18 @@ impl World {
         }
         for need in Need::ALL {
             let registry = self.contracts().expect("institutional rules");
+            let requester = need.requester();
+            let last_closed = registry.last_closed[need.index()];
+            let regular = last_closed == 0 || self.tick.saturating_sub(last_closed) >= COOLDOWN;
+            let accelerated = need == Need::ShrineMedicine
+                && !regular
+                && self.diplomatic_petition_ready(requester, last_closed);
             if registry.active.iter().any(|case| case.need == need)
                 || !need.triggered(self)
-                || (registry.last_closed[need.index()] > 0
-                    && self.tick.saturating_sub(registry.last_closed[need.index()]) < COOLDOWN)
+                || (!regular && !accelerated)
             {
                 continue;
             }
-            let requester = need.requester();
             let Some(npc) = self.npcs.get(&requester) else {
                 continue;
             };
@@ -241,6 +245,9 @@ impl World {
                 provider: None,
             });
             self.record_contract(need, ContractEventKind::Observed, requester, position);
+            if need == Need::ShrineMedicine {
+                self.diplomatic_petition_resolved(requester, id, accelerated);
+            }
         }
     }
 

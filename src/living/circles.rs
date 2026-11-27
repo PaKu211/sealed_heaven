@@ -167,6 +167,10 @@ impl Circles {
             });
         }
     }
+    #[cfg(test)]
+    pub(super) fn test_form(&mut self, a: ActorId, b: ActorId, purpose: Purpose, at: u64) {
+        self.form(a, b, purpose, a, at, (false, None));
+    }
     fn form(
         &mut self,
         a: ActorId,
@@ -471,7 +475,7 @@ impl World {
     pub fn witnessed_circles(&self) -> impl DoubleEndedIterator<Item = &Observed> {
         self.circles().into_iter().flat_map(|c| c.observed.iter())
     }
-    fn circle_available(&self, a: ActorId) -> bool {
+    pub(super) fn circle_available(&self, a: ActorId) -> bool {
         let n = &self.npcs[&a];
         n.alive()
             && n.hp == n.definition.hp
@@ -489,7 +493,7 @@ impl World {
                     | Goal::SellForCare
             )
     }
-    fn circle_interest(&self, a: ActorId, p: Purpose) -> bool {
+    pub(super) fn circle_interest(&self, a: ActorId, p: Purpose) -> bool {
         let d = &self.development().unwrap().profiles()[&a];
         match p {
             Purpose::Inquiry => {
@@ -507,20 +511,20 @@ impl World {
             Purpose::Partnership => (d.partnership_points, d.successful_projects),
         }
     }
-    fn circle_familiar(&self, a: ActorId, b: ActorId) -> bool {
+    pub(super) fn circle_familiar(&self, a: ActorId, b: ActorId) -> bool {
         self.social.relationship(a, b).trusts_news() && self.social.relationship(b, a).trusts_news()
     }
     fn circle_hostile(&self, a: ActorId, b: ActorId) -> bool {
         self.social.relationship(a, b).refuses_aid() || self.social.relationship(b, a).refuses_aid()
     }
-    fn circle_contact(&self, a: ActorId, b: ActorId) -> bool {
+    pub(super) fn circle_contact(&self, a: ActorId, b: ActorId) -> bool {
         let (x, y) = (self.npcs[&a].position, self.npcs[&b].position);
         self.npcs[&a].alive()
             && self.npcs[&b].alive()
             && navigation::distance(x, y) == 1
             && self.can_see(x, y)
     }
-    fn circle_seen(&self, actors: &[ActorId]) -> bool {
+    pub(super) fn circle_seen(&self, actors: &[ActorId]) -> bool {
         self.player.alive()
             && actors
                 .iter()

@@ -536,6 +536,7 @@ impl World {
                     | super::Rules::CausalNarratives
                     | super::Rules::PersonalDevelopment
                     | super::Rules::VoluntaryCircles
+                    | super::Rules::SituatedDiplomacy
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

@@ -472,6 +472,7 @@ impl World {
             .unwrap()
             .inquiry_end(i, end, alive);
         self.circle_inquiry_end(i, end, alive);
+        self.diplomatic_inquiry_end(i, end, alive);
     }
     pub(super) fn learn_own_resolution(&mut self, r: Resolution) {
         if self.development.is_none() || !self.npcs[&r.team.carrier].alive() {

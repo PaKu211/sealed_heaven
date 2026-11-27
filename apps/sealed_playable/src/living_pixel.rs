@@ -8,9 +8,9 @@ use crate::{
     clock,
     living_ascii::{
         Session, bonds_session, campaign_session, circles_session, communication_session,
-        cooperation_session, development_session, encounter_session, expanded_session,
-        favors_session, generated_session, history_session, knowledge_session, lod_session,
-        narrative_session, obligations_session, outcome_label, production_session,
+        cooperation_session, development_session, diplomacy_session, encounter_session,
+        expanded_session, favors_session, generated_session, history_session, knowledge_session,
+        lod_session, narrative_session, obligations_session, outcome_label, production_session,
         requests_session, rumor_session, social_network_session,
     },
     locale::Locale,
@@ -67,6 +67,10 @@ pub(crate) fn run_requests(seed: u32) {
 
 pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
+}
+
+pub(crate) fn run_diplomacy(seed: u32) {
+    run_session(diplomacy_session(seed, false));
 }
 
 pub(crate) fn run_circles(seed: u32) {
@@ -246,6 +250,12 @@ fn keyboard(
         game.session.input("profilesnext");
     } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::F11) {
         game.session.input("quests");
+    } else if game.session.world.diplomacy().is_some()
+        && keys.just_pressed(KeyCode::F12)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+        && (keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight))
+    {
+        game.session.input("diplomacynext");
     } else if game.session.world.circles().is_some()
         && keys.just_pressed(KeyCode::F12)
         && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
@@ -482,7 +492,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     if world.favors().is_some() {
         label(
             &mut commands,
-            tr(if world.circles().is_some() {
+            tr(if world.diplomacy().is_some() {
+                "living.diplomacy.pixel.hint"
+            } else if world.circles().is_some() {
                 "living.circle.pixel.hint"
             } else if world.development().is_some() {
                 "living.profile.pixel.hint"
@@ -2210,6 +2222,73 @@ mod tests {
             press(&mut app, KeyCode::F12, true);
         }
         assert!(text(&mut app).contains("Mei Fen, menyampaikan pada t213: koordinator"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+    }
+
+    #[test]
+    fn c58_diplomatic_pages_bilingual_read_only_and_separate_from_circles() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/living/c58_diplomacy_golden_v1.json"
+        ))
+        .unwrap();
+        let row = fixture["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["name"].as_str() == Some("member-disclosure"))
+            .unwrap();
+        let mut session = diplomacy_session(row["seed"].as_u64().unwrap() as u32, false);
+        for cmd in row["commands"].as_array().unwrap() {
+            assert!(session.input(cmd.as_str().unwrap()));
+        }
+        let before = session.world.checkpoint();
+        let pages = session.diplomacy_lines().len();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let press = |app: &mut App, key, ctrl: bool, shift: bool| {
+            {
+                let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                keys.clear();
+                keys.release(KeyCode::ControlLeft);
+                keys.release(KeyCode::ShiftLeft);
+                if ctrl {
+                    keys.press(KeyCode::ControlLeft);
+                }
+                if shift {
+                    keys.press(KeyCode::ShiftLeft);
+                }
+                keys.release(key);
+                keys.press(key);
+            }
+            app.update();
+        };
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("Ctrl+Shift+F12 diplomacy"));
+        press(&mut app, KeyCode::F12, true, true);
+        assert!(text(&mut app).contains(row["player_lines_en"][0].as_str().unwrap()));
+        press(&mut app, KeyCode::F12, true, false);
+        assert!(!text(&mut app).contains(row["player_lines_en"][0].as_str().unwrap()));
+        press(&mut app, KeyCode::Tab, false, false);
+        for _ in 0..pages {
+            press(&mut app, KeyCode::F12, true, true);
+        }
+        assert!(text(&mut app).contains(row["player_lines_id"][0].as_str().unwrap()));
         assert_eq!(
             app.world().resource::<Game>().session.world.checkpoint(),
             before

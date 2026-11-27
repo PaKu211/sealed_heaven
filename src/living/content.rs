@@ -61,7 +61,7 @@ pub fn definition_for_revision(revision: u16, id: &str) -> Option<&'static Defin
 pub fn identity_for_revision(revision: u16) -> Option<ContentIdentity> {
     // Revision 27 derives its geography from this exact authored v1 pack.
     // The separate generator version and world digest bind the generated map.
-    (1..=super::circles::REVISION)
+    (1..=super::diplomacy::REVISION)
         .contains(&revision)
         .then_some(ContentIdentity {
             schema_version: SCHEMA_VERSION,

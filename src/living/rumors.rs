@@ -409,6 +409,7 @@ impl World {
                     v.low.is_some() || v.local.is_some_and(|s| s.scarce)
                 };
                 (
+                    self.diplomatic_answer_priority(sender, recipient, *a),
                     opposing,
                     a.sample.scarce,
                     a.sample.stamp(),
@@ -483,6 +484,13 @@ impl World {
         proposals.sort_by_key(|&(a, b, r)| {
             (
                 Reverse(self.circle_peers(a, b)),
+                Reverse(if self.diplomatic_answer_priority(a, b, r) {
+                    4
+                } else if r.confidence(self.tick) >= super::development::MIN_LEAD_CONFIDENCE {
+                    self.diplomatic_priority(a, b, r.sample.site)
+                } else {
+                    0
+                }),
                 Reverse(r.sample.scarce),
                 Reverse(r.sample.stamp()),
                 a,
@@ -504,6 +512,7 @@ impl World {
                 used.insert(b);
                 self.story_account(b, report);
                 self.circle_account(a, b, report);
+                self.diplomatic_account(a, b, report);
             }
         }
     }
@@ -542,10 +551,12 @@ impl World {
                     .filter_map(|s| {
                         self.development_report_lead(n.id(), s)
                             .or_else(|| self.circle_report_lead(n.id(), s))
+                            .or_else(|| self.diplomatic_report_lead(n.id(), s))
                             .map(|confidence| {
                                 (
                                     self.development()
                                         .is_some_and(|d| d.efforts().contains_key(&(n.id(), s))),
+                                    self.diplomatic_report_lead(n.id(), s).is_some(),
                                     r.view(n.id(), s, self.tick).low.is_some(),
                                     confidence,
                                     Reverse(s),
@@ -553,7 +564,7 @@ impl World {
                             })
                     })
                     .max()
-                    .map(|(_, _, _, Reverse(s))| s)
+                    .map(|(_, _, _, _, Reverse(s))| s)
             })
             .map(Goal::VerifyRumor)
     }
@@ -563,7 +574,8 @@ impl World {
         let status = r.view(id, site, self.tick).status;
         let extended = status == Status::Reported
             && (self.development_report_lead(id, site).is_some()
-                || self.circle_report_lead(id, site).is_some());
+                || self.circle_report_lead(id, site).is_some()
+                || self.diplomatic_report_lead(id, site).is_some());
         if !self.verification_eligible(&n)
             || (status != Status::Contested && !extended)
             || (self.development.is_some()
@@ -574,6 +586,9 @@ impl World {
             return;
         }
         self.note_inquiry_effort(id, site, extended);
+        if extended {
+            self.note_diplomatic_effort(id, site);
+        }
         let target = site.position(self);
         self.travel(id, target, 1);
         let a = self
@@ -631,6 +646,311 @@ mod tests {
         let now = w.tick;
         assert!(w.rumors.as_mut().unwrap().receive(to, from, a, now));
         a
+    }
+
+    fn diplomatic_fixture() -> World {
+        use crate::living::{
+            circles::Purpose,
+            development::{Focus, Profile},
+        };
+        let mut w = World::diplomacy_campaign(3);
+        w.rumors = Some(Rumors::default());
+        w.tick = 10;
+        place(&mut w, PLAYER, row(0));
+        for (id, x, points) in [(A, 1, 3), (B, 8, 2), (C, 2, 2), (D, 10, 3)] {
+            place(&mut w, id, row(x));
+            *w.development.as_mut().unwrap().test_profile_mut(id) = Profile {
+                focus: if points >= 3 {
+                    Focus::Inquiry
+                } else {
+                    Focus::Vocation
+                },
+                inquiry_points: points,
+                ..Profile::default()
+            };
+        }
+        // Controlled affiliation fixture; actual news, local checks, choices
+        // and faction transactions below are committed through real systems.
+        let circles = w.circles.as_mut().unwrap();
+        circles.test_form(A, B, Purpose::Inquiry, 10);
+        circles.test_form(D, C, Purpose::Inquiry, 10);
+        w.social.meet(A, C);
+        w
+    }
+    fn diplomatic_transfer(w: &mut World, a: ActorId, b: ActorId) -> Account {
+        let report = transfer(w, a, b);
+        w.story_account(b, report);
+        w.diplomatic_account(a, b, report);
+        report
+    }
+
+    #[test]
+    fn c58_player_conversation_preserves_normal_local_rumor_exchange() {
+        let mut w = diplomatic_fixture();
+        known(&mut w, A, true, 30);
+        w.social.meet(A, PLAYER);
+        w.rumor_conversation(A);
+        assert_eq!(
+            w.rumors().unwrap().view(PLAYER, S, w.tick).status,
+            Status::Reported
+        );
+        assert!(w.diplomacy().unwrap().pacts().is_empty());
+        assert!(w.diplomacy().unwrap().cases().is_empty());
+        assert!(w.known_diplomacy().next().is_none());
+    }
+    #[test]
+    fn c58_cross_group_pact_is_local_and_reconciliation_requires_returned_evidence() {
+        use crate::living::diplomacy::Kind;
+        let mut w = diplomatic_fixture();
+        known(&mut w, C, false, 10);
+        known(&mut w, A, true, 30);
+        let offer = w.rumor_offer(A, C, false).unwrap();
+        w.diplomatic_account(A, C, offer);
+        assert!(
+            w.diplomacy().unwrap().pacts().is_empty(),
+            "proposal is not evidence"
+        );
+        let report = diplomatic_transfer(&mut w, A, C);
+        assert_eq!(offer, report);
+        let d = w.diplomacy().unwrap();
+        let c = d.cases()[&C];
+        let p = d.pacts()[&(A, C)];
+        assert_eq!(d.count(Kind::Accord), 1);
+        assert_eq!(d.count(Kind::Disputed), 1);
+        assert!(c.contested);
+        assert_eq!(p.dispute, Some((S, c.id)));
+        assert_ne!(p.a, p.b);
+        assert_eq!(w.diplomatic_priority(A, C, S), 3);
+        assert_eq!(w.diplomatic_priority(A, C, Site::PinefordDepot), 0);
+        let snapshot = d.clone();
+        w.diplomatic_account(A, C, report);
+        assert_eq!(w.diplomacy().unwrap(), &snapshot);
+        // One member's remote check cannot update the other party's knowledge.
+        let observed = w.diplomacy().unwrap().observed().clone();
+        w.disclose_diplomacy(A);
+        let before = *w.known_diplomacy().next().unwrap();
+        assert_eq!(before.event.kind, Kind::Disputed);
+        w.tick += 1;
+        w.region.as_mut().unwrap().market_herbs = 0;
+        let site = S.position(&w);
+        place(&mut w, C, site);
+        w.observe_regional(1);
+        let d = w.diplomacy().unwrap();
+        assert!(d.cases().is_empty());
+        assert_eq!(d.count(Kind::Confirmed), 1);
+        assert_eq!(d.count(Kind::Reconciled), 0);
+        assert_eq!(d.pacts()[&(A, C)].dispute, Some((S, c.id)));
+        assert_eq!(d.assessments()[&(C, A)].score, 1);
+        assert!(!d.assessments().contains_key(&(A, C)));
+        assert_eq!(d.observed(), &observed);
+        assert_eq!(w.known_diplomacy().next(), Some(&before));
+        assert_eq!(w.diplomatic_priority(A, C, S), 0, "remote pact cannot act");
+        w.disclose_diplomacy(A);
+        assert_eq!(
+            w.known_diplomacy().next().unwrap().event.kind,
+            Kind::Disputed
+        );
+        // The investigator personally returns the newer local receipt.
+        w.tick += 1;
+        place(&mut w, C, row(2));
+        w.observe_rumor(C, Site::PinefordDepot, true, 0);
+        let answer = diplomatic_transfer(&mut w, C, A);
+        assert_eq!(answer.sample.origin, C);
+        assert_eq!(answer.hops, 1);
+        let d = w.diplomacy().unwrap();
+        assert_eq!(d.count(Kind::Reconciled), 1);
+        assert!(d.replies().is_empty());
+        assert_eq!(d.pacts()[&(A, C)].dispute, None);
+        assert!(d.cases().is_empty());
+        assert_eq!(w.diplomatic_priority(A, C, S), 2);
+        let snapshot = d.clone();
+        w.diplomatic_account(C, A, answer);
+        assert_eq!(w.diplomacy().unwrap(), &snapshot);
+        // Disclosure remains dated until another physical conversation.
+        assert_eq!(
+            w.known_diplomacy().next().unwrap().event.kind,
+            Kind::Disputed
+        );
+        w.disclose_diplomacy(A);
+        assert_eq!(
+            w.known_diplomacy().next().unwrap().event.kind,
+            Kind::Reconciled
+        );
+    }
+
+    #[test]
+    fn c58_counterevidence_is_not_false_reconciliation_or_blame() {
+        use crate::living::diplomacy::Kind;
+        let mut w = diplomatic_fixture();
+        known(&mut w, C, false, 10);
+        known(&mut w, A, true, 30);
+        diplomatic_transfer(&mut w, A, C);
+        let first = w.diplomacy().unwrap().cases()[&C].id;
+        w.tick += 1;
+        w.region.as_mut().unwrap().market_herbs = 20;
+        let site = S.position(&w);
+        place(&mut w, C, site);
+        w.observe_regional(1);
+        let d = w.diplomacy().unwrap();
+        assert_eq!(d.count(Kind::Superseded), 1);
+        assert_eq!(d.assessments()[&(C, A)].score, 0);
+        let relationship = w.social.relationship(C, A);
+        w.tick += 1;
+        place(&mut w, C, row(2));
+        diplomatic_transfer(&mut w, C, A);
+        let d = w.diplomacy().unwrap();
+        assert_eq!(d.count(Kind::Returned), 1);
+        assert_eq!(d.count(Kind::Reconciled), 0);
+        let next = d.cases()[&A];
+        assert!(next.contested && next.id != first);
+        assert_eq!(d.pacts()[&(A, C)].dispute, Some((S, next.id)));
+        assert_eq!(w.social.relationship(C, A), relationship);
+        let public = d.observed().clone();
+        // Distant hostility or changed affiliations cannot silently create a
+        // public political incident. A local refusal can end the agreement.
+        w.tick += 1;
+        place(&mut w, C, row(9));
+        w.social.relations.get_mut(&(C, A)).unwrap().regard = -1;
+        w.advance_diplomacy();
+        assert_eq!(w.diplomacy().unwrap().count(Kind::Withdrawn), 0);
+        assert_eq!(w.diplomacy().unwrap().observed(), &public);
+        w.tick += 1;
+        place(&mut w, C, row(2));
+        w.advance_diplomacy();
+        assert_eq!(w.diplomacy().unwrap().count(Kind::Withdrawn), 1);
+        assert!(w.diplomacy().unwrap().pacts().is_empty());
+        w.tick += crate::living::diplomacy::CASE_LIFETIME;
+        w.advance_diplomacy();
+        assert!(w.diplomacy().unwrap().cases().is_empty());
+        assert_eq!(w.diplomacy().unwrap().count(Kind::Lapsed), 1);
+    }
+
+    #[test]
+    fn c58_accepted_external_report_enables_optional_check_without_overriding_duties() {
+        let mut w = diplomatic_fixture();
+        known(&mut w, A, true, 30);
+        diplomatic_transfer(&mut w, A, C);
+        assert!(w.development_report_lead(C, S).is_none());
+        assert!(w.circle_report_lead(C, S).is_none());
+        assert!(w.diplomatic_report_lead(C, S).is_some());
+        assert_eq!(
+            w.rumor_goal(&w.npcs[&C], Goal::Patrol),
+            Some(Goal::VerifyRumor(S))
+        );
+        assert!(w.rumor_goal(&w.npcs[&C], Goal::DeliverFreight).is_none());
+        w.npcs.get_mut(&C).unwrap().hp -= 1;
+        assert!(w.rumor_goal(&w.npcs[&C], Goal::Patrol).is_none());
+        w.npcs.get_mut(&C).unwrap().hp += 1;
+        let original = w.supply;
+        w.traffic.as_mut().unwrap().begin_tick();
+        w.work_verification(C, S);
+        assert_eq!(w.supply, original);
+        assert_eq!(
+            w.development().unwrap().efforts()[&(C, S)].extended_ticks,
+            1
+        );
+        // The report can become stale; no access to live remote stock.
+        w.tick += crate::living::diplomacy::CASE_LIFETIME;
+        w.advance_diplomacy();
+        assert!(w.diplomatic_report_lead(C, S).is_none());
+    }
+
+    #[test]
+    fn c58_verified_petition_can_accelerate_existing_contract_not_remote_inventory() {
+        use crate::living::{Need, Role, contracts::ContractPhase, diplomacy::Kind};
+        let mut w = diplomatic_fixture();
+        let watch = w
+            .npcs()
+            .find(|n| n.definition.role == Role::Watch)
+            .unwrap()
+            .id();
+        place(&mut w, A, row(9));
+        place(&mut w, C, row(1));
+        place(&mut w, watch, row(2));
+        w.social.meet(C, watch);
+        let registry = w.contracts.as_mut().unwrap();
+        registry.active.clear();
+        registry.last_closed[0] = 10;
+        w.tick = 58;
+        w.observe_rumor(C, Site::QingheShrine, true, 0);
+        let report = diplomatic_transfer(&mut w, C, watch);
+        assert_eq!(report.sample.site, Site::QingheShrine);
+        assert!(
+            w.diplomatic_report_lead(watch, Site::QingheShrine)
+                .is_some()
+        );
+        assert!(!w.diplomatic_petition_ready(watch, 10));
+        let mut clear = w.clone();
+        clear.supply.shrine = 20;
+        w.supply.shrine = 0;
+        // The hidden stock cannot alter the report-based proposal or open
+        // a contract before a physically situated check.
+        assert_eq!(
+            w.rumor_goal(&w.npcs[&watch], Goal::Patrol),
+            clear.rumor_goal(&clear.npcs[&watch], Goal::Patrol)
+        );
+        w.advance_contracts();
+        clear.advance_contracts();
+        assert!(
+            w.contracts()
+                .unwrap()
+                .active
+                .iter()
+                .all(|c| c.need != Need::ShrineMedicine)
+        );
+        assert!(
+            clear
+                .contracts()
+                .unwrap()
+                .active
+                .iter()
+                .all(|c| c.need != Need::ShrineMedicine)
+        );
+        let shrine = w.scenario.shrine;
+        w.tick += 1;
+        clear.tick += 1;
+        place(&mut w, watch, shrine);
+        place(&mut clear, watch, shrine);
+        w.observe_regional(1);
+        clear.observe_regional(1);
+        assert!(w.diplomatic_petition_ready(watch, 10));
+        assert!(!w.diplomatic_petition_ready(watch, 12));
+        assert!(!clear.diplomatic_petition_ready(watch, 10));
+        let before = w.supply;
+        let coins = w.rivalry().unwrap().lodge_coins;
+        let hall = w.politics().unwrap().hall_coins;
+        w.advance_contracts();
+        clear.advance_contracts();
+        let case = w
+            .contracts()
+            .unwrap()
+            .active
+            .iter()
+            .find(|c| c.need == Need::ShrineMedicine)
+            .unwrap();
+        assert_eq!(case.phase, ContractPhase::Soliciting);
+        assert_eq!(case.requester, watch);
+        assert!(
+            clear
+                .contracts()
+                .unwrap()
+                .active
+                .iter()
+                .all(|c| c.need != Need::ShrineMedicine)
+        );
+        let d = w.diplomacy().unwrap();
+        assert_eq!(d.count(Kind::Petition), 1);
+        assert!(d.petitions().is_empty());
+        assert!(
+            d.history()
+                .iter()
+                .any(|e| e.kind == Kind::Petition && e.contract == Some(case.id))
+        );
+        assert_eq!(w.supply, before);
+        assert_eq!(w.rivalry().unwrap().lodge_coins, coins);
+        assert_eq!(w.politics().unwrap().hall_coins, hall);
+        w.advance_contracts();
+        assert_eq!(w.diplomacy().unwrap().count(Kind::Petition), 1);
     }
 
     #[test]

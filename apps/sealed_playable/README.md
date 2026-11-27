@@ -2,7 +2,7 @@
 
 ## Current regional campaign
 
-C5.7: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c57 --pixel`. Omit `--pixel` for ASCII. `circles` / Ctrl+F12 show witnessed negotiations and dated disclosed affiliations; save slot `checkpoint.c57`. See the [C5.7 specification](../../C5_7_DYNAMIC_SOCIAL_GROUPS.md). The C0.4 material below is retained as historical documentation.
+C5.8: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c58 --pixel`. Omit `--pixel` for ASCII. `diplomacy` / Ctrl+Shift+F12 show witnessed accords and dated personal accounts; save slot `checkpoint.c58`. See the [C5.8 specification](../../C5_8_SITUATED_DIPLOMACY.md). The C0.4 material below is retained as historical documentation.
 
 **Current acceptance: C0.4 independent audit PASS.**
 Native evidence is `../../docs/evidence/c04-native-acceptance/`. The verdict is

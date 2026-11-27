@@ -33,6 +33,7 @@ pub(crate) struct Session {
     story_cursor: usize,
     profile_cursor: usize,
     circle_cursor: usize,
+    diplomacy_cursor: usize,
 }
 
 impl Session {
@@ -48,11 +49,14 @@ impl Session {
             story_cursor: 0,
             profile_cursor: 0,
             circle_cursor: 0,
+            diplomacy_cursor: 0,
         }
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 44 {
+        if self.world.checkpoint_revision() == 45 {
+            World::diplomacy_campaign(seed)
+        } else if self.world.checkpoint_revision() == 44 {
             World::circles_campaign(seed)
         } else if self.world.checkpoint_revision() == 43 {
             World::development_campaign(seed)
@@ -1136,6 +1140,21 @@ impl Session {
                 };
                 return true;
             }
+            "diplomacy" if self.world.diplomacy().is_some() => {
+                self.notice = self.diplomacy_lines().join("\n");
+                return true;
+            }
+            "diplomacynext" if self.world.diplomacy().is_some() => {
+                let pages = self.diplomacy_lines();
+                let page = self.diplomacy_cursor % pages.len();
+                self.notice = format!("{}/{}  {}", page + 1, pages.len(), pages[page]);
+                self.diplomacy_cursor = (page + 1) % pages.len();
+                return true;
+            }
+            "diplomacydebug" if self.debug_world && self.world.diplomacy().is_some() => {
+                self.notice = format!("{:?}", self.world.diplomacy().unwrap());
+                return true;
+            }
             "circles" if self.world.circles().is_some() => {
                 self.notice = self.circle_lines().join("\n");
                 return true;
@@ -1658,6 +1677,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.diplomacy().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.diplomacy.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" diplomacydebug");
                     }
                 }
                 if self.world.circles().is_some() {
@@ -2355,6 +2382,83 @@ impl Session {
             ],
         )
     }
+    pub(crate) fn diplomacy_lines(&self) -> Vec<String> {
+        use sealed_sim::living::diplomacy::{Kind, Notice, Side};
+        let tr = |key| living_text(self.locale, key);
+        let name = |id| actor_name(self.locale, &self.world, id);
+        let side = |p| {
+            tr(match p {
+                Side::Inquiry => "living.circle.inquiry",
+                Side::Partnership => "living.circle.partnership",
+                Side::Hall => "living.diplomacy.hall",
+                Side::Stonebank => "living.diplomacy.stonebank",
+                Side::Qinghe => "living.diplomacy.qinghe",
+            })
+        };
+        let fmt = |key, params: &[(&str, &str)]| living_format(self.locale, key, params);
+        let line = |n: Notice| {
+            let at = n.at.to_string();
+            let key = match n.kind {
+                Kind::Accord => "living.diplomacy.accord",
+                Kind::Disputed => "living.diplomacy.disputed",
+                Kind::Received => "living.diplomacy.received",
+                Kind::Confirmed => "living.diplomacy.confirmed",
+                Kind::Superseded => "living.diplomacy.superseded",
+                Kind::Lapsed => "living.diplomacy.lapsed",
+                Kind::Reconciled => "living.diplomacy.reconciled",
+                Kind::Petition => "living.diplomacy.petition",
+                Kind::Withdrawn => "living.diplomacy.withdrawn",
+                Kind::Expired => "living.diplomacy.expired",
+                Kind::Returned => "living.diplomacy.returned",
+            };
+            if n.kind == Kind::Accord {
+                fmt(
+                    key,
+                    &[
+                        ("at", &at),
+                        ("actor", name(n.actor)),
+                        ("other", name(n.other)),
+                        ("from", side(n.from)),
+                        ("to", side(n.to)),
+                    ],
+                )
+            } else {
+                fmt(
+                    key,
+                    &[
+                        ("at", &at),
+                        ("actor", name(n.actor)),
+                        ("other", name(n.other)),
+                    ],
+                )
+            }
+        };
+        let mut rows = Vec::new();
+        for d in self.world.known_diplomacy() {
+            let heard = d.heard.to_string();
+            rows.push((
+                d.heard,
+                fmt(
+                    "living.diplomacy.disclosed",
+                    &[
+                        ("speaker", name(d.speaker)),
+                        ("heard", &heard),
+                        ("event", &line(d.event)),
+                    ],
+                ),
+            ));
+        }
+        for n in self.world.witnessed_diplomacy() {
+            rows.push((n.at, line(*n)));
+        }
+        rows.sort_by_key(|(at, _)| std::cmp::Reverse(*at));
+        let mut rows = rows.into_iter().map(|(_, line)| line).collect::<Vec<_>>();
+        if rows.is_empty() {
+            rows.push(tr("living.diplomacy.empty").into());
+        }
+        rows
+    }
+
     pub(crate) fn circle_lines(&self) -> Vec<String> {
         use sealed_sim::living::circles::{Kind, Purpose};
         let tr = |key| living_text(self.locale, key);
@@ -5237,6 +5341,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         42 => "checkpoint.c55",
         43 => "checkpoint.c56",
         44 => "checkpoint.c57",
+        45 => "checkpoint.c58",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -5281,12 +5386,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         42 => World::narrative_campaign(0),
         43 => World::development_campaign(0),
         44 => World::circles_campaign(0),
+        45 => World::diplomacy_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn diplomacy_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 45);
+    if seed != 0 {
+        session.world = World::diplomacy_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_diplomacy_campaign(seed: u32, debug_world: bool) {
+    run_session(diplomacy_session(seed, debug_world));
+}
 pub(crate) fn circles_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 44);
     if seed != 0 {

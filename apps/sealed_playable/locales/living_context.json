@@ -3902,6 +3902,164 @@
     "parameters": {},
     "surface": "living_ascii.rs"
   },
+  "living.diplomacy.accord": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "from": "speaker's disclosed affiliation at encounter",
+      "other": "actual recipient of the report",
+      "to": "recipient's disclosed affiliation at encounter"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.confirmed": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.disclosed": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "event": "dated description of locally known event",
+      "heard": "date of player conversation",
+      "speaker": "actor who directly shared their own dated event"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.disputed": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.empty": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.expired": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.hall": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.help": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.lapsed": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.petition": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.pixel.hint": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.diplomacy.qinghe": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.received": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.reconciled": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.returned": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.stonebank": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.superseded": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.diplomacy.withdrawn": {
+    "active": true,
+    "context": "C5.8 dated witnessed negotiations or self-disclosed evidence; no private party IDs, case IDs, scores or remote stock values",
+    "parameters": {
+      "actor": "actual reporting actor",
+      "at": "date of actual event",
+      "other": "actual recipient of the report"
+    },
+    "surface": "living_ascii.rs"
+  },
   "living.expansion.depot": {
     "active": true,
     "context": "C4.1 local regional expansion",

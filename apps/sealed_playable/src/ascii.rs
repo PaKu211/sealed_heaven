@@ -111,6 +111,13 @@ pub fn run_c34() {
     crate::living_ascii::run_c34();
 }
 
+pub fn run_diplomacy_campaign(seed: u32, debug: bool) {
+    crate::living_ascii::run_diplomacy_campaign(seed, debug);
+}
+#[cfg(feature = "desktop")]
+pub fn run_diplomacy_window(seed: u32) {
+    crate::living_pixel::run_diplomacy(seed);
+}
 pub fn run_circles_campaign(seed: u32, debug: bool) {
     crate::living_ascii::run_circles_campaign(seed, debug);
 }

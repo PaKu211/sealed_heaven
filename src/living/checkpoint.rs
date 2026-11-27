@@ -80,6 +80,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::CausalNarratives => super::narrative::REVISION,
         Rules::PersonalDevelopment => super::development::REVISION,
         Rules::VoluntaryCircles => super::circles::REVISION,
+        Rules::SituatedDiplomacy => super::diplomacy::REVISION,
     }
 }
 
@@ -154,6 +155,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::narrative::REVISION => Rules::CausalNarratives,
         super::development::REVISION => Rules::PersonalDevelopment,
         super::circles::REVISION => Rules::VoluntaryCircles,
+        super::diplomacy::REVISION => Rules::SituatedDiplomacy,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -270,6 +272,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::Invite(actor)
@@ -317,6 +320,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::Provision(actor)
@@ -364,6 +368,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::Part(actor)
@@ -410,6 +415,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::OfferAccord
@@ -456,6 +462,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::SupportHall
@@ -501,6 +508,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::PledgeLodge
@@ -546,6 +554,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::AidLodge
@@ -591,6 +600,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::RenounceLodge
@@ -629,6 +639,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::Ask(actor)
@@ -667,6 +678,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::Examine
@@ -705,6 +717,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -743,6 +756,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::Take(actor)
@@ -778,6 +792,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -815,6 +830,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::ClaimLot(value)
@@ -848,6 +864,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -881,6 +898,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::AttuneLot(value)
@@ -913,6 +931,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -944,6 +963,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::Drill(actor)
@@ -975,6 +995,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -1013,6 +1034,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::DrawQi
@@ -1040,6 +1062,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::CirculateQi
@@ -1067,6 +1090,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::MendMeridians
@@ -1094,6 +1118,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::TreatWounds
@@ -1121,6 +1146,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -1141,6 +1167,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::RecoverCache(id)
@@ -1161,6 +1188,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::EntrustCache(id)
@@ -1180,6 +1208,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::AcceptRequest(id)
@@ -1199,6 +1228,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::DeclineRequest(id)
@@ -1218,6 +1248,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::AbandonRequest(id)
@@ -1236,6 +1267,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::AcceptFavor(id)
@@ -1254,6 +1286,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::DeclineFavor(id)
@@ -1272,6 +1305,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::WithdrawFavor(id)
@@ -1290,6 +1324,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::FundFavor(id)
@@ -1307,6 +1342,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::RequestAid(ActorId::new(id))
@@ -1324,6 +1360,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::RepayAid(ActorId::new(id))
@@ -1341,6 +1378,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) =>
         {
             Intent::WaiveAid(ActorId::new(id))
@@ -1352,7 +1390,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::VoluntaryCircles {
+        let mut bytes = if world.rules == Rules::SituatedDiplomacy {
+            b"SH:C58:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::VoluntaryCircles {
             b"SH:C57:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::PersonalDevelopment {
             b"SH:C56:SCENARIO:v1\0".to_vec()
@@ -1456,6 +1496,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::CausalNarratives => b"SH:C10:RULES:v42".to_vec(),
         Rules::PersonalDevelopment => b"SH:C10:RULES:v43".to_vec(),
         Rules::VoluntaryCircles => b"SH:C10:RULES:v44".to_vec(),
+        Rules::SituatedDiplomacy => b"SH:C10:RULES:v45".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -1561,6 +1602,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::CausalNarratives
             | Rules::PersonalDevelopment
             | Rules::VoluntaryCircles
+            | Rules::SituatedDiplomacy
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -1621,6 +1663,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::CausalNarratives => b"SH:C10:STATE:v42".to_vec(),
         Rules::PersonalDevelopment => b"SH:C10:STATE:v43".to_vec(),
         Rules::VoluntaryCircles => b"SH:C10:STATE:v44".to_vec(),
+        Rules::SituatedDiplomacy => b"SH:C10:STATE:v45".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1746,6 +1789,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::CausalNarratives
                 | Rules::PersonalDevelopment
                 | Rules::VoluntaryCircles
+                | Rules::SituatedDiplomacy
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1840,6 +1884,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::CausalNarratives
             | Rules::PersonalDevelopment
             | Rules::VoluntaryCircles
+            | Rules::SituatedDiplomacy
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1890,6 +1935,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::CausalNarratives
                     | Rules::PersonalDevelopment
                     | Rules::VoluntaryCircles
+                    | Rules::SituatedDiplomacy
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1947,6 +1993,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::CausalNarratives
             | Rules::PersonalDevelopment
             | Rules::VoluntaryCircles
+            | Rules::SituatedDiplomacy
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -2045,6 +2092,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::CausalNarratives
                 | Rules::PersonalDevelopment
                 | Rules::VoluntaryCircles
+                | Rules::SituatedDiplomacy
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -2269,6 +2317,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(circles) = world.circles() {
         let bytes = circles.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(d) = world.diplomacy() {
+        let bytes = d.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }

@@ -112,6 +112,7 @@ pub fn launch(args: &[String]) -> Result<(), String> {
             "--c55" if revision.is_none() => revision = Some(42),
             "--c56" if revision.is_none() => revision = Some(43),
             "--c57" if revision.is_none() => revision = Some(44),
+            "--c58" if revision.is_none() => revision = Some(45),
             "--pixel" if !pixel => pixel = true,
             "--debug-world" if !debug => debug = true,
             "--seed" if selected_seed.is_none() => {
@@ -128,14 +129,16 @@ pub fn launch(args: &[String]) -> Result<(), String> {
     }
     if revision.is_none() || (pixel && debug) {
         return Err(
-            "usage: --c40 | --c41 | --c42 | --c43 | --c44 | --c45 | --c46 | --c47 | --c48 | --c49 | --c50 | --c51 | --c52 | --c53 | --c54 | --c55 | --c56 | --c57 [--seed N] [--pixel | --debug-world]"
+            "usage: --c40 | --c41 | --c42 | --c43 | --c44 | --c45 | --c46 | --c47 | --c48 | --c49 | --c50 | --c51 | --c52 | --c53 | --c54 | --c55 | --c56 | --c57 | --c58 [--seed N] [--pixel | --debug-world]"
                 .into(),
         );
     }
     let seed = selected_seed.unwrap_or(0);
     if pixel {
         #[cfg(feature = "desktop")]
-        if revision == Some(44) {
+        if revision == Some(45) {
+            sealed_playable::ascii::run_diplomacy_window(seed);
+        } else if revision == Some(44) {
             sealed_playable::ascii::run_circles_window(seed);
         } else if revision == Some(43) {
             sealed_playable::ascii::run_development_window(seed);
@@ -175,7 +178,9 @@ pub fn launch(args: &[String]) -> Result<(), String> {
         #[cfg(not(feature = "desktop"))]
         return Err("The window requires the desktop feature.".into());
     } else {
-        if revision == Some(44) {
+        if revision == Some(45) {
+            sealed_playable::ascii::run_diplomacy_campaign(seed, debug);
+        } else if revision == Some(44) {
             sealed_playable::ascii::run_circles_campaign(seed, debug);
         } else if revision == Some(43) {
             sealed_playable::ascii::run_development_campaign(seed, debug);
