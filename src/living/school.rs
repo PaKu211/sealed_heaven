@@ -162,6 +162,7 @@ impl World {
             self.require_reach(self.scenario.shrine)?;
             self.supply.shrine += 1;
             self.supply.player_deliveries += 1;
+            self.note_governance_contribution(super::Need::ShrineMedicine);
             self.school.as_mut().expect("school rules").duty = Duty::Delivered;
             self.note_player_duty_delivered();
             return Ok(Outcome::DutyDelivered);

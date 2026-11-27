@@ -278,7 +278,7 @@ impl World {
         event: InfoEvent,
         provenance: Provenance,
     ) {
-        if !is_institutional_requester(actor) {
+        if !self.is_institutional_requester(actor) {
             return;
         }
         match event.finding {
@@ -532,7 +532,7 @@ impl World {
         let institutional = self
             .npcs
             .values()
-            .filter(|peer| peer.id() != npc.id() && is_institutional_requester(peer.id()))
+            .filter(|peer| peer.id() != npc.id() && self.institutional_testimony_target(npc, peer))
             .find_map(&proposal);
         if institutional.is_some() {
             return institutional;
@@ -632,7 +632,11 @@ impl World {
                         .map(|event| (npc.id(), event))
                 })
                 .min_by_key(|&(id, _)| {
-                    (!is_institutional_requester(id), Some(id) != preferred, id)
+                    (
+                        !self.is_institutional_requester(id),
+                        Some(id) != preferred,
+                        id,
+                    )
                 });
             let Some((recipient, event_id)) = recipient else {
                 continue;
@@ -1023,10 +1027,6 @@ impl World {
             },
         );
     }
-}
-
-fn is_institutional_requester(actor: ActorId) -> bool {
-    Need::ALL.iter().any(|need| need.requester() == actor)
 }
 
 fn provenance_origin(provenance: Provenance) -> ActorId {

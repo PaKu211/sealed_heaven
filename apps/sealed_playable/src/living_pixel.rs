@@ -9,9 +9,9 @@ use crate::{
     living_ascii::{
         Session, bonds_session, campaign_session, circles_session, communication_session,
         cooperation_session, development_session, diplomacy_session, encounter_session,
-        expanded_session, favors_session, generated_session, history_session, knowledge_session,
-        lod_session, narrative_session, obligations_session, outcome_label, production_session,
-        requests_session, rumor_session, social_network_session,
+        expanded_session, favors_session, generated_session, governance_session, history_session,
+        knowledge_session, lod_session, narrative_session, obligations_session, outcome_label,
+        production_session, requests_session, rumor_session, social_network_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -67,6 +67,10 @@ pub(crate) fn run_requests(seed: u32) {
 
 pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
+}
+
+pub(crate) fn run_governance(seed: u32) {
+    run_session(governance_session(seed, false));
 }
 
 pub(crate) fn run_diplomacy(seed: u32) {
@@ -191,6 +195,11 @@ fn keyboard(
         if let Ok(mut window) = windows.single_mut() {
             window.title = living_text(game.session.locale, "living.pixel.window.title").to_owned();
         }
+    } else if game.session.world.governance().is_some()
+        && keys.just_pressed(KeyCode::F9)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+    {
+        game.session.input("governancenext");
     } else if game.session.world.rumors().is_some()
         && keys.just_pressed(KeyCode::F2)
         && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
@@ -492,7 +501,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     if world.favors().is_some() {
         label(
             &mut commands,
-            tr(if world.diplomacy().is_some() {
+            tr(if world.governance().is_some() {
+                "living.governance.pixel.hint"
+            } else if world.diplomacy().is_some() {
                 "living.diplomacy.pixel.hint"
             } else if world.circles().is_some() {
                 "living.circle.pixel.hint"
@@ -2222,6 +2233,65 @@ mod tests {
             press(&mut app, KeyCode::F12, true);
         }
         assert!(text(&mut app).contains("Mei Fen, menyampaikan pada t213: koordinator"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+    }
+
+    #[test]
+    fn c59_board_shortcut_is_read_only_and_bilingual() {
+        let session = governance_session(3, false);
+        let before = session.world.checkpoint();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let press = |app: &mut App, key, ctrl: bool| {
+            {
+                let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                keys.clear();
+                keys.release(KeyCode::ControlLeft);
+                if ctrl {
+                    keys.press(KeyCode::ControlLeft);
+                }
+                keys.release(key);
+                keys.press(key);
+            }
+            app.update();
+        };
+        press(&mut app, KeyCode::F9, true);
+        let expected = app.world().resource::<Game>().session.governance_lines()[0].clone();
+        assert!(
+            app.world()
+                .resource::<Game>()
+                .session
+                .notice
+                .contains(expected.as_str())
+        );
+        press(&mut app, KeyCode::Tab, false);
+        let pages = app
+            .world()
+            .resource::<Game>()
+            .session
+            .governance_lines()
+            .len();
+        for _ in 0..pages {
+            press(&mut app, KeyCode::F9, true);
+        }
+        let expected = app.world().resource::<Game>().session.governance_lines();
+        assert!(expected.iter().any(|s| {
+            app.world()
+                .resource::<Game>()
+                .session
+                .notice
+                .contains(s.as_str())
+        }));
         assert_eq!(
             app.world().resource::<Game>().session.world.checkpoint(),
             before

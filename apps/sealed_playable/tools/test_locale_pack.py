@@ -11,7 +11,7 @@ class LocalePackTests(unittest.TestCase):
         cls.base=cls.catalogs["living"]["en"]
 
     def test_source_parity(self):
-        self.assertEqual(len(self.base),792)
+        self.assertEqual(len(self.base),812)
         expected_contacts = {
             "living.contact.care", "living.contact.talk",
             "living.contact.empty", "living.contact.help",
@@ -27,6 +27,7 @@ class LocalePackTests(unittest.TestCase):
         self.assertEqual({key for key in self.base if key.startswith("living.profile.")},{'living.profile.help', 'living.profile.pixel.hint', 'living.profile.empty', 'living.profile.vocation', 'living.profile.line', 'living.profile.inquiry', 'living.profile.partnership'})
         self.assertEqual({key for key in self.base if key.startswith("living.circle.")},{'living.circle.empty', 'living.circle.joined', 'living.circle.elected', 'living.circle.inquiry', 'living.circle.coordinator', 'living.circle.formed', 'living.circle.help', 'living.circle.affiliated', 'living.circle.pixel.hint', 'living.circle.unaffiliated', 'living.circle.member', 'living.circle.partnership'})
         self.assertEqual({key for key in self.base if key.startswith("living.diplomacy.")},{'living.diplomacy.help', 'living.diplomacy.lapsed', 'living.diplomacy.withdrawn', 'living.diplomacy.empty', 'living.diplomacy.pixel.hint', 'living.diplomacy.reconciled', 'living.diplomacy.stonebank', 'living.diplomacy.disputed', 'living.diplomacy.expired', 'living.diplomacy.returned', 'living.diplomacy.received', 'living.diplomacy.accord', 'living.diplomacy.superseded', 'living.diplomacy.petition', 'living.diplomacy.disclosed', 'living.diplomacy.hall', 'living.diplomacy.qinghe', 'living.diplomacy.confirmed'})
+        self.assertEqual({key for key in self.base if key.startswith("living.governance.")},{'living.governance.review', 'living.governance.help', 'living.governance.negotiations', 'living.governance.no_award', 'living.governance.account', 'living.governance.pixel.hint', 'living.governance.empty', 'living.governance.routine', 'living.governance.negotiation.last', 'living.governance.audit.delivered', 'living.governance.hall', 'living.governance.shrine', 'living.governance.reserve', 'living.governance.audit.last', 'living.governance.caution', 'living.governance.contributions', 'living.governance.audit.unfulfilled', 'living.governance.board', 'living.governance.restored', 'living.governance.decision'})
         self.assertEqual(self.base.keys(),self.catalogs["living"]["id"].keys())
         self.assertEqual(len(self.catalogs["ui"]["en"]),203)
 

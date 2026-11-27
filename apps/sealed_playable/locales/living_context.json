@@ -4236,6 +4236,171 @@
     },
     "surface": "living_ascii.rs"
   },
+  "living.governance.account": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {
+      "delivered": "dated institutional record: delivered",
+      "orders": "dated institutional record: orders",
+      "proactive": "dated institutional record: proactive",
+      "site": "dated institutional record: site",
+      "unfulfilled": "dated institutional record: unfulfilled"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.audit.delivered": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.audit.last": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {
+      "at": "dated institutional record: at",
+      "case": "dated institutional record: case",
+      "finding": "dated institutional record: finding",
+      "inspector": "dated institutional record: inspector",
+      "requester": "dated institutional record: requester",
+      "site": "dated institutional record: site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.audit.unfulfilled": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.board": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {
+      "mode": "dated institutional record: mode",
+      "read": "dated institutional record: read",
+      "site": "dated institutional record: site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.caution": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {
+      "site": "dated institutional record: site",
+      "until": "dated institutional record: until"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.contributions": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {
+      "count": "dated institutional record: count",
+      "site": "dated institutional record: site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.decision": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {
+      "after": "dated institutional record: after",
+      "before": "dated institutional record: before",
+      "first": "dated institutional record: first",
+      "second": "dated institutional record: second",
+      "site": "dated institutional record: site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.empty": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.hall": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.help": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.negotiation.last": {
+    "active": true,
+    "context": "Local office record, only after actual official returns and files negotiation outcome",
+    "parameters": {
+      "actor": "dated negotiation record: actor",
+      "at": "dated negotiation record: at",
+      "case": "dated negotiation record: case",
+      "filed": "dated negotiation record: filed",
+      "finding": "dated negotiation record: finding",
+      "site": "dated negotiation record: site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.negotiations": {
+    "active": true,
+    "context": "Local office record, only after actual official returns and files negotiation outcome",
+    "parameters": {
+      "no_award": "dated negotiation record: no_award",
+      "restored": "dated negotiation record: restored",
+      "site": "dated negotiation record: site"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.no_award": {
+    "active": true,
+    "context": "Local office record, only after actual official returns and files negotiation outcome",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.pixel.hint": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.governance.reserve": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.restored": {
+    "active": true,
+    "context": "Local office record, only after actual official returns and files negotiation outcome",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.review": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {
+      "actor": "dated institutional record: actor",
+      "at": "dated institutional record: at",
+      "site": "dated institutional record: site",
+      "stock": "dated institutional record: stock"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.routine": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.governance.shrine": {
+    "active": true,
+    "context": "C5.9 locally read dated institutional board, never live remote information",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.help.c351": {
     "active": true,
     "context": "help / c351",

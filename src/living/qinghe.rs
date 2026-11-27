@@ -23,6 +23,7 @@ pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
             | Rules::PersonalDevelopment
             | Rules::VoluntaryCircles
             | Rules::SituatedDiplomacy
+            | Rules::CommunityGovernance
     ) {
         return super::expansion::scenario(seed);
     }

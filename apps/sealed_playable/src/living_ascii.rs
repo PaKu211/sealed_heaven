@@ -34,6 +34,7 @@ pub(crate) struct Session {
     profile_cursor: usize,
     circle_cursor: usize,
     diplomacy_cursor: usize,
+    governance_cursor: usize,
 }
 
 impl Session {
@@ -50,11 +51,14 @@ impl Session {
             profile_cursor: 0,
             circle_cursor: 0,
             diplomacy_cursor: 0,
+            governance_cursor: 0,
         }
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 45 {
+        if self.world.checkpoint_revision() == 46 {
+            World::governance_campaign(seed)
+        } else if self.world.checkpoint_revision() == 45 {
             World::diplomacy_campaign(seed)
         } else if self.world.checkpoint_revision() == 44 {
             World::circles_campaign(seed)
@@ -1140,6 +1144,21 @@ impl Session {
                 };
                 return true;
             }
+            "governance" if self.world.governance().is_some() => {
+                self.notice = self.governance_lines().join("\n");
+                return true;
+            }
+            "governancenext" if self.world.governance().is_some() => {
+                let pages = self.governance_lines();
+                let page = self.governance_cursor % pages.len();
+                self.notice = format!("{}/{}  {}", page + 1, pages.len(), pages[page]);
+                self.governance_cursor = (page + 1) % pages.len();
+                return true;
+            }
+            "governancedebug" if self.debug_world && self.world.governance().is_some() => {
+                self.notice = format!("{:?}", self.world.governance().unwrap());
+                return true;
+            }
             "diplomacy" if self.world.diplomacy().is_some() => {
                 self.notice = self.diplomacy_lines().join("\n");
                 return true;
@@ -1677,6 +1696,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.governance().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.governance.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" governancedebug");
                     }
                 }
                 if self.world.diplomacy().is_some() {
@@ -2382,6 +2409,136 @@ impl Session {
             ],
         )
     }
+    pub(crate) fn governance_lines(&self) -> Vec<String> {
+        use sealed_sim::living::governance::{AUDIT_CAUTION, Priority};
+        let tr = |key| living_text(self.locale, key);
+        let fmt = |key, params: &[(&str, &str)]| living_format(self.locale, key, params);
+        let mut rows = Vec::new();
+        for need in [Need::ShrineMedicine, Need::HallOfferings] {
+            let Some(k) = self.world.known_board(need) else {
+                continue;
+            };
+            let b = k.board;
+            let site = tr(match need {
+                Need::ShrineMedicine => "living.governance.shrine",
+                Need::HallOfferings => "living.governance.hall",
+            });
+            let mode = tr(match b.priority {
+                Priority::Routine => "living.governance.routine",
+                Priority::Reserve => "living.governance.reserve",
+            });
+            rows.push(fmt(
+                "living.governance.board",
+                &[
+                    ("site", site),
+                    ("read", &k.read_at.to_string()),
+                    ("mode", mode),
+                ],
+            ));
+            if let Some(r) = b.review {
+                rows.push(fmt(
+                    "living.governance.review",
+                    &[
+                        ("site", site),
+                        ("actor", actor_name(self.locale, &self.world, r.actor)),
+                        ("at", &r.at.to_string()),
+                        ("stock", &r.stock.to_string()),
+                    ],
+                ));
+            }
+            if let Some(d) = b.decision {
+                rows.push(fmt(
+                    "living.governance.decision",
+                    &[
+                        ("site", site),
+                        ("first", &d.prior.at.to_string()),
+                        ("before", &d.prior.stock.to_string()),
+                        ("second", &d.current.at.to_string()),
+                        ("after", &d.current.stock.to_string()),
+                    ],
+                ));
+            }
+            rows.push(fmt(
+                "living.governance.account",
+                &[
+                    ("site", site),
+                    ("orders", &b.orders.to_string()),
+                    ("proactive", &b.proactive.to_string()),
+                    ("delivered", &b.delivered.to_string()),
+                    ("unfulfilled", &b.unfulfilled.to_string()),
+                ],
+            ));
+            if let Some(a) = b.last_audit {
+                let finding = tr(match a.finding {
+                    AuditFinding::Delivered => "living.governance.audit.delivered",
+                    AuditFinding::Unfulfilled => "living.governance.audit.unfulfilled",
+                });
+                rows.push(fmt(
+                    "living.governance.audit.last",
+                    &[
+                        ("site", site),
+                        ("case", &a.contract.to_string()),
+                        ("inspector", actor_name(self.locale, &self.world, a.actor)),
+                        ("at", &a.at.to_string()),
+                        ("finding", finding),
+                        (
+                            "requester",
+                            actor_name(self.locale, &self.world, a.requester),
+                        ),
+                    ],
+                ));
+            }
+            rows.push(fmt(
+                "living.governance.negotiations",
+                &[
+                    ("site", site),
+                    ("no_award", &b.no_award.to_string()),
+                    ("restored", &b.restored_locally.to_string()),
+                ],
+            ));
+            if let Some(n) = b.last_negotiation {
+                use sealed_sim::living::governance::NegotiationKind;
+                let kind = tr(match n.fact.kind {
+                    NegotiationKind::NoAward => "living.governance.no_award",
+                    NegotiationKind::RestoredLocally => "living.governance.restored",
+                });
+                rows.push(fmt(
+                    "living.governance.negotiation.last",
+                    &[
+                        ("site", site),
+                        ("case", &n.fact.contract.to_string()),
+                        ("actor", actor_name(self.locale, &self.world, n.fact.actor)),
+                        ("at", &n.fact.at.to_string()),
+                        ("filed", &n.filed_at.to_string()),
+                        ("finding", kind),
+                    ],
+                ));
+            }
+            let audit_until = b
+                .latest_outcome
+                .filter(|a| a.finding == AuditFinding::Unfulfilled)
+                .map_or(0, |a| a.at + AUDIT_CAUTION);
+            let until = audit_until.max(b.no_award_until);
+            if k.read_at < until {
+                rows.push(fmt(
+                    "living.governance.caution",
+                    &[("site", site), ("until", &until.to_string())],
+                ));
+            }
+            rows.push(fmt(
+                "living.governance.contributions",
+                &[
+                    ("site", site),
+                    ("count", &b.player_contributions.to_string()),
+                ],
+            ));
+        }
+        if rows.is_empty() {
+            rows.push(tr("living.governance.empty").into());
+        }
+        rows
+    }
+
     pub(crate) fn diplomacy_lines(&self) -> Vec<String> {
         use sealed_sim::living::diplomacy::{Kind, Notice, Side};
         let tr = |key| living_text(self.locale, key);
@@ -5342,6 +5499,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         43 => "checkpoint.c56",
         44 => "checkpoint.c57",
         45 => "checkpoint.c58",
+        46 => "checkpoint.c59",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -5387,12 +5545,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         43 => World::development_campaign(0),
         44 => World::circles_campaign(0),
         45 => World::diplomacy_campaign(0),
+        46 => World::governance_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn governance_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 46);
+    if seed != 0 {
+        session.world = World::governance_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_governance_campaign(seed: u32, debug_world: bool) {
+    run_session(governance_session(seed, debug_world));
+}
 pub(crate) fn diplomacy_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 45);
     if seed != 0 {

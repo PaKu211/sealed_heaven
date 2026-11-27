@@ -88,7 +88,9 @@ impl World {
         self.contract_memory()?
             .receipts
             .iter()
-            .filter(|receipt| receipt.requester == requester && !receipt.inspected)
+            .filter(|receipt| {
+                self.can_inspect_contract_receipt(requester, receipt) && !receipt.inspected
+            })
             .filter(|receipt| {
                 receipt.delivered || self.tick >= receipt.opened.saturating_add(DEADLINE)
             })
@@ -104,7 +106,7 @@ impl World {
         }
         let Some(receipt) = self.contract_memory().and_then(|memory| {
             memory.receipts.iter().copied().find(|receipt| {
-                receipt.requester == requester
+                self.can_inspect_contract_receipt(requester, receipt)
                     && receipt.need == need
                     && !receipt.inspected
                     && (receipt.delivered || self.tick >= receipt.opened.saturating_add(DEADLINE))
@@ -135,6 +137,11 @@ impl World {
         {
             entry.inspected = true;
         }
+        // A successor inspects an institutional archive, not a personal contract.
+        if requester != receipt.requester {
+            self.note_governance_audit(requester, receipt, finding);
+            return;
+        }
         let regard = memory
             .regard
             .entry((requester, receipt.provider))
@@ -154,6 +161,7 @@ impl World {
             finding,
             witnessed,
         });
+        self.note_governance_audit(requester, receipt, finding);
         self.record_audit_information(
             receipt.case_id,
             receipt.need,

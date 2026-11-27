@@ -180,8 +180,11 @@ impl World {
                         case.phase,
                         ContractPhase::Soliciting | ContractPhase::Awarding
                     )
-                    && case.need == Need::ShrineMedicine
-                    && self.supply.shrine >= self.scenario.shrine_target
+                    && ((case.need == Need::ShrineMedicine
+                        && self.supply.shrine >= self.scenario.shrine_target)
+                        || (self.governance().is_some()
+                            && case.need == Need::HallOfferings
+                            && self.region().is_some_and(|r| r.hall_offerings > 0)))
                     && self.perceives(npc.position, case.need.site(self))
                 {
                     Some((
@@ -209,16 +212,15 @@ impl World {
         }
         for need in Need::ALL {
             let registry = self.contracts().expect("institutional rules");
-            let requester = need.requester();
+            let Some(requester) = self.contract_requester(need) else {
+                continue;
+            };
             let last_closed = registry.last_closed[need.index()];
             let regular = last_closed == 0 || self.tick.saturating_sub(last_closed) >= COOLDOWN;
             let accelerated = need == Need::ShrineMedicine
                 && !regular
                 && self.diplomatic_petition_ready(requester, last_closed);
-            if registry.active.iter().any(|case| case.need == need)
-                || !need.triggered(self)
-                || (!regular && !accelerated)
-            {
+            if registry.active.iter().any(|case| case.need == need) || (!regular && !accelerated) {
                 continue;
             }
             let Some(npc) = self.npcs.get(&requester) else {
@@ -231,6 +233,11 @@ impl World {
                 continue;
             }
             let position = npc.position;
+            let ordinary = need.triggered(self);
+            let proactive = !ordinary && self.governance_need(need, requester);
+            if !ordinary && !proactive {
+                continue;
+            }
             let registry = self.contracts.as_mut().expect("institutional rules");
             registry.opened = registry.opened.saturating_add(1);
             let id = registry.opened;
@@ -245,6 +252,7 @@ impl World {
                 provider: None,
             });
             self.record_contract(need, ContractEventKind::Observed, requester, position);
+            self.note_governance_order(need, requester, id, proactive);
             if need == Need::ShrineMedicine {
                 self.diplomatic_petition_resolved(requester, id, accelerated);
             }
@@ -478,6 +486,12 @@ impl World {
             contract.phase = ContractPhase::Awarding;
         } else {
             let position = self.npcs[&case.requester].position;
+            self.note_governance_negotiation(
+                case.need,
+                case.requester,
+                case.id,
+                super::governance::NegotiationKind::NoAward,
+            );
             self.close_contract(
                 case.need,
                 ContractEventKind::Failed,
@@ -621,6 +635,14 @@ impl World {
             registry.failed = registry.failed.saturating_add(1);
         }
         self.record_contract_with_id(case_id, need, kind, actor, position);
+        if kind == ContractEventKind::ResolvedLocally {
+            self.note_governance_negotiation(
+                need,
+                actor,
+                case_id,
+                super::governance::NegotiationKind::RestoredLocally,
+            );
+        }
         if let Some(receipt) = receipt {
             self.retain_contract_receipt(receipt);
         }

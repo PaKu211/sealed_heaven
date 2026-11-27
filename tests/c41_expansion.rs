@@ -74,7 +74,7 @@ fn overlay_compiler_is_strict_and_pinned() {
         content::definition_for_revision(35, "sealed_heaven:li_wen"),
         content::definition_for_revision(34, "sealed_heaven:li_wen")
     );
-    for revision in 36..=sealed_sim::living::diplomacy::REVISION {
+    for revision in 36..=sealed_sim::living::governance::REVISION {
         assert_eq!(
             content::definition_for_revision(revision, "sealed_heaven:li_wen"),
             content::definition_for_revision(35, "sealed_heaven:li_wen")

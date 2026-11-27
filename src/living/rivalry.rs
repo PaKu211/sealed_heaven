@@ -192,6 +192,7 @@ impl World {
         let lodge = self.rivalry.as_mut().expect("sect campaign");
         lodge.hall_patronage += 1;
         lodge.pressure = lodge.pressure.saturating_sub(2);
+        self.note_governance_contribution(super::Need::HallOfferings);
         self.record_sect_event(SectEventKind::Patronage, PLAYER, Region::sites().hall);
         if let Some(politics) = self.politics.as_mut() {
             politics.hall_favor = politics.hall_favor.saturating_add(1).min(8);

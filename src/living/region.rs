@@ -296,6 +296,7 @@ impl World {
         self.player.herbs -= 1;
         region.hall_offerings += 1;
         region.enrolled = true;
+        self.note_governance_contribution(super::Need::HallOfferings);
         self.social.meet(mentor, PLAYER);
         self.enroll_hierarchy_player();
         Ok(Outcome::Enrolled)
