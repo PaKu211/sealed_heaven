@@ -3668,6 +3668,108 @@
     "parameters": {},
     "surface": "living_ascii.rs"
   },
+  "living.favor.accepted": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {
+      "id": "C4.7 local request evidence; regard is actual change, not current trust"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.care": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.changed": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.declined": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {
+      "id": "C4.7 local request evidence; regard is actual change, not current trust"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.fulfilled": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.funded": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {
+      "actor": "C4.7 local request evidence; regard is actual change, not current trust",
+      "coins": "C4.7 local request evidence; regard is actual change, not current trust",
+      "id": "C4.7 local request evidence; regard is actual change, not current trust"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.help": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.kit": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.line": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {
+      "actor": "C4.7 local request evidence; regard is actual change, not current trust",
+      "due": "C4.7 local request evidence; regard is actual change, not current trust",
+      "id": "C4.7 local request evidence; regard is actual change, not current trust",
+      "need": "C4.7 local request evidence; regard is actual change, not current trust",
+      "regard": "C4.7 local request evidence; regard is actual change, not current trust",
+      "seen": "C4.7 local request evidence; regard is actual change, not current trust",
+      "status": "C4.7 local request evidence; regard is actual change, not current trust"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.no_receipts": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.no_selection": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.pixel.hint": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.favor.unknown": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.favor.withdrawn": {
+    "active": true,
+    "context": "C4.7 situated personal favors, actual aid and remembered social outcomes",
+    "parameters": {
+      "id": "C4.7 local request evidence; regard is actual change, not current trust"
+    },
+    "surface": "living_ascii.rs"
+  },
   "living.help.c351": {
     "active": true,
     "context": "help / c351",

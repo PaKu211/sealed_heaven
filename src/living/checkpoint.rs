@@ -69,6 +69,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::SettlementProduction => super::production::REVISION,
         Rules::RoadHistory => super::road_history::REVISION,
         Rules::EmergentRequests => super::requests::REVISION,
+        Rules::PersonalFavors => super::favors::REVISION,
     }
 }
 
@@ -132,6 +133,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::production::REVISION => Rules::SettlementProduction,
         super::road_history::REVISION => Rules::RoadHistory,
         super::requests::REVISION => Rules::EmergentRequests,
+        super::favors::REVISION => Rules::PersonalFavors,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -237,6 +239,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::Invite(actor)
@@ -273,6 +276,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::Provision(actor)
@@ -309,6 +313,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::Part(actor)
@@ -344,6 +349,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::OfferAccord
@@ -379,6 +385,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::SupportHall
@@ -413,6 +420,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::PledgeLodge
@@ -447,6 +455,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::AidLodge
@@ -481,6 +490,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::RenounceLodge
@@ -508,6 +518,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::Ask(actor)
@@ -535,6 +546,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::Examine
@@ -562,6 +574,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -589,6 +602,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::Take(actor)
@@ -613,6 +627,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -639,6 +654,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::ClaimLot(value)
@@ -661,6 +677,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -683,6 +700,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::AttuneLot(value)
@@ -704,6 +722,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -724,6 +743,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::Drill(actor)
@@ -744,6 +764,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -771,6 +792,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::DrawQi
@@ -787,6 +809,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::CirculateQi
@@ -803,6 +826,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::MendMeridians
@@ -819,6 +843,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::TreatWounds
@@ -835,19 +860,40 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) =>
         {
             Intent::ClaimHallAllocation
         }
-        (42, id) if matches!(rules, Rules::RoadHistory | Rules::EmergentRequests) => {
+        (42, id)
+            if matches!(
+                rules,
+                Rules::RoadHistory | Rules::EmergentRequests | Rules::PersonalFavors
+            ) =>
+        {
             Intent::RecoverCache(id)
         }
-        (43, id) if matches!(rules, Rules::RoadHistory | Rules::EmergentRequests) => {
+        (43, id)
+            if matches!(
+                rules,
+                Rules::RoadHistory | Rules::EmergentRequests | Rules::PersonalFavors
+            ) =>
+        {
             Intent::EntrustCache(id)
         }
-        (44, id) if rules == Rules::EmergentRequests => Intent::AcceptRequest(id),
-        (45, id) if rules == Rules::EmergentRequests => Intent::DeclineRequest(id),
-        (46, id) if rules == Rules::EmergentRequests => Intent::AbandonRequest(id),
+        (44, id) if matches!(rules, Rules::EmergentRequests | Rules::PersonalFavors) => {
+            Intent::AcceptRequest(id)
+        }
+        (45, id) if matches!(rules, Rules::EmergentRequests | Rules::PersonalFavors) => {
+            Intent::DeclineRequest(id)
+        }
+        (46, id) if matches!(rules, Rules::EmergentRequests | Rules::PersonalFavors) => {
+            Intent::AbandonRequest(id)
+        }
+        (47, id) if rules == Rules::PersonalFavors => Intent::AcceptFavor(id),
+        (48, id) if rules == Rules::PersonalFavors => Intent::DeclineFavor(id),
+        (49, id) if rules == Rules::PersonalFavors => Intent::WithdrawFavor(id),
+        (50, id) if rules == Rules::PersonalFavors => Intent::FundFavor(id),
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -855,7 +901,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::EmergentRequests {
+        let mut bytes = if world.rules == Rules::PersonalFavors {
+            b"SH:C47:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::EmergentRequests {
             b"SH:C46:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::RoadHistory {
             b"SH:C45:SCENARIO:v1\0".to_vec()
@@ -926,6 +974,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::SettlementProduction => b"SH:C10:RULES:v31".to_vec(),
         Rules::RoadHistory => b"SH:C10:RULES:v32".to_vec(),
         Rules::EmergentRequests => b"SH:C10:RULES:v33".to_vec(),
+        Rules::PersonalFavors => b"SH:C10:RULES:v34".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -1020,6 +1069,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::SettlementProduction
             | Rules::RoadHistory
             | Rules::EmergentRequests
+            | Rules::PersonalFavors
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -1069,6 +1119,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::SettlementProduction => b"SH:C10:STATE:v31".to_vec(),
         Rules::RoadHistory => b"SH:C10:STATE:v32".to_vec(),
         Rules::EmergentRequests => b"SH:C10:STATE:v33".to_vec(),
+        Rules::PersonalFavors => b"SH:C10:STATE:v34".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1183,6 +1234,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1266,6 +1318,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SettlementProduction
             | Rules::RoadHistory
             | Rules::EmergentRequests
+            | Rules::PersonalFavors
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1305,6 +1358,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1351,6 +1405,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SettlementProduction
             | Rules::RoadHistory
             | Rules::EmergentRequests
+            | Rules::PersonalFavors
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1438,6 +1493,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1607,6 +1663,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(requests) = world.requests() {
         let bytes = requests.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(favors) = world.favors() {
+        let bytes = favors.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }
@@ -2183,6 +2244,10 @@ impl Wire {
             Intent::AcceptRequest(id) => (44, id),
             Intent::DeclineRequest(id) => (45, id),
             Intent::AbandonRequest(id) => (46, id),
+            Intent::AcceptFavor(id) => (47, id),
+            Intent::DeclineFavor(id) => (48, id),
+            Intent::WithdrawFavor(id) => (49, id),
+            Intent::FundFavor(id) => (50, id),
         };
         let [a, b, c, d] = payload.to_le_bytes();
         [tag, a, b, c, d]
@@ -2334,6 +2399,10 @@ impl Wire {
             Some(Outcome::RequestAccepted(_)) => 50,
             Some(Outcome::RequestDeclined(_)) => 51,
             Some(Outcome::RequestAbandoned(_)) => 52,
+            Some(Outcome::FavorAccepted(_)) => 53,
+            Some(Outcome::FavorDeclined(_)) => 54,
+            Some(Outcome::FavorWithdrawn(_)) => 55,
+            Some(Outcome::FavorFunded { .. }) => 56,
         });
         match outcome {
             Some(
@@ -2410,6 +2479,16 @@ impl Wire {
                 | Outcome::RequestDeclined(id)
                 | Outcome::RequestAbandoned(id),
             ) => self.u32(id),
+            Some(
+                Outcome::FavorAccepted(id)
+                | Outcome::FavorDeclined(id)
+                | Outcome::FavorWithdrawn(id),
+            ) => self.u32(id),
+            Some(Outcome::FavorFunded { id, actor, coins }) => {
+                self.u32(id);
+                self.actor(actor);
+                self.u32(coins);
+            }
             Some(Outcome::Rejected(reason)) => self.u8(match reason {
                 Rejection::Dead => 0,
                 Rejection::Impassable => 1,

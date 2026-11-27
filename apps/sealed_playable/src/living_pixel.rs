@@ -7,8 +7,9 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 use crate::{
     clock,
     living_ascii::{
-        Session, campaign_session, expanded_session, generated_session, history_session,
-        knowledge_session, lod_session, outcome_label, production_session, requests_session,
+        Session, campaign_session, expanded_session, favors_session, generated_session,
+        history_session, knowledge_session, lod_session, outcome_label, production_session,
+        requests_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -60,6 +61,10 @@ pub(crate) fn run_history(seed: u32) {
 
 pub(crate) fn run_requests(seed: u32) {
     run_session(requests_session(seed, false));
+}
+
+pub(crate) fn run_favors(seed: u32) {
+    run_session(favors_session(seed, false));
 }
 
 fn run_session(session: Session) {
@@ -166,6 +171,43 @@ fn keyboard(
         game.session.input("abandonquest market");
     } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::Digit0) {
         game.session.input("questlog 2");
+    } else if game.session.world.favors().is_some() && keys.just_pressed(KeyCode::F1) {
+        game.session.input(
+            if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+                "favorlog 2"
+            } else {
+                "favors 2"
+            },
+        );
+    } else if game.session.world.favors().is_some()
+        && [
+            KeyCode::KeyQ,
+            KeyCode::Backspace,
+            KeyCode::Delete,
+            KeyCode::Period,
+        ]
+        .into_iter()
+        .any(|k| keys.just_pressed(k))
+    {
+        let command = if keys.just_pressed(KeyCode::KeyQ) {
+            "acceptfavor"
+        } else if keys.just_pressed(KeyCode::Backspace) {
+            "declinefavor"
+        } else if keys.just_pressed(KeyCode::Delete) {
+            "withdrawfavor"
+        } else {
+            "fundfavor"
+        };
+        // An explicit adjacent target wins; otherwise require a unique eligible known promise.
+        let target = game
+            .target
+            .filter(|a| game.session.world.at_favor_actor(*a));
+        if let Some(id) = game.session.favor_selection(command, target) {
+            game.session.input(&format!("{command} {id}"));
+        } else {
+            game.session.notice =
+                living_text(game.session.locale, "living.favor.no_selection").into();
+        }
     } else if keys.just_pressed(KeyCode::KeyT) {
         let nearby = nearby(&game.session);
         let next = nearby
@@ -306,6 +348,16 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
         );
     }
 
+    if world.favors().is_some() {
+        label(
+            &mut commands,
+            tr("living.favor.pixel.hint").into(),
+            172.0,
+            12.0,
+            OCHRE,
+        );
+    }
+
     let width = scenario.width.min(17);
     let left = player
         .position
@@ -348,6 +400,8 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
         .filter(|event| event.witnessed && event.at == world.tick());
     let local = if let Some(event) = event {
         session.company_line(event)
+    } else if let Some(hint) = session.local_favor_hint() {
+        hint
     } else if let Some(hint) = session.local_quest_hint() {
         hint
     } else if let Some(hint) = session.duty_hint() {
@@ -404,6 +458,11 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     {
         message.push('\n');
         message.push_str(&line);
+    }
+    if session.notice.is_empty()
+        && let Some(line) = session.latest_favor_notice()
+    {
+        message = line;
     }
     let message_size = if world.regional_news().is_some() && message.contains('\n') {
         14.0
@@ -1225,6 +1284,111 @@ mod tests {
                     "decline" => Status::Declined,
                     _ => Status::Abandoned,
                 }
+            );
+        }
+    }
+
+    #[test]
+    fn personal_favor_pixel_keys_replay_five_real_branches_and_inspection_is_read_only() {
+        use sealed_sim::living::{ActorId, Intent, PLAYER, World, favors::Status};
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/living/c47_branch_trace_v1.json"
+        ))
+        .unwrap();
+        for row in fixture["rows"].as_array().unwrap() {
+            let seed = row["seed"].as_u64().unwrap().try_into().unwrap();
+            let actor = ActorId::new(row["actor"].as_u64().unwrap().try_into().unwrap());
+            let id = row["id"].as_u64().unwrap().try_into().unwrap();
+            let mut session = favors_session(seed, false);
+            let commands = row["commands"].as_array().unwrap();
+            let first = row["offer_tick"].as_u64().unwrap() as usize;
+            for c in &commands[..first] {
+                assert!(session.input(c.as_str().unwrap()));
+            }
+            let before = session.world.checkpoint();
+            let mut reference = World::restore(&before).unwrap();
+            let mut app = App::new();
+            app.insert_resource(Game {
+                session,
+                target: Some(actor),
+            })
+            .init_resource::<ButtonInput<KeyCode>>()
+            .add_systems(Update, (keyboard, draw).chain());
+            app.world_mut().spawn((Window::default(), PrimaryWindow));
+            app.update();
+            let press = |app: &mut App, key, shift: bool| {
+                {
+                    let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                    keys.clear();
+                    keys.release(KeyCode::ShiftLeft);
+                    if shift {
+                        keys.press(KeyCode::ShiftLeft);
+                    }
+                    keys.release(key);
+                    keys.press(key);
+                }
+                app.update();
+            };
+            let text = |app: &mut App| {
+                let mut q = app.world_mut().query::<&Text2d>();
+                q.iter(app.world())
+                    .map(|t| t.0.clone())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            assert!(text(&mut app).contains("F1 favors"));
+            press(&mut app, KeyCode::F1, false);
+            assert!(text(&mut app).contains("1 herb for travel kit"));
+            press(&mut app, KeyCode::F1, true);
+            assert!(text(&mut app).contains("No remembered personal outcomes."));
+            press(&mut app, KeyCode::Tab, false);
+            press(&mut app, KeyCode::F1, false);
+            assert!(text(&mut app).contains("1 herba bekal"));
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                before
+            );
+            for c in &commands[first..] {
+                let command = c.as_str().unwrap();
+                let (key, intent) = match command {
+                    "pack 22" => (KeyCode::KeyO, Intent::Provision(actor)),
+                    "part 22" => (KeyCode::KeyR, Intent::Part(actor)),
+                    s if s.starts_with("acceptfavor") => (KeyCode::KeyQ, Intent::AcceptFavor(id)),
+                    s if s.starts_with("declinefavor") => {
+                        (KeyCode::Backspace, Intent::DeclineFavor(id))
+                    }
+                    s if s.starts_with("withdrawfavor") => {
+                        (KeyCode::Delete, Intent::WithdrawFavor(id))
+                    }
+                    s => panic!("unexpected command {s}"),
+                };
+                reference.step(reference.tick(), intent).unwrap();
+                press(&mut app, key, false);
+                assert_eq!(
+                    app.world().resource::<Game>().session.world.checkpoint(),
+                    reference.checkpoint()
+                );
+            }
+            press(&mut app, KeyCode::F1, true);
+            let memory = text(&mut app);
+            let status = match row["choice"].as_str().unwrap() {
+                "fulfill" => ("Bantuan diberikan", Status::Fulfilled),
+                "decline" => ("Ditolak", Status::Declined),
+                "withdraw" => ("Dibatalkan", Status::Withdrawn),
+                _ => ("Keadaan berubah", Status::Changed),
+            };
+            assert!(memory.contains(status.0), "{memory}");
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                reference.checkpoint()
+            );
+            assert_eq!(
+                reference.favor_receipts().last().unwrap().favor.status,
+                status.1
+            );
+            assert_eq!(
+                i64::from(reference.social().relationship(actor, PLAYER).regard),
+                row["regard"].as_i64().unwrap()
             );
         }
     }

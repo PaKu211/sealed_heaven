@@ -59,7 +59,7 @@ fn historical_campaign_rejects_unsupported_information_intents_before_commit() {
 // a turn; a structural rejection must not mutate anything.
 #[test]
 fn every_admitted_intent_roundtrips_across_released_seeded_campaigns() {
-    let campaigns: [fn(u32) -> World; 31] = [
+    let campaigns: [fn(u32) -> World; 32] = [
         World::riverlands,
         World::reed_hall,
         World::road_company,
@@ -91,6 +91,7 @@ fn every_admitted_intent_roundtrips_across_released_seeded_campaigns() {
         World::settlement_production_campaign,
         World::road_history_campaign,
         World::emergent_requests_campaign,
+        World::personal_favors_campaign,
     ];
     let actor = ActorId::new(1);
     let intents = [
@@ -172,6 +173,10 @@ fn every_admitted_intent_roundtrips_across_released_seeded_campaigns() {
         Intent::AcceptRequest(1),
         Intent::DeclineRequest(2),
         Intent::AbandonRequest(u32::MAX),
+        Intent::AcceptFavor(1),
+        Intent::DeclineFavor(2),
+        Intent::WithdrawFavor(u32::MAX),
+        Intent::FundFavor(0),
     ];
     for seed in [0, 1] {
         for make in campaigns {

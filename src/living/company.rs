@@ -144,6 +144,7 @@ impl World {
         }
         self.player.herbs -= 1;
         self.npcs.get_mut(&id).expect("adjacent actor").packed_herbs += 1;
+        self.provisioned_for_favor(id);
         Ok(Outcome::Provisioned(id))
     }
 
@@ -153,6 +154,7 @@ impl World {
             return Err(Rejection::NotCompanion);
         }
         self.end_journey(id, JourneyEvent::Dismissed);
+        self.parted_favor(id);
         Ok(Outcome::Parted(id))
     }
 

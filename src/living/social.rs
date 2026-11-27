@@ -192,6 +192,16 @@ impl Social {
         self.adjust(patient, helper, 1);
     }
 
+    /// Honest face-to-face release of a promise may reduce positive regard,
+    /// but never creates hostility from a neutral relationship.
+    pub(super) fn promise_disappointment(&mut self, actor: ActorId, other: ActorId) -> i8 {
+        if self.relationship(actor, other).regard > 0 {
+            self.adjust(actor, other, -1)
+        } else {
+            0
+        }
+    }
+
     fn adjust(&mut self, actor: ActorId, other: ActorId, delta: i8) -> i8 {
         if delta == 0 {
             return 0;
@@ -505,6 +515,7 @@ impl World {
                     | super::Rules::SettlementProduction
                     | super::Rules::RoadHistory
                     | super::Rules::EmergentRequests
+                    | super::Rules::PersonalFavors
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

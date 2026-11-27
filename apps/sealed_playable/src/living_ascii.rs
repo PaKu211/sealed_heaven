@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 33 {
+        if self.world.checkpoint_revision() == 34 {
+            World::personal_favors_campaign(seed)
+        } else if self.world.checkpoint_revision() == 33 {
             World::emergent_requests_campaign(seed)
         } else if self.world.checkpoint_revision() == 32 {
             World::road_history_campaign(seed)
@@ -146,6 +148,12 @@ impl Session {
                         | "declinequest"
                         | "abandonquest"
                         | "questlog"
+                        | "favors"
+                        | "favorlog"
+                        | "acceptfavor"
+                        | "declinefavor"
+                        | "withdrawfavor"
+                        | "fundfavor"
                 ))
         {
             self.notice =
@@ -1089,6 +1097,37 @@ impl Session {
                 };
                 return true;
             }
+            "favors" | "favorlog" if self.world.favors().is_some() => {
+                let count = argument
+                    .and_then(|n| n.parse::<usize>().ok())
+                    .unwrap_or(12)
+                    .clamp(1, 48);
+                self.notice = self.favor_lines(command == "favorlog", count).join("\n");
+                return true;
+            }
+            "favordebug" if self.debug_world && self.world.favors().is_some() => {
+                self.notice = format!("{:?}", self.world.favors().unwrap());
+                return true;
+            }
+            "acceptfavor" | "declinefavor" | "withdrawfavor" | "fundfavor"
+                if self.world.favors().is_some() =>
+            {
+                let id = if let Some(arg) = argument {
+                    arg.parse::<u32>().ok()
+                } else {
+                    self.favor_selection(command, None)
+                };
+                let Some(id) = id else {
+                    self.notice = living_text(self.locale, "living.favor.no_selection").into();
+                    return true;
+                };
+                match command {
+                    "acceptfavor" => Intent::AcceptFavor(id),
+                    "declinefavor" => Intent::DeclineFavor(id),
+                    "withdrawfavor" => Intent::WithdrawFavor(id),
+                    _ => Intent::FundFavor(id),
+                }
+            }
             "quests" if self.world.requests().is_some() => {
                 self.notice = self.quest_lines(false, 2).join("\n");
                 return true;
@@ -1418,6 +1457,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.quest.help"));
                     if self.debug_world {
                         self.notice.push_str(" questdebug");
+                    }
+                }
+                if self.world.favors().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.favor.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" favordebug");
                     }
                 }
                 return true;
@@ -2037,6 +2084,118 @@ impl Session {
                 ("days", &d.days_ago.to_string()),
             ],
         )
+    }
+    fn favor_line(&self, s: sealed_sim::living::favors::Seen) -> String {
+        use sealed_sim::living::favors::{Need, Status};
+        let f = s.favor;
+        let kind = living_text(
+            self.locale,
+            match f.need {
+                Need::CareFunds => "living.favor.care",
+                Need::TravelKit => "living.favor.kit",
+            },
+        );
+        let status = living_text(
+            self.locale,
+            match f.status {
+                Status::Offered => "living.quest.offered",
+                Status::Accepted => "living.quest.accepted",
+                Status::Fulfilled => "living.favor.fulfilled",
+                Status::Declined => "living.quest.declined",
+                Status::Withdrawn => "living.quest.abandoned",
+                Status::Expired => "living.quest.expired",
+                Status::Changed => "living.favor.changed",
+            },
+        );
+        living_format(
+            self.locale,
+            "living.favor.line",
+            &[
+                ("id", &f.id.to_string()),
+                ("actor", actor_name(self.locale, &self.world, f.actor)),
+                ("need", kind),
+                ("status", status),
+                ("due", &f.deadline.to_string()),
+                ("seen", &s.at.to_string()),
+                ("regard", &format!("{:+}", f.regard_change)),
+            ],
+        )
+    }
+    pub(crate) fn favor_lines(&self, log: bool, count: usize) -> Vec<String> {
+        let mut records = if log {
+            self.world.favor_receipts().collect::<Vec<_>>()
+        } else {
+            self.world.known_favors()
+        };
+        if log {
+            records.reverse();
+        } else {
+            records.sort_by_key(|s| {
+                (
+                    !s.favor.status.active(),
+                    std::cmp::Reverse(s.at),
+                    s.favor.id,
+                )
+            });
+        }
+        if records.is_empty() {
+            return vec![
+                living_text(
+                    self.locale,
+                    if log {
+                        "living.favor.no_receipts"
+                    } else {
+                        "living.favor.unknown"
+                    },
+                )
+                .into(),
+            ];
+        }
+        records
+            .into_iter()
+            .take(count)
+            .map(|s| self.favor_line(s))
+            .collect()
+    }
+    pub(crate) fn favor_selection(&self, command: &str, target: Option<ActorId>) -> Option<u32> {
+        use sealed_sim::living::favors::{Need, Status};
+        let mut records = self.world.known_favors().into_iter().filter(|s| {
+            let f = s.favor;
+            if target.is_some_and(|a| a != f.actor) {
+                return false;
+            }
+            let local = self.world.at_favor_actor(f.actor);
+            match command {
+                "acceptfavor" | "declinefavor" => local && f.status == Status::Offered,
+                "fundfavor" => local && f.status == Status::Accepted && f.need == Need::CareFunds,
+                "withdrawfavor" => f.status == Status::Accepted,
+                _ => false,
+            }
+        });
+        let first = records.next()?.favor.id;
+        if records.next().is_none() {
+            Some(first)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn local_favor_hint(&self) -> Option<String> {
+        self.world
+            .known_favors()
+            .into_iter()
+            .find(|s| {
+                s.favor.status.active()
+                    && (s.favor.opened == self.world.tick()
+                        || self.world.at_favor_actor(s.favor.actor))
+            })
+            .map(|s| self.favor_line(s))
+    }
+    pub(crate) fn latest_favor_notice(&self) -> Option<String> {
+        self.world
+            .favor_receipts()
+            .filter(|s| s.at == self.world.tick())
+            .last()
+            .map(|s| self.favor_line(s))
     }
     fn quest_line(&self, s: sealed_sim::living::requests::Seen) -> String {
         use sealed_sim::living::requests::{Site, Status};
@@ -2779,6 +2938,12 @@ impl Session {
         }
         if let Some(hint) = self.local_quest_hint() {
             let _ = writeln!(out, "{hint}");
+        }
+        if let Some(hint) = self.local_favor_hint() {
+            let _ = writeln!(out, "{hint}");
+        }
+        if let Some(receipt) = self.latest_favor_notice() {
+            let _ = writeln!(out, "{receipt}");
         }
         for incident in world
             .social()
@@ -3799,6 +3964,25 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
             };
             return living_format(locale, key, &[("id", &id.to_string())]);
         }
+        Outcome::FavorAccepted(id) | Outcome::FavorDeclined(id) | Outcome::FavorWithdrawn(id) => {
+            let key = match outcome {
+                Outcome::FavorAccepted(_) => "living.favor.accepted",
+                Outcome::FavorDeclined(_) => "living.favor.declined",
+                _ => "living.favor.withdrawn",
+            };
+            return living_format(locale, key, &[("id", &id.to_string())]);
+        }
+        Outcome::FavorFunded { id, actor, coins } => {
+            return living_format(
+                locale,
+                "living.favor.funded",
+                &[
+                    ("id", &id.to_string()),
+                    ("actor", actor_name(locale, world, actor)),
+                    ("coins", &coins.to_string()),
+                ],
+            );
+        }
         Outcome::LotSold { to, id, coins } => {
             return living_format(
                 locale,
@@ -4137,6 +4321,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         31 => "checkpoint.c44",
         32 => "checkpoint.c45",
         33 => "checkpoint.c46",
+        34 => "checkpoint.c47",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -4170,10 +4355,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         31 => World::settlement_production_campaign(0),
         32 => World::road_history_campaign(0),
         33 => World::emergent_requests_campaign(0),
+        34 => World::personal_favors_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn favors_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 34);
+    if seed != 0 {
+        session.world = World::personal_favors_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_favors_campaign(seed: u32, debug_world: bool) {
+    run_session(favors_session(seed, debug_world));
 }
 
 pub(crate) fn requests_session(seed: u32, debug_world: bool) -> Session {

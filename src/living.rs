@@ -18,6 +18,7 @@ pub mod expansion;
 mod faction_agency;
 #[cfg(test)]
 mod faction_agency_tests;
+pub mod favors;
 mod information;
 #[cfg(test)]
 mod information_tests;
@@ -168,6 +169,10 @@ pub enum Intent {
     AcceptRequest(u32),
     DeclineRequest(u32),
     AbandonRequest(u32),
+    AcceptFavor(u32),
+    DeclineFavor(u32),
+    WithdrawFavor(u32),
+    FundFavor(u32),
 }
 
 impl Intent {
@@ -335,6 +340,14 @@ pub enum Outcome {
     RequestAccepted(u32),
     RequestDeclined(u32),
     RequestAbandoned(u32),
+    FavorAccepted(u32),
+    FavorDeclined(u32),
+    FavorWithdrawn(u32),
+    FavorFunded {
+        id: u32,
+        actor: ActorId,
+        coins: u32,
+    },
     Rejected(Rejection),
 }
 
@@ -405,6 +418,7 @@ pub struct World {
     production: Option<production::Production>,
     road_history: Option<road_history::RoadHistory>,
     requests: Option<requests::Requests>,
+    favors: Option<favors::Favors>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -468,6 +482,7 @@ enum Rules {
     SettlementProduction,
     RoadHistory,
     EmergentRequests,
+    PersonalFavors,
 }
 
 impl Rules {
@@ -482,6 +497,7 @@ impl Rules {
                 | Self::SettlementProduction
                 | Self::RoadHistory
                 | Self::EmergentRequests
+                | Self::PersonalFavors
         )
     }
 
@@ -522,6 +538,7 @@ impl Rules {
                 | Self::SettlementProduction
                 | Self::RoadHistory
                 | Self::EmergentRequests
+                | Self::PersonalFavors
         )
     }
 }
@@ -663,6 +680,11 @@ impl World {
         Self::seeded(seed, Rules::EmergentRequests)
     }
 
+    /// C4.7: personal, optional promises with physical aid and local trust.
+    pub fn personal_favors_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::PersonalFavors)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -674,6 +696,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
@@ -684,6 +707,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -699,7 +723,10 @@ impl World {
                 .all(|site| world.walkable(site))
         );
         world.region = Some(Region::new(seed));
-        if matches!(rules, Rules::RoadHistory | Rules::EmergentRequests) {
+        if matches!(
+            rules,
+            Rules::RoadHistory | Rules::EmergentRequests | Rules::PersonalFavors
+        ) {
             world.road_history = Some(road_history::RoadHistory::new(&mut world, seed));
             world.observe_road_history();
         }
@@ -710,6 +737,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         ) {
             world.init_regional_news();
         }
@@ -719,18 +747,25 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         ) {
             world.scheduler = Some(lod::Scheduler::new(&world));
         }
         if matches!(
             rules,
-            Rules::SettlementProduction | Rules::RoadHistory | Rules::EmergentRequests
+            Rules::SettlementProduction
+                | Rules::RoadHistory
+                | Rules::EmergentRequests
+                | Rules::PersonalFavors
         ) {
             world.production = Some(production::Production::new(&world));
         }
-        if rules == Rules::EmergentRequests {
+        if matches!(rules, Rules::EmergentRequests | Rules::PersonalFavors) {
             world.requests = Some(requests::Requests::default());
             world.advance_requests();
+        }
+        if rules == Rules::PersonalFavors {
+            world.favors = Some(favors::Favors::default());
         }
         world
     }
@@ -755,6 +790,7 @@ impl World {
             production: None,
             road_history: None,
             requests: None,
+            favors: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -799,6 +835,7 @@ impl World {
                         | Rules::SettlementProduction
                         | Rules::RoadHistory
                         | Rules::EmergentRequests
+                        | Rules::PersonalFavors
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -843,6 +880,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(Company::default),
             rivalry: matches!(
@@ -875,6 +913,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -906,6 +945,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(Politics::new),
             traffic: matches!(
@@ -936,6 +976,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -965,6 +1006,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -991,6 +1033,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -1016,6 +1059,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(Information::default),
             contested: matches!(
@@ -1035,6 +1079,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(|| {
                 Contested::new(matches!(
@@ -1053,6 +1098,7 @@ impl World {
                         | Rules::SettlementProduction
                         | Rules::RoadHistory
                         | Rules::EmergentRequests
+                        | Rules::PersonalFavors
                 ))
             }),
             martial: matches!(
@@ -1070,6 +1116,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -1086,6 +1133,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -1101,6 +1149,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -1115,6 +1164,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -1128,6 +1178,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1310,6 +1361,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1338,6 +1390,7 @@ impl World {
                     | Rules::SettlementProduction
                     | Rules::RoadHistory
                     | Rules::EmergentRequests
+                    | Rules::PersonalFavors
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1377,6 +1430,7 @@ impl World {
         self.advance_information_recovery();
         self.advance_production();
         self.advance_requests();
+        self.advance_favors();
         // 2. Apply the player's action and capture observation at the point of contact.
         if self.tick == 1 && !matches!(intent, Intent::ChooseBackground(_)) {
             self.select_default_background();
@@ -1395,6 +1449,7 @@ impl World {
         self.retire_scheduled_dead();
         self.observe_road_history();
         self.advance_requests();
+        self.advance_favors();
         if intent == Intent::Wait {
             self.recover_martial(PLAYER);
         }
@@ -1540,6 +1595,10 @@ impl World {
             Intent::AcceptRequest(id) => self.choose_request(id, true),
             Intent::DeclineRequest(id) => self.choose_request(id, false),
             Intent::AbandonRequest(id) => self.abandon_request(id),
+            Intent::AcceptFavor(id) => self.choose_favor(id, true),
+            Intent::DeclineFavor(id) => self.choose_favor(id, false),
+            Intent::WithdrawFavor(id) => self.withdraw_favor(id),
+            Intent::FundFavor(id) => self.fund_favor(id),
         }
     }
 
@@ -1566,6 +1625,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         )
     }
 
@@ -1591,6 +1651,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         )
     }
 
@@ -1615,6 +1676,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         )
     }
 
@@ -1638,6 +1700,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         )
     }
 
@@ -1660,6 +1723,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         )
     }
 
@@ -1680,6 +1744,7 @@ impl World {
                 | Rules::SettlementProduction
                 | Rules::RoadHistory
                 | Rules::EmergentRequests
+                | Rules::PersonalFavors
         )
     }
 
@@ -1770,6 +1835,7 @@ impl World {
         }
         self.social.meet(id, PLAYER);
         self.regional_conversation(id);
+        self.discuss_favor(id);
         Ok(Outcome::Spoke(id))
     }
 

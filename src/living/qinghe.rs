@@ -11,6 +11,7 @@ pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
             | Rules::SettlementProduction
             | Rules::RoadHistory
             | Rules::EmergentRequests
+            | Rules::PersonalFavors
     ) {
         return super::expansion::scenario(seed);
     }
