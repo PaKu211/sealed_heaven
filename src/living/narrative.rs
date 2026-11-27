@@ -562,6 +562,7 @@ impl World {
         if let Some(n) = self.narrative.as_mut() {
             n.open(t);
         }
+        self.circle_project_open(t);
     }
     pub(super) fn story_resolve(&mut self, r: Resolution) {
         if self.narrative.is_none() {
@@ -577,6 +578,7 @@ impl World {
             n.receipt(p, self.tick);
         }
         self.learn_own_resolution(r);
+        self.circle_project_end(r);
     }
     pub(super) fn story_register(&mut self, r: Witnessed) {
         if let Some(n) = self.narrative.as_mut() {

@@ -106,7 +106,7 @@ fn canonical_registry_is_pinned_and_order_independent_for_object_keys() {
         content::identity_for_revision(35),
         content::identity_for_revision(34)
     );
-    for revision in 36..=sealed_sim::living::development::REVISION {
+    for revision in 36..=sealed_sim::living::circles::REVISION {
         assert_eq!(
             content::identity_for_revision(revision),
             content::identity_for_revision(35)

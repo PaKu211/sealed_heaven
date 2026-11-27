@@ -11,7 +11,7 @@ class LocalePackTests(unittest.TestCase):
         cls.base=cls.catalogs["living"]["en"]
 
     def test_source_parity(self):
-        self.assertEqual(len(self.base),762)
+        self.assertEqual(len(self.base),774)
         expected_contacts = {
             "living.contact.care", "living.contact.talk",
             "living.contact.empty", "living.contact.help",
@@ -25,6 +25,7 @@ class LocalePackTests(unittest.TestCase):
         self.assertEqual({key for key in self.base if key.startswith("living.rumor.")},{'living.rumor.contested', 'living.rumor.verified', 'living.rumor.account', 'living.rumor.line', 'living.rumor.adequate', 'living.rumor.empty', 'living.rumor.goal', 'living.rumor.help', 'living.rumor.reported', 'living.rumor.pixel.hint', 'living.rumor.low', 'living.rumor.local'})
         self.assertEqual({key for key in self.base if key.startswith("living.story.")},{'living.story.empty', 'living.story.help', 'living.story.pixel.hint', 'living.story.checked', 'living.story.dispatch', 'living.story.conflict', 'living.story.register', 'living.story.followup', 'living.story.delivery', 'living.story.lapsed', 'living.story.inquiry', 'living.story.witnessed', 'living.story.opportunity'})
         self.assertEqual({key for key in self.base if key.startswith("living.profile.")},{'living.profile.help', 'living.profile.pixel.hint', 'living.profile.empty', 'living.profile.vocation', 'living.profile.line', 'living.profile.inquiry', 'living.profile.partnership'})
+        self.assertEqual({key for key in self.base if key.startswith("living.circle.")},{'living.circle.empty', 'living.circle.joined', 'living.circle.elected', 'living.circle.inquiry', 'living.circle.coordinator', 'living.circle.formed', 'living.circle.help', 'living.circle.affiliated', 'living.circle.pixel.hint', 'living.circle.unaffiliated', 'living.circle.member', 'living.circle.partnership'})
         self.assertEqual(self.base.keys(),self.catalogs["living"]["id"].keys())
         self.assertEqual(len(self.catalogs["ui"]["en"]),203)
 

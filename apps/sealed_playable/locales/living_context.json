@@ -3764,6 +3764,101 @@
     },
     "surface": "living_ascii.rs"
   },
+  "living.circle.affiliated": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {
+      "actor": "actor who spoke or participated in witnessed negotiation",
+      "at": "actual evidence tick",
+      "founder": "founding actor disclosed by member",
+      "purpose": "voluntary association type",
+      "role": "actor's own dated affiliation role"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.coordinator": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.elected": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {
+      "actor": "actor who spoke or participated in witnessed negotiation",
+      "at": "actual evidence tick",
+      "purpose": "voluntary association type"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.empty": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.formed": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {
+      "actor": "actor who spoke or participated in witnessed negotiation",
+      "at": "actual evidence tick",
+      "other": "other witnessed participant",
+      "purpose": "voluntary association type"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.help": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.inquiry": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.joined": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {
+      "actor": "actor who spoke or participated in witnessed negotiation",
+      "at": "actual evidence tick",
+      "other": "other witnessed participant",
+      "purpose": "voluntary association type"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.member": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.partnership": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.circle.pixel.hint": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.circle.unaffiliated": {
+    "active": true,
+    "context": "C5.7 only witnessed local negotiations and dated self-disclosed affiliations; no private roster or group IDs",
+    "parameters": {
+      "actor": "actor who spoke or participated in witnessed negotiation",
+      "at": "actual evidence tick"
+    },
+    "surface": "living_ascii.rs"
+  },
   "living.contact.care": {
     "active": true,
     "context": "C4.9 directly confirmed encounter memory, not live actor tracking",

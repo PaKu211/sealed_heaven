@@ -599,6 +599,65 @@ mod tests {
     }
 
     #[test]
+    fn c57_partnership_requires_mutually_known_delivery_and_links_later_real_projects() {
+        use crate::living::circles::{Kind, Purpose};
+        let (mut w, a, b, plans) = fixture_for(World::circles_campaign(0), Route::Qinghe);
+        w.commit_cooperative_dispatches(&plans);
+        let first = w.cooperation().unwrap().active()[&b].id;
+        assert!(w.circles().unwrap().groups().is_empty());
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().position = w.scenario.shrine;
+        w.unload_regional_cargo(b, false);
+        w.advance_circles();
+        assert!(w.circles().unwrap().groups().is_empty());
+        let hub = w.npcs[&a].position;
+        let cell = DIRECTIONS
+            .into_iter()
+            .filter_map(|d| navigation::moved(hub, d))
+            .find(|&p| w.walkable(p))
+            .unwrap();
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().position = cell;
+        w.advance_obligations();
+        w.advance_circles();
+        let c = w.circles().unwrap();
+        let g = c.group_of(a).unwrap();
+        assert_eq!(g.purpose, Purpose::Partnership);
+        assert!(g.members.contains_key(&b));
+        assert!(
+            c.history()
+                .iter()
+                .any(|e| e.kind == Kind::Formed && e.evidence == Some(first))
+        );
+        let group = g.id;
+        w.tick += 1;
+        w.traffic.as_mut().unwrap().begin_tick();
+        w.npcs.get_mut(&a).unwrap().herbs = 2;
+        w.npcs.get_mut(&b).unwrap().herbs = 0;
+        w.region.as_mut().unwrap().market_herbs = content::MARKET_RESERVE;
+        w.region.as_mut().unwrap().order_remaining = 2;
+        let stock = w.supply.shrine;
+        assert_eq!(w.dispatch_amount(Route::Qinghe, a, b), Some((2, 2)));
+        w.commit_cooperative_dispatches(&plans);
+        let second = w.cooperation().unwrap().active()[&b].id;
+        assert_ne!(first, second);
+        assert_eq!(w.circles().unwrap().projects()[&second].circle, group);
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().position = w.scenario.shrine;
+        w.unload_regional_cargo(b, false);
+        assert_eq!(w.supply.shrine, stock + 2);
+        let c = w.circles().unwrap();
+        assert!(c.projects().is_empty());
+        assert_eq!(c.count(Kind::Project), 1);
+        assert_eq!(c.count(Kind::Delivered), 1);
+        assert!(
+            c.history()
+                .iter()
+                .any(|e| e.kind == Kind::Delivered && e.evidence == Some(second))
+        );
+    }
+
+    #[test]
     fn c56_success_changes_personal_focus_only_when_each_partner_knows() {
         use crate::living::development::{Cause, Focus, ProjectEvidence};
         let (mut w, a, b, plans) = fixture_for(World::development_campaign(0), Route::Qinghe);

@@ -480,8 +480,15 @@ impl World {
                 }
             }
         }
-        proposals
-            .sort_by_key(|&(a, b, r)| (Reverse(r.sample.scarce), Reverse(r.sample.stamp()), a, b));
+        proposals.sort_by_key(|&(a, b, r)| {
+            (
+                Reverse(self.circle_peers(a, b)),
+                Reverse(r.sample.scarce),
+                Reverse(r.sample.stamp()),
+                a,
+                b,
+            )
+        });
         let mut used = BTreeSet::new();
         for (a, b, report) in proposals {
             if used.contains(&a) || used.contains(&b) {
@@ -496,6 +503,7 @@ impl World {
                 used.insert(a);
                 used.insert(b);
                 self.story_account(b, report);
+                self.circle_account(a, b, report);
             }
         }
     }
@@ -532,15 +540,17 @@ impl World {
                     .into_iter()
                     .filter(|&s| available(s))
                     .filter_map(|s| {
-                        self.development_report_lead(n.id(), s).map(|confidence| {
-                            (
-                                self.development()
-                                    .is_some_and(|d| d.efforts().contains_key(&(n.id(), s))),
-                                r.view(n.id(), s, self.tick).low.is_some(),
-                                confidence,
-                                Reverse(s),
-                            )
-                        })
+                        self.development_report_lead(n.id(), s)
+                            .or_else(|| self.circle_report_lead(n.id(), s))
+                            .map(|confidence| {
+                                (
+                                    self.development()
+                                        .is_some_and(|d| d.efforts().contains_key(&(n.id(), s))),
+                                    r.view(n.id(), s, self.tick).low.is_some(),
+                                    confidence,
+                                    Reverse(s),
+                                )
+                            })
                     })
                     .max()
                     .map(|(_, _, _, Reverse(s))| s)
@@ -551,8 +561,9 @@ impl World {
         let n = self.npcs[&id];
         let r = self.rumors().unwrap();
         let status = r.view(id, site, self.tick).status;
-        let extended =
-            status == Status::Reported && self.development_report_lead(id, site).is_some();
+        let extended = status == Status::Reported
+            && (self.development_report_lead(id, site).is_some()
+                || self.circle_report_lead(id, site).is_some());
         if !self.verification_eligible(&n)
             || (status != Status::Contested && !extended)
             || (self.development.is_some()
@@ -620,6 +631,80 @@ mod tests {
         let now = w.tick;
         assert!(w.rumors.as_mut().unwrap().receive(to, from, a, now));
         a
+    }
+
+    #[test]
+    fn c57_actual_peer_report_enables_optional_collective_verification() {
+        use crate::living::{
+            circles::Kind,
+            development::{Focus, Profile},
+        };
+        let mut w = World::circles_campaign(3);
+        w.rumors = Some(Rumors::default());
+        place(&mut w, PLAYER, row(0));
+        place(&mut w, A, row(1));
+        place(&mut w, B, row(2));
+        *w.development.as_mut().unwrap().test_profile_mut(A) = Profile {
+            focus: Focus::Inquiry,
+            inquiry_points: 3,
+            ..Profile::default()
+        };
+        *w.development.as_mut().unwrap().test_profile_mut(B) = Profile {
+            focus: Focus::Vocation,
+            inquiry_points: 2,
+            ..Profile::default()
+        };
+        known(&mut w, A, true, 10);
+        w.social.meet(A, B);
+        w.advance_circles();
+        assert!(w.circles().unwrap().group_of(B).is_some());
+        let before = w.supply;
+        let stock = w.region().unwrap().market_herbs;
+        w.advance_rumors();
+        let c = w.circles().unwrap();
+        let lead = c.leads()[&B];
+        assert_eq!((lead.actor, lead.sponsor, lead.site), (B, A, S));
+        assert_eq!(c.count(Kind::Lead), 1);
+        assert_eq!(
+            w.rumors().unwrap().view(B, S, w.tick).status,
+            Status::Reported
+        );
+        assert!(w.development_report_lead(B, S).is_none());
+        assert!(w.circle_report_lead(B, S).is_some());
+        assert_eq!(
+            w.rumor_goal(&w.npcs[&B], Goal::Patrol),
+            Some(Goal::VerifyRumor(S))
+        );
+        assert!(w.rumor_goal(&w.npcs[&B], Goal::DeliverFreight).is_none());
+        w.npcs.get_mut(&B).unwrap().hp -= 1;
+        assert!(w.rumor_goal(&w.npcs[&B], Goal::Patrol).is_none());
+        w.npcs.get_mut(&B).unwrap().hp += 1;
+        w.traffic.as_mut().unwrap().begin_tick();
+        let pos = w.npcs[&B].position;
+        w.work_verification(B, S);
+        assert!(super::super::navigation::distance(pos, w.npcs[&B].position) <= 1);
+        assert_eq!(
+            w.development().unwrap().efforts()[&(B, S)].extended_ticks,
+            1
+        );
+        w.tick += 1;
+        let site = S.position(&w);
+        place(&mut w, B, site);
+        w.observe_regional(1);
+        assert!(w.circles().unwrap().leads().is_empty());
+        assert_eq!(w.circles().unwrap().count(Kind::Checked), 1);
+        assert_eq!(
+            w.rumors().unwrap().view(B, S, w.tick).status,
+            Status::Verified
+        );
+        assert_eq!(w.region().unwrap().market_herbs, stock);
+        assert_eq!(w.supply, before);
+        assert_eq!(
+            w.development().unwrap().profiles()[&B].focus,
+            Focus::Inquiry
+        );
+        w.observe_regional(1);
+        assert_eq!(w.circles().unwrap().count(Kind::Checked), 1);
     }
 
     #[test]
