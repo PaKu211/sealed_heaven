@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 38 {
+        if self.world.checkpoint_revision() == 39 {
+            World::obligations_campaign(seed)
+        } else if self.world.checkpoint_revision() == 38 {
             World::cooperation_campaign(seed)
         } else if self.world.checkpoint_revision() == 37 {
             World::social_network_campaign(seed)
@@ -158,6 +160,7 @@ impl Session {
                         | "questlog"
                         | "favors"
                         | "favorlog"
+                        | "obligations"
                         | "teams"
                         | "sociallog"
                         | "contacts"
@@ -1113,6 +1116,18 @@ impl Session {
                 };
                 return true;
             }
+            "obligations" if self.world.obligations().is_some() => {
+                let count = argument
+                    .and_then(|n| n.parse::<usize>().ok())
+                    .unwrap_or(12)
+                    .clamp(1, 48);
+                self.notice = self.obligation_lines(count).join("\n");
+                return true;
+            }
+            "obligationdebug" if self.debug_world && self.world.obligations().is_some() => {
+                self.notice = format!("{:?}", self.world.obligations().unwrap());
+                return true;
+            }
             "teams" if self.world.cooperation().is_some() => {
                 let count = argument
                     .and_then(|n| n.parse::<usize>().ok())
@@ -1539,6 +1554,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.obligations().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.obligation.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" obligationdebug");
                     }
                 }
                 if self.world.cooperation().is_some() {
@@ -2188,6 +2211,40 @@ impl Session {
             ],
         )
     }
+    fn obligation_line(&self, e: &sealed_sim::living::obligations::Witnessed) -> String {
+        use sealed_sim::living::obligations::ResultKind;
+        let key = match e.result {
+            ResultKind::Fulfilled => "living.obligation.fulfilled",
+            ResultKind::Released => "living.obligation.released",
+            ResultKind::ChangedCargo => "living.obligation.changed",
+            ResultKind::Expired => "living.obligation.expired",
+            ResultKind::CarrierLost => "living.obligation.lost",
+        };
+        living_format(
+            self.locale,
+            key,
+            &[
+                ("id", &e.id.to_string()),
+                ("at", &e.at.to_string()),
+                ("grower", actor_name(self.locale, &self.world, e.grower)),
+                ("carrier", actor_name(self.locale, &self.world, e.carrier)),
+            ],
+        )
+    }
+    pub(crate) fn obligation_lines(&self, count: usize) -> Vec<String> {
+        let mut rows = self
+            .world
+            .witnessed_obligations()
+            .rev()
+            .take(count)
+            .map(|e| self.obligation_line(e))
+            .collect::<Vec<_>>();
+        if rows.is_empty() {
+            rows.push(living_text(self.locale, "living.obligation.empty").into());
+        }
+        rows
+    }
+
     pub(crate) fn team_lines(&self, count: usize) -> Vec<String> {
         use sealed_sim::living::cooperation::{Evidence, Route};
         let mut rows = self
@@ -4664,6 +4721,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         36 => "checkpoint.c49",
         37 => "checkpoint.c50",
         38 => "checkpoint.c51",
+        39 => "checkpoint.c52",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -4702,12 +4760,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         36 => World::encounter_campaign(0),
         37 => World::social_network_campaign(0),
         38 => World::cooperation_campaign(0),
+        39 => World::obligations_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn obligations_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 39);
+    if seed != 0 {
+        session.world = World::obligations_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_obligations_campaign(seed: u32, debug_world: bool) {
+    run_session(obligations_session(seed, debug_world));
+}
 pub(crate) fn cooperation_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 38);
     if seed != 0 {
@@ -4889,6 +4958,59 @@ fn run_session(mut session: Session) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn c52_witnessed_event_formatting_is_bilingual_without_private_scores() {
+        use sealed_sim::living::obligations::{Evidence, ResultKind, Witnessed};
+        let mut session = obligations_session(42, false);
+        let before = session.world.checkpoint();
+        let mut event = Witnessed {
+            id: 0,
+            grower: ActorId::new(31),
+            carrier: ActorId::new(32),
+            at: 354,
+            place: Position { x: 28, y: 2 },
+            result: ResultKind::Fulfilled,
+            evidence: Evidence::Conversation,
+        };
+        for (result, en, id) in [
+            (
+                ResultKind::Fulfilled,
+                "confirmed delivery to",
+                "mengonfirmasi pengiriman kepada",
+            ),
+            (
+                ResultKind::Released,
+                "promise was released",
+                "janji dilepas",
+            ),
+            (
+                ResultKind::ChangedCargo,
+                "reported changed cargo",
+                "melaporkan perubahan muatan",
+            ),
+            (
+                ResultKind::Expired,
+                "reported an expired promise",
+                "melaporkan janji kedaluwarsa",
+            ),
+        ] {
+            event.result = result;
+            assert!(session.input("lang en"));
+            let line = session.obligation_line(&event);
+            assert!(
+                line.contains(en)
+                    && line.contains("t354 #0:")
+                    && line.contains("Mei Fen")
+                    && line.contains("Bao Jun"),
+                "{line}"
+            );
+            assert!(session.input("lang id"));
+            let line = session.obligation_line(&event);
+            assert!(line.contains(id) && line.contains("t354 #0:"), "{line}");
+        }
+        assert_eq!(session.world.checkpoint(), before);
+    }
 
     #[test]
     fn recovery_keeps_existing_foreign_and_corrupt_saves_intact() {

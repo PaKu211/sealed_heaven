@@ -4219,6 +4219,79 @@
     "parameters": {},
     "surface": "living_pixel.rs"
   },
+  "living.obligation.changed": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {
+      "at": "acknowledgement tick",
+      "carrier": "observed reporting carrier",
+      "grower": "observed recipient of confirmation",
+      "id": "stable project ID"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.obligation.empty": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.obligation.expired": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {
+      "at": "acknowledgement tick",
+      "carrier": "observed reporting carrier",
+      "grower": "observed recipient of confirmation",
+      "id": "stable project ID"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.obligation.fulfilled": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {
+      "at": "acknowledgement tick",
+      "carrier": "observed reporting carrier",
+      "grower": "observed recipient of confirmation",
+      "id": "stable project ID"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.obligation.help": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.obligation.lost": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {
+      "at": "acknowledgement tick",
+      "carrier": "observed reporting carrier",
+      "grower": "observed recipient of confirmation",
+      "id": "stable project ID"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.obligation.pixel.hint": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.obligation.released": {
+    "active": true,
+    "context": "C5.2 witnessed public acknowledgement; no private trust delta, no remote tracking",
+    "parameters": {
+      "at": "acknowledgement tick",
+      "carrier": "observed reporting carrier",
+      "grower": "observed recipient of confirmation",
+      "id": "stable project ID"
+    },
+    "surface": "living_ascii.rs"
+  },
   "living.pixel.draw.4_pledge_5_supply_stonebank_6_renounce": {
     "active": true,
     "context": "pixel.draw",

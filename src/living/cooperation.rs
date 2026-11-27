@@ -41,7 +41,7 @@ impl Route {
             Self::Willowford => expansion::DEPOT,
         }
     }
-    fn destination(self, w: &World) -> Position {
+    pub(super) fn destination(self, w: &World) -> Position {
         match self {
             Self::Qinghe => w.scenario.shrine,
             Self::Willowford => Region::sites().market,
@@ -332,6 +332,7 @@ impl World {
             || self.social.relationship(grower, carrier).refuses_aid()
             || self.social.relationship(carrier, grower).refuses_aid()
             || self.cache_livelihood(b).is_some()
+            || !self.can_offer_commitment(grower, carrier)
         {
             return None;
         }
@@ -449,6 +450,7 @@ impl World {
         c.next_id += 1;
         c.active.insert(b, team);
         c.record(team, at, route.hub(), Outcome::Dispatch, seen);
+        self.open_obligation(team);
     }
     pub(super) fn complete_cooperative_delivery(
         &mut self,
@@ -466,17 +468,19 @@ impl World {
         let place = self.npcs[&carrier].position;
         let success = team.route == route && team.shipment == amount && self.tick < team.deadline;
         let seen = self.player.alive() && self.player_sees(place);
+        let outcome = if success {
+            Outcome::Delivered
+        } else {
+            Outcome::CargoChanged
+        };
         self.cooperation.as_mut().unwrap().close(
             carrier,
             self.tick,
             place,
-            if success {
-                Outcome::Delivered
-            } else {
-                Outcome::CargoChanged
-            },
+            outcome,
             success && seen,
         );
+        self.close_obligation(team, outcome, place);
     }
     /// No physical consequences on cancellation. Actual cargo stays wherever
     /// existing work/combat put it, and blame cannot be inferred remotely.
@@ -503,9 +507,13 @@ impl World {
                 Some((t.carrier, n.position, outcome))
             })
             .collect();
-        let c = self.cooperation.as_mut().unwrap();
         for (id, pos, outcome) in closed {
-            c.close(id, self.tick, pos, outcome, false);
+            let team = self.cooperation().unwrap().active()[&id];
+            self.cooperation
+                .as_mut()
+                .unwrap()
+                .close(id, self.tick, pos, outcome, false);
+            self.close_obligation(team, outcome, pos);
         }
     }
 }
@@ -523,7 +531,9 @@ mod tests {
         )
     }
     fn fixture(route: Route) -> (World, ActorId, ActorId, Vec<Planned>) {
-        let mut w = World::cooperation_campaign(0);
+        fixture_for(World::cooperation_campaign(0), route)
+    }
+    fn fixture_for(mut w: World, route: Route) -> (World, ActorId, ActorId, Vec<Planned>) {
         let (a, b) = find_workers(&w, route);
         let hub = route.hub();
         let pos = DIRECTIONS
@@ -582,6 +592,182 @@ mod tests {
         assert_eq!(w.dispatch_amount(route, a, b), Some((2, 2)), "{route:?}");
         assert_eq!(collect, route.goals().1);
         (w, a, b, plans)
+    }
+
+    #[test]
+    fn c52_completion_requires_local_evidence_and_rewards_once_directionally() {
+        use crate::living::obligations::{Evidence as Proof, ResultKind};
+        for route in [Route::Qinghe, Route::Willowford] {
+            let (mut w, a, b, plans) = fixture_for(World::obligations_campaign(0), route);
+            let original = w.social.relationship(a, b).regard;
+            let reverse = w.social.relationship(b, a);
+            let home = w.npcs[&b].position;
+            w.commit_cooperative_dispatches(&plans);
+            assert_eq!(w.obligations().unwrap().counts(), (1, 0, 0, 0));
+            assert_eq!(
+                w.obligation_delivery_goal(&w.npcs[&b]),
+                Some(match route {
+                    Route::Qinghe => Goal::DeliverFreight,
+                    Route::Willowford => Goal::DeliverFrontierFreight,
+                })
+            );
+            let saved = w.npcs[&b];
+            w.npcs.get_mut(&b).unwrap().hp -= 1;
+            assert!(w.obligation_delivery_goal(&w.npcs[&b]).is_none());
+            w.npcs.insert(b, saved);
+            w.npcs.get_mut(&b).unwrap().fatigue = saved.definition.rest_threshold;
+            assert!(w.obligation_delivery_goal(&w.npcs[&b]).is_none());
+            w.npcs.insert(b, saved);
+            w.tick += 1;
+            w.npcs.get_mut(&b).unwrap().position = route.destination(&w);
+            match route {
+                Route::Qinghe => w.unload_regional_cargo(b, false),
+                Route::Willowford => w.work_frontier(b, Goal::DeliverFrontierFreight),
+            }
+            assert_eq!(w.obligations().unwrap().counts(), (1, 1, 0, 0));
+            assert_eq!(
+                w.obligations().unwrap().pending()[&b].result,
+                ResultKind::Fulfilled
+            );
+            assert!(!w.can_offer_commitment(a, b));
+            let snapshot = w.clone();
+            w.advance_obligations();
+            assert_eq!(w, snapshot);
+            assert_eq!(w.social.relationship(a, b).regard, original);
+            let mut manifest = w.clone();
+            manifest.npcs.get_mut(&a).unwrap().position = route.destination(&w);
+            manifest.npcs.get_mut(&b).unwrap().position = home;
+            manifest.advance_obligations();
+            assert_eq!(manifest.obligations().unwrap().counts(), (1, 1, 1, 0));
+            assert_eq!(manifest.witnessed_obligations().count(), 0);
+            let crate::living::obligations::Event::Acknowledged(ack) =
+                manifest.obligations().unwrap().history().back().unwrap()
+            else {
+                panic!("missing manifest acknowledgement")
+            };
+            assert_eq!(ack.evidence, Proof::Register);
+            w.npcs.get_mut(&b).unwrap().position = home;
+            w.player.position = route.hub();
+            w.tick += 1;
+            w.advance_obligations();
+            assert_eq!(w.social.relationship(a, b).regard, (original + 1).min(8));
+            assert_eq!(w.social.relationship(b, a), reverse);
+            assert_eq!(w.obligations().unwrap().reliability(a, b).fulfilled, 1);
+            assert_eq!(w.obligations().unwrap().counts(), (1, 1, 1, 0));
+            assert!(w.can_offer_commitment(a, b));
+            assert_eq!(
+                w.witnessed_obligations().last().unwrap().evidence,
+                Proof::Conversation
+            );
+            let snapshot = w.clone();
+            w.advance_obligations();
+            assert_eq!(w, snapshot);
+        }
+    }
+
+    #[test]
+    fn c52_unexcused_release_cools_retry_but_disruptions_never_create_blame() {
+        use crate::living::obligations::{REPORT_LIFETIME, RETRY_INTERVAL, ResultKind};
+        for outcome in [
+            Outcome::Withdrawn,
+            Outcome::CargoChanged,
+            Outcome::Expired,
+            Outcome::CarrierLost,
+        ] {
+            let (mut w, a, b, plans) = fixture_for(World::obligations_campaign(0), Route::Qinghe);
+            w.social.link(a, b);
+            let initial = w.social.relationship(a, b).regard;
+            let near = w.npcs[&b].position;
+            w.commit_cooperative_dispatches(&plans);
+            let team = w.cooperation().unwrap().active()[&b];
+            w.npcs.get_mut(&b).unwrap().position = w.scenario.shrine;
+            w.tick += 1;
+            match outcome {
+                Outcome::Withdrawn => {
+                    w.company.as_mut().unwrap().journey = Some(crate::living::Journey {
+                        actor: b,
+                        seen_at: w.tick,
+                        last_seen: w.player.position,
+                    });
+                }
+                Outcome::CargoChanged => {
+                    w.npcs.get_mut(&b).unwrap().herbs -= 1;
+                    w.player.herbs += 1;
+                }
+                Outcome::Expired => w.tick = team.deadline,
+                Outcome::CarrierLost => w.npcs.get_mut(&b).unwrap().hp = 0,
+                _ => unreachable!(),
+            }
+            w.reconcile_cooperation();
+            w.advance_obligations();
+            assert_eq!(w.social.relationship(a, b).regard, initial);
+            assert_eq!(w.obligations().unwrap().counts().1, 1);
+            if outcome == Outcome::CarrierLost {
+                assert_eq!(w.obligations().unwrap().counts(), (1, 1, 0, 1));
+                continue;
+            }
+            let mut missed = w.clone();
+            missed.tick += REPORT_LIFETIME;
+            missed.advance_obligations();
+            assert_eq!(missed.obligations().unwrap().counts(), (1, 1, 0, 1));
+            assert_eq!(missed.social.relationship(a, b).regard, initial);
+            w.npcs.get_mut(&b).unwrap().position = near;
+            w.player.position = Route::Qinghe.hub();
+            w.advance_obligations();
+            let r = w.obligations().unwrap().reliability(a, b);
+            assert_eq!(w.obligations().unwrap().counts(), (1, 1, 1, 0));
+            if outcome == Outcome::Withdrawn {
+                assert_eq!(w.social.relationship(a, b).regard, (initial - 1).max(0));
+                assert_eq!(r.released, 1);
+                assert!(!w.can_offer_commitment(a, b));
+                assert_eq!(
+                    w.witnessed_obligations().last().unwrap().result,
+                    ResultKind::Released
+                );
+                w.tick += RETRY_INTERVAL;
+                assert!(w.can_offer_commitment(a, b));
+            } else {
+                assert_eq!(w.social.relationship(a, b).regard, initial);
+                assert_eq!(r.disrupted + r.expired, 1);
+                assert!(w.can_offer_commitment(a, b));
+            }
+        }
+    }
+
+    #[test]
+    fn c52_natural_commitment_outcomes_and_local_acknowledgement_replay() {
+        let mut opened = 0;
+        let mut acknowledged = 0;
+        for seed in [0, 3, 7, 42] {
+            let mut w = World::obligations_campaign(seed);
+            let mut twin = w.clone();
+            for _ in 0..2000 {
+                assert_eq!(
+                    w.step(w.tick(), Intent::Wait),
+                    twin.step(twin.tick(), Intent::Wait)
+                );
+            }
+            assert_eq!(w, twin);
+            assert_eq!(World::restore(&w.checkpoint()).unwrap(), w);
+            let o = w.obligations().unwrap();
+            let (start, closed, ack, unreported) = o.counts();
+            assert_eq!(
+                start,
+                closed + w.cooperation().unwrap().active().len() as u32
+            );
+            assert_eq!(closed, ack + unreported + o.pending().len() as u32);
+            opened += start;
+            acknowledged += ack;
+            println!(
+                "seed {seed}: {:?}, pending {}",
+                o.counts(),
+                o.pending().len()
+            );
+        }
+        assert!(
+            opened > 0 && acknowledged > 0,
+            "need natural acknowledgement, not only fixtures"
+        );
     }
 
     #[test]

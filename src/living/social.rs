@@ -202,6 +202,16 @@ impl Social {
         }
     }
 
+    /// Verified completion of a material promise: directional regard only.
+    /// Do not erase hostility caused by an unrelated incident.
+    pub(super) fn promise_fulfilled(&mut self, actor: ActorId, other: ActorId) -> i8 {
+        if self.relationship(actor, other).refuses_aid() {
+            0
+        } else {
+            self.adjust(actor, other, 1)
+        }
+    }
+
     fn adjust(&mut self, actor: ActorId, other: ActorId, delta: i8) -> i8 {
         if delta == 0 {
             return 0;
@@ -520,6 +530,7 @@ impl World {
                     | super::Rules::EncounterMemory
                     | super::Rules::SocialNetworks
                     | super::Rules::CollectiveAgency
+                    | super::Rules::DynamicObligations
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

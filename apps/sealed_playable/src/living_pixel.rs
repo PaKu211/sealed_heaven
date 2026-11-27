@@ -9,7 +9,8 @@ use crate::{
     living_ascii::{
         Session, bonds_session, campaign_session, cooperation_session, encounter_session,
         expanded_session, favors_session, generated_session, history_session, knowledge_session,
-        lod_session, outcome_label, production_session, requests_session, social_network_session,
+        lod_session, obligations_session, outcome_label, production_session, requests_session,
+        social_network_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -65,6 +66,10 @@ pub(crate) fn run_requests(seed: u32) {
 
 pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
+}
+
+pub(crate) fn run_obligations(seed: u32) {
+    run_session(obligations_session(seed, false));
 }
 
 pub(crate) fn run_cooperation(seed: u32) {
@@ -175,6 +180,12 @@ fn keyboard(
         game.session.input("sociallog 2");
     } else if keys.just_pressed(KeyCode::F3) && game.session.world.regional_news().is_some() {
         game.session.input("newsnext");
+    } else if game.session.world.obligations().is_some()
+        && keys.just_pressed(KeyCode::F4)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+        && (keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight))
+    {
+        game.session.input("obligations 2");
     } else if game.session.world.cooperation().is_some()
         && keys.just_pressed(KeyCode::F4)
         && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
@@ -423,7 +434,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     if world.favors().is_some() {
         label(
             &mut commands,
-            tr(if world.cooperation().is_some() {
+            tr(if world.obligations().is_some() {
+                "living.obligation.pixel.hint"
+            } else if world.cooperation().is_some() {
                 "living.team.pixel.hint"
             } else if world.social_network().is_some() {
                 "living.network.pixel.hint"
@@ -1741,6 +1754,67 @@ mod tests {
         assert!(text(&mut app).contains("Catatan t37 #0:"));
         press(&mut app, KeyCode::F4, false);
         assert!(!text(&mut app).contains("Catatan t37 #0:"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+    }
+
+    #[test]
+    fn c52_promise_keyboard_projection_keeps_old_team_controls_and_private_state() {
+        let mut session = obligations_session(3, false);
+        for _ in 0..120 {
+            assert!(session.input("wait"));
+        }
+        for cmd in ["east", "east", "south"] {
+            assert!(session.input(cmd));
+        }
+        assert!(session.world.known_cooperation().next().is_some());
+        assert!(session.world.witnessed_obligations().next().is_none());
+        let before = session.world.checkpoint();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let press = |app: &mut App, key, ctrl: bool, shift: bool| {
+            {
+                let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                keys.clear();
+                keys.release(KeyCode::ControlLeft);
+                keys.release(KeyCode::ShiftLeft);
+                if ctrl {
+                    keys.press(KeyCode::ControlLeft);
+                }
+                if shift {
+                    keys.press(KeyCode::ShiftLeft);
+                }
+                keys.release(key);
+                keys.press(key);
+            }
+            app.update();
+        };
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("Ctrl+Shift+F4 promises"));
+        press(&mut app, KeyCode::F4, true, true);
+        assert!(text(&mut app).contains("No witnessed promise acknowledgements yet."));
+        press(&mut app, KeyCode::F4, true, false);
+        assert!(text(&mut app).contains("Receipt t37 #0:"));
+        press(&mut app, KeyCode::Tab, false, false);
+        press(&mut app, KeyCode::F4, true, true);
+        assert!(text(&mut app).contains("Belum ada konfirmasi janji yang disaksikan."));
+        press(&mut app, KeyCode::F4, true, false);
+        assert!(text(&mut app).contains("Catatan t37 #0:"));
         assert_eq!(
             app.world().resource::<Game>().session.world.checkpoint(),
             before

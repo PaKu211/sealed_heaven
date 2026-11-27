@@ -458,6 +458,11 @@ impl World {
                 care.then_some(Goal::SeekCare),
                 DecisionReason::PhysicalRecovery,
             ),
+            (
+                49,
+                self.obligation_delivery_goal(npc),
+                DecisionReason::InstitutionalObligation,
+            ),
             (20, Some(duty), ambition_reason(npc, duty)),
         ];
         let (score, _, goal, reason) = plans
@@ -536,6 +541,7 @@ impl World {
             || self.injuries()?.people[&id].injured()
             || self.character_agency()?.people[&id].suspended.is_some()
             || self.company_goal(npc).is_some()
+            || self.obligation_delivery_goal(npc).is_some()
             || self.martial_goal(npc).is_some()
             || self.npc_meridian_goal(id).is_some()
             || self.report_goal(npc).is_some()

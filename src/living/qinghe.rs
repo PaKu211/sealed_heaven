@@ -16,6 +16,7 @@ pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
             | Rules::EncounterMemory
             | Rules::SocialNetworks
             | Rules::CollectiveAgency
+            | Rules::DynamicObligations
     ) {
         return super::expansion::scenario(seed);
     }

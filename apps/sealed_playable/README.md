@@ -2,7 +2,7 @@
 
 ## Current regional campaign
 
-C5.1: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c51 --pixel`. Omit `--pixel` for ASCII. `teams` / Ctrl+F4 show known cooperative freight history; save slot `checkpoint.c51`. See the [C5.1 specification](../../C5_1_EMERGENT_COOPERATION.md). The C0.4 material below is retained as historical documentation.
+C5.2: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c52 --pixel`. Omit `--pixel` for ASCII. `obligations` / Ctrl+Shift+F4 show witnessed promise acknowledgements; save slot `checkpoint.c52`. See the [C5.2 specification](../../C5_2_DYNAMIC_OBLIGATIONS.md). The C0.4 material below is retained as historical documentation.
 
 **Current acceptance: C0.4 independent audit PASS.**
 Native evidence is `../../docs/evidence/c04-native-acceptance/`. The verdict is
