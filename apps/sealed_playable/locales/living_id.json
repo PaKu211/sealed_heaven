@@ -550,5 +550,19 @@
   "living.reset.ok": "Memulai desa baru.",
   "living.save.error": "Gagal menyimpan — {error}",
   "living.save.foreign": "Simpanan yang ada milik kampanye lain.",
-  "living.save.ok": "Desa tersimpan."
+  "living.save.ok": "Desa tersimpan.",
+  "living.worldgen.help": "C4.0: sungai berdasarkan seed memisahkan permukiman. Cari jembatan. Gunakan survey untuk mengamati medan dan Qi setempat; seed N sebelum giliran pertama memilih geografi.",
+  "living.worldgen.legend": "Seed {seed} | ~ sungai | % jembatan | : jalan | ; hutan kecil | , padang rumput | survey",
+  "living.worldgen.no_survey": "Kamu tidak dapat mengamati medan.",
+  "living.worldgen.pixel.hint": "Seed {seed} | F2: amati medan setempat",
+  "living.worldgen.regrowth": "Herba setempat tumbuh kembali setiap {turns} giliran saat stok di bawah kapasitas.",
+  "living.worldgen.survey": "{terrain} | elevasi {elevation}/100 | kelembapan {moisture}/100 | Qi {qi}/100",
+  "living.worldgen.terrain.bridge": "Jembatan",
+  "living.worldgen.terrain.ground": "Tanah permukiman",
+  "living.worldgen.terrain.meadow": "Padang rumput",
+  "living.worldgen.terrain.river": "Sungai",
+  "living.worldgen.terrain.road": "Jalan",
+  "living.worldgen.terrain.rock": "Batuan",
+  "living.worldgen.terrain.wall": "Tembok",
+  "living.worldgen.terrain.woodland": "Hutan kecil"
 }

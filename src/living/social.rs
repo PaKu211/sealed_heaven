@@ -164,6 +164,11 @@ impl Social {
         self.body_reports.values()
     }
 
+    /// Aggregate held recovery cargo for conservation checks.
+    pub fn recovery_cargo_total(&self) -> u32 {
+        self.recovery_cargo.values().sum()
+    }
+
     pub fn recoveries(&self) -> &[RecoveryEvent] {
         &self.recoveries
     }
@@ -493,6 +498,7 @@ impl World {
                     | super::Rules::AutonomousAgency
                     | super::Rules::SectHierarchy
                     | super::Rules::DutyCoherence
+                    | super::Rules::GeneratedRiverlands
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

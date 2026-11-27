@@ -3,6 +3,11 @@ use super::{Rules, Scenario, checkpoint, content};
 pub(super) use content::SCENARIO_QINGHE as QINGHE;
 
 pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
-    content::scenario_for_revision(checkpoint::revision(rules), seed)
+    let revision = if rules == Rules::GeneratedRiverlands {
+        super::worldgen::BASE_REVISION
+    } else {
+        checkpoint::revision(rules)
+    };
+    content::scenario_for_revision(revision, seed)
         .expect("every supported rules revision has a content binding")
 }

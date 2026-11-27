@@ -43,12 +43,16 @@ pub fn definition(id: &str) -> Option<&'static Definition> {
 /// All historical revisions are permanently bound to the exact v1 pack.
 /// Never guess content identity for an unknown future revision.
 pub fn identity_for_revision(revision: u16) -> Option<ContentIdentity> {
-    (1..=26).contains(&revision).then_some(ContentIdentity {
-        schema_version: SCHEMA_VERSION,
-        core_version: CORE_VERSION,
-        world_version: CONTENT_VERSION,
-        sha256: CONTENT_SHA256,
-    })
+    // Revision 27 derives its geography from this exact authored v1 pack.
+    // The separate generator version and world digest bind the generated map.
+    (1..=super::worldgen::GENERATED_REVISION)
+        .contains(&revision)
+        .then_some(ContentIdentity {
+            schema_version: SCHEMA_VERSION,
+            core_version: CORE_VERSION,
+            world_version: CONTENT_VERSION,
+            sha256: CONTENT_SHA256,
+        })
 }
 
 /// Diagnostics only; does not construct or advance a world.

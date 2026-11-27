@@ -6,7 +6,7 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 
 use crate::{
     clock,
-    living_ascii::{Session, campaign_session, outcome_label},
+    living_ascii::{Session, campaign_session, generated_session, outcome_label},
     locale::Locale,
     locale_living::{living_format, living_text},
 };
@@ -28,9 +28,17 @@ struct Game {
 struct Projection;
 
 pub(crate) fn run() {
+    run_session(campaign_session(false, 26));
+}
+
+pub(crate) fn run_generated(seed: u32) {
+    run_session(generated_session(seed, false));
+}
+
+fn run_session(session: Session) {
     App::new()
         .insert_resource(Game {
-            session: campaign_session(false, 26),
+            session,
             target: None,
         })
         .insert_resource(ClearColor(Color::srgb(0.048, 0.062, 0.065)))
@@ -105,6 +113,8 @@ fn keyboard(
         if let Ok(mut window) = windows.single_mut() {
             window.title = living_text(game.session.locale, "living.pixel.window.title").to_owned();
         }
+    } else if keys.just_pressed(KeyCode::F2) && game.session.world.generated_region().is_some() {
+        game.session.input("survey");
     } else if keys.just_pressed(KeyCode::KeyT) {
         let nearby = nearby(&game.session);
         let next = nearby
@@ -221,6 +231,19 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
         ));
     }
     label(&mut commands, stats, 219.0, 16.0, OCHRE);
+    if let Some(map) = world.generated_region() {
+        label(
+            &mut commands,
+            living_format(
+                session.locale,
+                "living.worldgen.pixel.hint",
+                &[("seed", &map.seed().to_string())],
+            ),
+            190.0,
+            14.0,
+            INK,
+        );
+    }
 
     let width = scenario.width.min(17);
     let left = player
@@ -239,6 +262,11 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
             let tile_color = match symbol {
                 '?' => FOG,
                 '#' => STONE,
+                '~' => Color::srgb(0.12, 0.28, 0.43),
+                '%' => Color::srgb(0.42, 0.29, 0.16),
+                ':' => Color::srgb(0.34, 0.30, 0.21),
+                ';' => Color::srgb(0.10, 0.22, 0.14),
+                ',' => Color::srgb(0.28, 0.38, 0.23),
                 _ if (x + y) % 2 == 0 => MOSS,
                 _ => Color::srgb(0.21, 0.29, 0.24),
             };
@@ -388,7 +416,22 @@ fn draw_icon(commands: &mut Commands, at: Vec2, symbol: char) {
             Color::srgb(0.56, 0.31, 0.27),
             INK,
         ),
-        '?' | '.' => return,
+        '~' => (
+            &["01010", "10101", "01010", "10101"][..],
+            Color::srgb(0.21, 0.49, 0.65),
+            Color::srgb(0.48, 0.71, 0.80),
+        ),
+        '%' => (
+            &["11111", "22222", "11111", "22222"][..],
+            OCHRE,
+            Color::srgb(0.52, 0.38, 0.24),
+        ),
+        ';' => (
+            &["00100", "01110", "11111", "00100", "00100"][..],
+            Color::srgb(0.34, 0.55, 0.28),
+            OCHRE,
+        ),
+        '?' | '.' | ':' | ',' => return,
         _ => (
             &["01110", "01210", "01110", "11111", "01010"][..],
             Color::srgb(0.42, 0.62, 0.68),
@@ -480,5 +523,76 @@ mod tests {
             app.world().resource::<Game>().session.world.checkpoint(),
             before
         );
+    }
+
+    #[test]
+    fn generated_pixel_projection_and_survey_preserve_world_and_hide_unseen_terrain() {
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session: generated_session(7, false),
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let before = app.world().resource::<Game>().session.world.checkpoint();
+        let session = &app.world().resource::<Game>().session;
+        assert_eq!(session.tile_symbol(Position { x: 16, y: 4 }), '?');
+        assert_eq!(session.world.checkpoint_revision(), 27);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F2);
+        app.update();
+        assert!(
+            app.world()
+                .resource::<Game>()
+                .session
+                .notice
+                .contains("elevation")
+        );
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("F2: survey"));
+        assert!(text(&mut app).contains("elevation"));
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .clear();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Tab);
+        app.update();
+        assert!(text(&mut app).contains("F2: amati"));
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .clear();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .release(KeyCode::F2);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F2);
+        app.update();
+        assert!(text(&mut app).contains("elevasi"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+
+        // The renderer uses the same generated tile map when the explicitly
+        // requested developer projection removes fog.
+        let session = generated_session(7, true);
+        let map = session.world.generated_region().unwrap();
+        for y in 0..9 {
+            for x in 12..21 {
+                let p = Position { x, y };
+                assert_eq!(session.tile_symbol(p), map.tile(p).unwrap().terrain.glyph());
+            }
+        }
     }
 }

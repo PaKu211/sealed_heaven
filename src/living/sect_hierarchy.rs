@@ -285,7 +285,7 @@ impl World {
         match member.duty {
             SectDuty::Unassigned => {
                 // Defensive revalidation of a duty plan at execution time.
-                if self.rules == super::Rules::DutyCoherence && self.companion(actor).is_some() {
+                if self.rules.has_duty_coherence() && self.companion(actor).is_some() {
                     return;
                 }
                 if !self.hall_leader_on_duty_for(actor) {

@@ -41,6 +41,7 @@ mod social;
 #[cfg(test)]
 mod tests;
 mod traffic;
+pub mod worldgen;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -373,6 +374,7 @@ pub struct Scenario {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct World {
     scenario: &'static Scenario,
+    generated: Option<std::sync::Arc<worldgen::GeneratedRegion>>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -429,9 +431,14 @@ enum Rules {
     AutonomousAgency,
     SectHierarchy,
     DutyCoherence,
+    GeneratedRiverlands,
 }
 
 impl Rules {
+    fn has_duty_coherence(self) -> bool {
+        matches!(self, Self::DutyCoherence | Self::GeneratedRiverlands)
+    }
+
     fn has_region(self) -> bool {
         self == Self::Riverlands || self.has_school()
     }
@@ -462,6 +469,7 @@ impl Rules {
                 | Self::AutonomousAgency
                 | Self::SectHierarchy
                 | Self::DutyCoherence
+                | Self::GeneratedRiverlands
         )
     }
 }
@@ -568,8 +576,18 @@ impl World {
         Self::seeded(seed, Rules::DutyCoherence)
     }
 
+    /// C4.0: generated regional geography, with the existing living society.
+    pub fn generated_riverlands(seed: u32) -> Self {
+        Self::seeded(seed, Rules::GeneratedRiverlands)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
+        if rules == Rules::GeneratedRiverlands {
+            world.generated = Some(std::sync::Arc::new(
+                worldgen::GeneratedRegion::from_scenario(seed, world.scenario),
+            ));
+        }
         assert!(
             Region::sites()
                 .positions()
@@ -592,6 +610,7 @@ impl World {
         );
         Self {
             scenario,
+            generated: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -629,6 +648,7 @@ impl World {
                         | Rules::AutonomousAgency
                         | Rules::SectHierarchy
                         | Rules::DutyCoherence
+                        | Rules::GeneratedRiverlands
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -666,6 +686,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(Company::default),
             rivalry: matches!(
@@ -691,6 +712,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -715,6 +737,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(Politics::new),
             traffic: matches!(
@@ -738,6 +761,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -760,6 +784,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -779,6 +804,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -797,6 +823,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(Information::default),
             contested: matches!(
@@ -809,6 +836,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(|| {
                 Contested::new(matches!(
@@ -820,6 +848,7 @@ impl World {
                         | Rules::AutonomousAgency
                         | Rules::SectHierarchy
                         | Rules::DutyCoherence
+                        | Rules::GeneratedRiverlands
                 ))
             }),
             martial: matches!(
@@ -830,6 +859,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -839,6 +869,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -847,15 +878,22 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
                 rules,
-                Rules::AutonomousAgency | Rules::SectHierarchy | Rules::DutyCoherence
+                Rules::AutonomousAgency
+                    | Rules::SectHierarchy
+                    | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
             .then(|| CharacterAgency::new(scenario)),
-            sect_hierarchy: matches!(rules, Rules::SectHierarchy | Rules::DutyCoherence)
-                .then(|| SectHierarchy::new(scenario)),
+            sect_hierarchy: matches!(
+                rules,
+                Rules::SectHierarchy | Rules::DutyCoherence | Rules::GeneratedRiverlands
+            )
+            .then(|| SectHierarchy::new(scenario)),
         }
     }
 
@@ -943,12 +981,23 @@ impl World {
         self.latest
     }
 
+    pub fn generated_region(&self) -> Option<&worldgen::GeneratedRegion> {
+        self.generated.as_deref()
+    }
+
     pub fn walkable(&self, position: Position) -> bool {
-        self.scenario.walkable(position)
+        self.generated_region().map_or_else(
+            || self.scenario.walkable(position),
+            |map| map.walkable(position),
+        )
     }
 
     pub fn can_see(&self, from: Position, to: Position) -> bool {
-        navigation::can_see(self.scenario, from, to)
+        if let Some(map) = self.generated_region() {
+            navigation::can_see_with(from, to, |p| map.walkable(p))
+        } else {
+            navigation::can_see(self.scenario, from, to)
+        }
     }
 
     pub fn player_sees(&self, target: Position) -> bool {
@@ -1012,6 +1061,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1033,6 +1083,7 @@ impl World {
                     | Rules::AutonomousAgency
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1234,6 +1285,7 @@ impl World {
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
+                | Rules::GeneratedRiverlands
         )
     }
 
@@ -1252,6 +1304,7 @@ impl World {
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
+                | Rules::GeneratedRiverlands
         )
     }
 
@@ -1269,6 +1322,7 @@ impl World {
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
+                | Rules::GeneratedRiverlands
         )
     }
 
@@ -1285,6 +1339,7 @@ impl World {
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
+                | Rules::GeneratedRiverlands
         )
     }
 
@@ -1300,6 +1355,7 @@ impl World {
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
+                | Rules::GeneratedRiverlands
         )
     }
 
@@ -1313,6 +1369,7 @@ impl World {
                 | Rules::AutonomousAgency
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
+                | Rules::GeneratedRiverlands
         )
     }
 
@@ -1420,9 +1477,11 @@ impl World {
     }
 
     fn regrow(&mut self) {
-        if self.tick.is_multiple_of(self.scenario.regrow_every)
-            && self.supply.source < self.scenario.initial_source
-        {
+        let cadence = self.generated_region().map_or(
+            self.scenario.regrow_every,
+            worldgen::GeneratedRegion::west_regrow_every,
+        );
+        if self.tick.is_multiple_of(cadence) && self.supply.source < self.scenario.initial_source {
             self.supply.source += 1;
             self.supply.regrown += 1;
         }

@@ -550,5 +550,19 @@
   "living.reset.ok": "Started a new settlement.",
   "living.save.error": "Save failed — {error}",
   "living.save.foreign": "Existing save belongs to another campaign.",
-  "living.save.ok": "Saved the settlement."
+  "living.save.ok": "Saved the settlement.",
+  "living.worldgen.help": "C4.0: a seeded river divides the settlements. Find a bridge. Use survey to inspect local terrain and Qi; seed N before the first turn selects geography.",
+  "living.worldgen.legend": "Seed {seed} | ~ river | % bridge | : road | ; woodland | , meadow | survey",
+  "living.worldgen.no_survey": "You cannot survey the terrain.",
+  "living.worldgen.pixel.hint": "Seed {seed} | F2: survey local terrain",
+  "living.worldgen.regrowth": "Local herbs regrow every {turns} turns when below capacity.",
+  "living.worldgen.survey": "{terrain} | elevation {elevation}/100 | moisture {moisture}/100 | Qi {qi}/100",
+  "living.worldgen.terrain.bridge": "Bridge",
+  "living.worldgen.terrain.ground": "Settlement ground",
+  "living.worldgen.terrain.meadow": "Meadow",
+  "living.worldgen.terrain.river": "River",
+  "living.worldgen.terrain.road": "Road",
+  "living.worldgen.terrain.rock": "Rock",
+  "living.worldgen.terrain.wall": "Wall",
+  "living.worldgen.terrain.woodland": "Woodland"
 }

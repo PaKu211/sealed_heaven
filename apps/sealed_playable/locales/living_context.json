@@ -3854,5 +3854,100 @@
     "context": "save / ok",
     "source": "phase A",
     "surface": "living"
+  },
+  "living.worldgen.help": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.legend": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {
+      "seed": "C4.0 local world observation"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.no_survey": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.pixel.hint": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {
+      "seed": "C4.0 local world observation"
+    },
+    "surface": "living_pixel.rs"
+  },
+  "living.worldgen.regrowth": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {
+      "turns": "C4.0 local world observation"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.survey": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {
+      "elevation": "C4.0 local world observation",
+      "moisture": "C4.0 local world observation",
+      "qi": "C4.0 local world observation",
+      "terrain": "C4.0 local world observation"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.bridge": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.ground": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.meadow": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.river": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.road": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.rock": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.wall": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.worldgen.terrain.woodland": {
+    "active": true,
+    "context": "C4.0 regional worldgen projection",
+    "parameters": {},
+    "surface": "living_ascii.rs"
   }
 }

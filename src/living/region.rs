@@ -169,15 +169,17 @@ impl World {
     }
 
     pub(super) fn advance_region(&mut self) {
+        let garden_cadence = self.generated_region().map_or(
+            GARDEN_REGROW_EVERY,
+            super::worldgen::GeneratedRegion::garden_regrow_every,
+        );
         let shortage = if self.region.is_some() && self.tick.is_multiple_of(ORDER_INTERVAL) {
             Some(self.west_shortage())
         } else {
             None
         };
         if let Some(region) = &mut self.region {
-            if self.tick.is_multiple_of(GARDEN_REGROW_EVERY)
-                && region.garden_herbs < GARDEN_CAPACITY
-            {
+            if self.tick.is_multiple_of(garden_cadence) && region.garden_herbs < GARDEN_CAPACITY {
                 region.garden_herbs += 1;
                 region.garden_regrown += 1;
             }

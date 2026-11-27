@@ -26,7 +26,15 @@ pub(super) fn in_reach(from: Position, to: Position) -> bool {
 
 /// Integer line of sight. A diagonal step cannot peek around an opaque corner.
 pub(super) fn can_see(scenario: &Scenario, from: Position, to: Position) -> bool {
-    if !scenario.walkable(from) || !scenario.walkable(to) {
+    can_see_with(from, to, |p| scenario.walkable(p))
+}
+
+pub(super) fn can_see_with(
+    from: Position,
+    to: Position,
+    walkable: impl Fn(Position) -> bool,
+) -> bool {
+    if !walkable(from) || !walkable(to) {
         return false;
     }
     let (mut x, mut y) = (i64::from(from.x), i64::from(from.y));
@@ -34,7 +42,7 @@ pub(super) fn can_see(scenario: &Scenario, from: Position, to: Position) -> bool
     let (dx, dy) = ((end_x - x).abs(), (end_y - y).abs());
     let (sx, sy) = ((end_x - x).signum(), (end_y - y).signum());
     let (mut crossed_x, mut crossed_y) = (0i64, 0i64);
-    let open = |x, y| scenario.walkable(position(x as u32, y as u32));
+    let open = |x, y| walkable(position(x as u32, y as u32));
     while (x, y) != (end_x, end_y) {
         let horizontal = i128::from(2 * crossed_x + 1) * i128::from(dy);
         let vertical = i128::from(2 * crossed_y + 1) * i128::from(dx);

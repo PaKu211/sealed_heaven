@@ -1,6 +1,7 @@
 //! Qinghe's turn-based ASCII client, with previous milestones available explicitly.
 #[cfg(feature = "desktop")]
 mod agency_desktop;
+mod worldgen_cli;
 
 fn main() {
     let options: Vec<_> = std::env::args().skip(1).collect();
@@ -10,6 +11,21 @@ fn main() {
             std::process::exit(2);
         }
         println!("{}", sealed_sim::living::content::manifest_json());
+        return;
+    }
+    if options
+        .iter()
+        .any(|arg| arg == "--worldgen-info" || arg == "--c40")
+    {
+        let result = if options.iter().any(|arg| arg == "--worldgen-info") {
+            worldgen_cli::inspect(&options)
+        } else {
+            worldgen_cli::launch(&options)
+        };
+        if let Err(error) = result {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
         return;
     }
     if options.iter().any(|arg| arg == "--pixel") {

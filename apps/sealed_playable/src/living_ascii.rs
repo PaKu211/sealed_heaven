@@ -42,7 +42,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 26 {
+        if self.world.checkpoint_revision() == 27 {
+            World::generated_riverlands(seed)
+        } else if self.world.checkpoint_revision() == 26 {
             World::duty_coherence_campaign(seed)
         } else if self.world.sect_hierarchy().is_some() {
             World::sect_hierarchy_campaign(seed)
@@ -1067,8 +1069,12 @@ impl Session {
                 };
                 return true;
             }
+            "survey" if self.world.generated_region().is_some() => {
+                self.notice = self.survey();
+                return true;
+            }
             "help" => {
-                self.notice = if self.world.checkpoint_revision() == 26 {
+                self.notice = if self.world.checkpoint_revision() >= 26 {
                     living_text(self.locale, "living.help.c351")
                 } else if self.world.sect_hierarchy().is_some() {
                     living_text(
@@ -1174,6 +1180,11 @@ impl Session {
                     )
                 }
                 .into();
+                if self.world.generated_region().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.worldgen.help"));
+                }
                 return true;
             }
             "lang" => {
@@ -1698,6 +1709,67 @@ impl Session {
     }
 
     /// Both presentation modes project the same observation rules.
+    fn survey(&self) -> String {
+        use sealed_sim::living::worldgen::Terrain;
+        let player = self.world.player();
+        let Some(map) = self.world.generated_region().filter(|_| player.alive()) else {
+            return living_text(self.locale, "living.worldgen.no_survey").into();
+        };
+        let Some(tile) = map.tile(player.position) else {
+            return living_text(self.locale, "living.worldgen.no_survey").into();
+        };
+        let key = match tile.terrain {
+            Terrain::Ground => "living.worldgen.terrain.ground",
+            Terrain::Wall => "living.worldgen.terrain.wall",
+            Terrain::Meadow => "living.worldgen.terrain.meadow",
+            Terrain::Woodland => "living.worldgen.terrain.woodland",
+            Terrain::Rock => "living.worldgen.terrain.rock",
+            Terrain::River => "living.worldgen.terrain.river",
+            Terrain::Road => "living.worldgen.terrain.road",
+            Terrain::Bridge => "living.worldgen.terrain.bridge",
+        };
+        let mut result = living_format(
+            self.locale,
+            "living.worldgen.survey",
+            &[
+                ("terrain", living_text(self.locale, key)),
+                ("elevation", &tile.elevation.to_string()),
+                ("moisture", &tile.moisture.to_string()),
+                ("qi", &tile.qi.to_string()),
+            ],
+        );
+        let near = |site: Position| {
+            player.position.x.abs_diff(site.x) + player.position.y.abs_diff(site.y) <= 1
+                && self.world.player_sees(site)
+        };
+        let cadence = if near(self.world.scenario().patch) {
+            Some(map.west_regrow_every())
+        } else if near(Region::sites().garden) {
+            Some(map.garden_regrow_every())
+        } else {
+            None
+        };
+        if let Some(cadence) = cadence {
+            result.push(' ');
+            result.push_str(&living_format(
+                self.locale,
+                "living.worldgen.regrowth",
+                &[("turns", &cadence.to_string())],
+            ));
+        }
+        result
+    }
+
+    fn ground_symbol(&self, cell: Position) -> char {
+        if let Some(tile) = self.world.generated_region().and_then(|map| map.tile(cell)) {
+            tile.terrain.glyph()
+        } else if self.world.walkable(cell) {
+            '.'
+        } else {
+            '#'
+        }
+    }
+
     pub(crate) fn tile_symbol(&self, cell: Position) -> char {
         let world = &self.world;
         let scenario = world.scenario();
@@ -1717,7 +1789,11 @@ impl Session {
                 .into_iter()
                 .flatten()
                 .any(|neighbor| world.player_sees(neighbor));
-            return if wall_edge { '#' } else { '?' };
+            return if wall_edge {
+                self.ground_symbol(cell)
+            } else {
+                '?'
+            };
         }
         if let Some(npc) = world.npcs().find(|npc| npc.alive() && npc.position == cell) {
             return npc.definition.glyph;
@@ -1746,7 +1822,7 @@ impl Session {
                 return '^';
             }
         }
-        if world.walkable(cell) { '.' } else { '#' }
+        self.ground_symbol(cell)
     }
 
     fn frame(&self) -> String {
@@ -1878,6 +1954,17 @@ impl Session {
             "{}",
             tr("living.ascii.frame.you_herb_patch_shrine_clinic_wall_x")
         );
+        if let Some(map) = world.generated_region() {
+            let _ = writeln!(
+                out,
+                "{}",
+                living_format(
+                    self.locale,
+                    "living.worldgen.legend",
+                    &[("seed", &map.seed().to_string())]
+                )
+            );
+        }
         for npc in world.npcs().filter(|npc| visible(npc.position)) {
             let status = if !npc.alive() {
                 tr("living.ascii.frame.fallen")
@@ -3356,6 +3443,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         24 => "checkpoint.c34",
         25 => "checkpoint.c35",
         26 => "checkpoint.c351",
+        27 => "checkpoint.c40",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3382,14 +3470,30 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         24 => World::autonomous_agency(0),
         25 => World::sect_hierarchy_campaign(0),
         26 => World::duty_coherence_campaign(0),
+        27 => World::generated_riverlands(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn generated_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 27);
+    if seed != 0 {
+        session.world = World::generated_riverlands(seed);
+    }
+    session
+}
+
+pub(crate) fn run_generated_campaign(seed: u32, debug_world: bool) {
+    run_session(generated_session(seed, debug_world));
+}
+
 fn run_campaign(debug_world: bool, revision: u16) {
-    let mut session = campaign_session(debug_world, revision);
+    run_session(campaign_session(debug_world, revision));
+}
+
+fn run_session(mut session: Session) {
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
         println!("{}", session.frame());
         // Semicolons support explicit IDs. A comma or whitespace sequence of
