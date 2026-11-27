@@ -6,6 +6,7 @@ mod living_ascii;
 #[cfg(feature = "desktop")]
 mod living_pixel;
 pub mod locale;
+pub mod locale_living;
 pub mod persistence;
 pub mod supply;
 pub mod view;

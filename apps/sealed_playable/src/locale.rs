@@ -360,7 +360,10 @@ impl<'de> Deserialize<'de> for Dictionary {
     }
 }
 
-fn parse_dictionary(code: &str, source: &str) -> Result<BTreeMap<String, String>, String> {
+pub(crate) fn parse_dictionary(
+    code: &str,
+    source: &str,
+) -> Result<BTreeMap<String, String>, String> {
     serde_json::from_str::<Dictionary>(source)
         .map(|dictionary| dictionary.0)
         .map_err(|error| format!("{code}: {error}"))

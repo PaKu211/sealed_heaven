@@ -1,0 +1,15 @@
+{
+  "living.background.herbalist": "Pemetik herba",
+  "living.background.peddler": "Pedagang keliling",
+  "living.background.wanderer": "Pengembara",
+  "living.help.c351": "C3.5.1: Anggota Balai Alang-alang menuntaskan pengantaran dan laporan tugas kuil sebelum bergabung dengan rombonganmu. Mereka tidak menerima tugas pengantaran balai baru saat menemanimu. sect dan sectlog menampilkan pangkat yang diketahui serta peristiwa yang disaksikan; duty, drill, drawqi, study dan allocate tetap mengikuti aturan C3.5. Gunakan --c35 untuk simpanan C3.5 asli.",
+  "living.intent.unrecordable": "Perintah ini tidak dapat direkam secara utuh dalam kampanye ini.",
+  "living.load.error": "Gagal memuat — {error}",
+  "living.load.foreign": "Simpanan milik kampanye lain.",
+  "living.load.legacy": "Untuk simpanan C0.9, gunakan --c09 dan lokasi simpan aslinya.",
+  "living.load.ok": "Desa berhasil dimuat.",
+  "living.reset.ok": "Memulai desa baru.",
+  "living.save.error": "Gagal menyimpan — {error}",
+  "living.save.foreign": "Simpanan yang ada milik kampanye lain.",
+  "living.save.ok": "Desa tersimpan."
+}

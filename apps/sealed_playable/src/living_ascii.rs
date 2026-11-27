@@ -15,7 +15,12 @@ use sealed_sim::living::{
     SectDuty, SectEventKind, StepError, TrafficEventKind, World,
 };
 
-use crate::{clock, locale::Locale, persistence};
+use crate::{
+    clock,
+    locale::Locale,
+    locale_living::{living_format, living_text},
+    persistence,
+};
 
 pub(crate) struct Session {
     pub(crate) world: World,
@@ -975,9 +980,7 @@ impl Session {
             }
             "help" => {
                 self.notice = if self.world.checkpoint_revision() == 26 {
-                    text(self.locale,
-                        "C3.5.1: Reed Hall members finish active shrine deliveries and reports before joining your company. They cannot accept new Hall delivery duties while accompanying you. sect and sectlog inspect known rank and witnessed events; duty, drill, drawqi, study and allocate retain their C3.5 rules. Use --c35 for the original C3.5 save.",
-                        "C3.5.1: Anggota Balai Alang-alang menuntaskan pengantaran dan laporan tugas kuil sebelum bergabung dengan rombonganmu. Mereka tidak menerima tugas pengantaran balai baru saat menemanimu. sect dan sectlog menampilkan pangkat yang diketahui serta peristiwa yang disaksikan; duty, drill, drawqi, study dan allocate tetap mengikuti aturan C3.5. Gunakan --c35 untuk simpanan C3.5 asli.")
+                    living_text(self.locale, "living.help.c351")
                 } else if self.world.sect_hierarchy().is_some() {
                     text(self.locale,
                         "C3.5: Reed Hall tracks persisted rank and merit for both you and NPC members. Complete shrine duty to reach Disciple (free Reed Hall martial drills, Reed Strike study, and Hall Qi access), and repeat Hall duty from real Hall offerings to reach Senior Disciple and claim one physical herb with allocate. NPC members perform duties, advance, and assume Elder office on succession without you. sect and sectlog inspect known standing and witnessed events. --c34 keeps C3.4.",
@@ -1131,11 +1134,10 @@ impl Session {
             },
             "v" | "save" => {
                 self.notice = match save_living(&self.save_path, &self.world, self.locale) {
-                    Ok(()) => text(self.locale, "Saved the settlement.", "Desa tersimpan.").into(),
-                    Err(error) => format!(
-                        "{} — {error}",
-                        text(self.locale, "Save failed", "Gagal menyimpan")
-                    ),
+                    Ok(()) => living_text(self.locale, "living.save.ok").into(),
+                    Err(error) => {
+                        living_format(self.locale, "living.save.error", &[("error", &error)])
+                    }
                 };
                 return true;
             }
@@ -1147,29 +1149,18 @@ impl Session {
                 ) {
                     Ok(world) => {
                         self.world = world;
-                        text(
-                            self.locale,
-                            "Restored the settlement.",
-                            "Desa berhasil dimuat.",
-                        )
-                        .into()
+                        living_text(self.locale, "living.load.ok").into()
                     }
-                    Err(error) => format!(
-                        "{} — {error}",
-                        text(self.locale, "Load failed", "Gagal memuat")
-                    ),
+                    Err(error) => {
+                        living_format(self.locale, "living.load.error", &[("error", &error)])
+                    }
                 };
                 return true;
             }
             "r" | "reset" => {
                 let seed = self.world.region().map_or(0, |region| region.seed);
                 self.world = self.new_seeded_world(seed);
-                self.notice = text(
-                    self.locale,
-                    "Started a new settlement.",
-                    "Memulai desa baru.",
-                )
-                .into();
+                self.notice = living_text(self.locale, "living.reset.ok").into();
                 return true;
             }
             "journal" => {
@@ -1502,12 +1493,9 @@ impl Session {
                     "Laporan jenazah tidak sah atau kampanye tidak tersedia.",
                 )
                 .into(),
-                StepError::UnrecordableIntent => text(
-                    self.locale,
-                    "This command cannot be recorded exactly in this campaign.",
-                    "Perintah ini tidak dapat direkam secara utuh dalam kampanye ini.",
-                )
-                .into(),
+                StepError::UnrecordableIntent => {
+                    living_text(self.locale, "living.intent.unrecordable").into()
+                }
                 StepError::ContestedCampaignRequired => text(
                     self.locale,
                     "Contested resources are unavailable in this campaign.",
@@ -2654,12 +2642,7 @@ fn save_living(path: &Path, world: &World, locale: Locale) -> Result<(), String>
             let old = persistence::read_limited(file, MAX_SAVE_BYTES)?;
             let previous = World::restore(&old).map_err(|error| format!("{error:?}"))?;
             if previous.checkpoint_revision() != world.checkpoint_revision() {
-                return Err(text(
-                    locale,
-                    "Existing save belongs to another campaign.",
-                    "Simpanan yang ada milik kampanye lain.",
-                )
-                .into());
+                return Err(living_text(locale, "living.save.foreign").into());
             }
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -2671,12 +2654,7 @@ fn save_living(path: &Path, world: &World, locale: Locale) -> Result<(), String>
 fn load_campaign(path: &Path, locale: Locale, expected_revision: u16) -> Result<World, String> {
     let world = load(path, locale)?;
     if world.checkpoint_revision() != expected_revision {
-        return Err(text(
-            locale,
-            "Save belongs to another campaign.",
-            "Simpanan milik kampanye lain.",
-        )
-        .into());
+        return Err(living_text(locale, "living.load.foreign").into());
     }
     Ok(world)
 }
@@ -2685,12 +2663,7 @@ fn load(path: &Path, locale: Locale) -> Result<World, String> {
     let file = File::open(path).map_err(|error| error.to_string())?;
     let bytes = persistence::read_limited(file, MAX_SAVE_BYTES)?;
     World::restore(&bytes).map_err(|error| match error {
-        LoadError::LegacyCheckpoint => text(
-            locale,
-            "For a C0.9 save, use --c09 and its original save location.",
-            "Untuk simpanan C0.9, gunakan --c09 dan lokasi simpan aslinya.",
-        )
-        .into(),
+        LoadError::LegacyCheckpoint => living_text(locale, "living.load.legacy").into(),
         _ => format!("{error:?}"),
     })
 }
@@ -2716,9 +2689,9 @@ fn actor_name(locale: Locale, world: &World, id: ActorId) -> &'static str {
 
 fn background_label(locale: Locale, background: Background) -> &'static str {
     match background {
-        Background::Wanderer => text(locale, "Wanderer", "Pengembara"),
-        Background::Herbalist => text(locale, "Herbalist", "Pemetik herba"),
-        Background::Peddler => text(locale, "Peddler", "Pedagang keliling"),
+        Background::Wanderer => living_text(locale, "living.background.wanderer"),
+        Background::Herbalist => living_text(locale, "living.background.herbalist"),
+        Background::Peddler => living_text(locale, "living.background.peddler"),
     }
 }
 

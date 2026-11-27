@@ -1,0 +1,15 @@
+{
+  "living.background.herbalist": "Herbalist",
+  "living.background.peddler": "Peddler",
+  "living.background.wanderer": "Wanderer",
+  "living.help.c351": "C3.5.1: Reed Hall members finish active shrine deliveries and reports before joining your company. They cannot accept new Hall delivery duties while accompanying you. sect and sectlog inspect known rank and witnessed events; duty, drill, drawqi, study and allocate retain their C3.5 rules. Use --c35 for the original C3.5 save.",
+  "living.intent.unrecordable": "This command cannot be recorded exactly in this campaign.",
+  "living.load.error": "Load failed — {error}",
+  "living.load.foreign": "Save belongs to another campaign.",
+  "living.load.legacy": "For a C0.9 save, use --c09 and its original save location.",
+  "living.load.ok": "Restored the settlement.",
+  "living.reset.ok": "Started a new settlement.",
+  "living.save.error": "Save failed — {error}",
+  "living.save.foreign": "Existing save belongs to another campaign.",
+  "living.save.ok": "Saved the settlement."
+}
