@@ -7,8 +7,8 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 use crate::{
     clock,
     living_ascii::{
-        Session, campaign_session, expanded_session, generated_session, knowledge_session,
-        lod_session, outcome_label, production_session,
+        Session, campaign_session, expanded_session, generated_session, history_session,
+        knowledge_session, lod_session, outcome_label, production_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -52,6 +52,10 @@ pub(crate) fn run_lod(seed: u32) {
 
 pub(crate) fn run_production(seed: u32) {
     run_session(production_session(seed, false));
+}
+
+pub(crate) fn run_history(seed: u32) {
+    run_session(history_session(seed, false));
 }
 
 fn run_session(session: Session) {
@@ -138,6 +142,14 @@ fn keyboard(
         game.session.input("newsnext");
     } else if keys.just_pressed(KeyCode::F4) && game.session.world.production().is_some() {
         game.session.input("production");
+    } else if keys.just_pressed(KeyCode::F6) && game.session.world.road_history().is_some() {
+        game.session.input("encounters");
+    } else if keys.just_pressed(KeyCode::F10) && game.session.world.road_history().is_some() {
+        game.session.input("history");
+    } else if keys.just_pressed(KeyCode::F7) && game.session.world.road_history().is_some() {
+        game.session.input("recovercache");
+    } else if keys.just_pressed(KeyCode::F8) && game.session.world.road_history().is_some() {
+        game.session.input("entrustcache");
     } else if keys.just_pressed(KeyCode::KeyT) {
         let nearby = nearby(&game.session);
         let next = nearby
@@ -259,7 +271,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
             &mut commands,
             living_format(
                 session.locale,
-                if world.production().is_some() {
+                if world.road_history().is_some() {
+                    "living.history.pixel.hint"
+                } else if world.production().is_some() {
                     "living.production.pixel.hint"
                 } else if world.regional_news().is_some() {
                     "living.regional.pixel.hint"
@@ -446,6 +460,11 @@ fn draw_icon(commands: &mut Commands, at: Vec2, symbol: char) {
         '+' | '=' | '$' | '^' => (
             &["00100", "01110", "11111", "12021", "12221"][..],
             Color::srgb(0.53, 0.30, 0.21),
+            OCHRE,
+        ),
+        '!' => (
+            &["01110", "12221", "11111", "10001", "11111"][..],
+            Color::srgb(0.62, 0.34, 0.18),
             OCHRE,
         ),
         '@' => (
@@ -981,5 +1000,86 @@ mod tests {
             app.world().resource::<Game>().session.world.checkpoint(),
             before
         );
+    }
+
+    mod road_trace {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/support/c45_trace.rs"
+        ));
+    }
+
+    #[test]
+    fn history_pixel_keys_are_read_only_until_player_selects_a_physical_outcome() {
+        use sealed_sim::living::Intent;
+        for entrust in [false, true] {
+            let (mut expected, _) = road_trace::trace(entrust);
+            let mut session = history_session(expected.region().unwrap().seed, false);
+            session.world = expected.clone();
+            let before = expected.checkpoint();
+            let mut app = App::new();
+            app.insert_resource(Game {
+                session,
+                target: None,
+            })
+            .init_resource::<ButtonInput<KeyCode>>()
+            .add_systems(Update, (keyboard, draw).chain());
+            app.world_mut().spawn((Window::default(), PrimaryWindow));
+            app.update();
+            let text = |app: &mut App| {
+                let mut q = app.world_mut().query::<&Text2d>();
+                q.iter(app.world())
+                    .map(|t| t.0.clone())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            let press = |app: &mut App, key| {
+                {
+                    let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                    keys.clear();
+                    keys.release(key);
+                    keys.press(key);
+                }
+                app.update();
+            };
+            assert!(text(&mut app).contains("F6-8 cache/take/entrust"));
+            press(&mut app, KeyCode::F6);
+            assert!(text(&mut app).contains("Cache #1, Willowford to Qinghe"));
+            press(&mut app, KeyCode::F10);
+            assert!(text(&mut app).contains("days before the campaign"));
+            press(&mut app, KeyCode::Tab);
+            press(&mut app, KeyCode::F6);
+            assert!(text(&mut app).contains("Simpanan #1, Willowford ke Qinghe"));
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                before
+            );
+            press(&mut app, if entrust { KeyCode::F8 } else { KeyCode::F7 });
+            expected
+                .step(
+                    expected.tick(),
+                    if entrust {
+                        Intent::EntrustCache(1)
+                    } else {
+                        Intent::RecoverCache(1)
+                    },
+                )
+                .unwrap();
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                expected.checkpoint()
+            );
+            press(&mut app, KeyCode::F10);
+            let memory = text(&mut app);
+            assert!(memory.contains(if entrust {
+                "diserahkan kepada Bao Jun"
+            } else {
+                "mengambil simpanan #1"
+            }));
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                expected.checkpoint()
+            );
+        }
     }
 }

@@ -478,6 +478,9 @@ impl World {
     }
 
     fn livelihood_duty(&self, npc: &Npc, teaches: bool) -> Goal {
+        if let Some(goal) = self.cache_livelihood(npc) {
+            return goal;
+        }
         match npc.definition.role {
             Role::FrontierCarrier | Role::FrontierGrower => self.frontier_duty(npc),
             Role::Medic => Goal::TendClinic,
@@ -653,6 +656,9 @@ impl World {
         self.npcs.get_mut(&id).expect("planned actor").fatigue = fatigue;
         let pos = npc.position;
         let scenario = self.scenario;
+        if self.collect_road_cache(id, goal) {
+            return;
+        }
 
         match goal {
             Goal::Idle => {}

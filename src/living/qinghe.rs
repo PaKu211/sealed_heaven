@@ -9,6 +9,7 @@ pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
             | Rules::RegionalKnowledge
             | Rules::ExactLod
             | Rules::SettlementProduction
+            | Rules::RoadHistory
     ) {
         return super::expansion::scenario(seed);
     }

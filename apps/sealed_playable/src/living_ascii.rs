@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 31 {
+        if self.world.checkpoint_revision() == 32 {
+            World::road_history_campaign(seed)
+        } else if self.world.checkpoint_revision() == 31 {
             World::settlement_production_campaign(seed)
         } else if self.world.checkpoint_revision() == 30 {
             World::exact_lod_campaign(seed)
@@ -136,6 +138,8 @@ impl Session {
                         | "drill"
                         | "technique"
                         | "agency"
+                        | "recovercache"
+                        | "entrustcache"
                 ))
         {
             self.notice =
@@ -1079,6 +1083,55 @@ impl Session {
                 };
                 return true;
             }
+            "history" if self.world.road_history().is_some() => {
+                self.notice = self.history_lines().join("\n");
+                return true;
+            }
+            "encounters" if self.world.road_history().is_some() => {
+                self.notice = self.encounter_lines().join("\n");
+                return true;
+            }
+            "historylog" if self.debug_world && self.world.road_history().is_some() => {
+                self.notice = self
+                    .world
+                    .road_history()
+                    .unwrap()
+                    .caches()
+                    .iter()
+                    .map(|c| format!("{:?}", c))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                return true;
+            }
+            "recovercache" | "entrustcache" if self.world.road_history().is_some() => {
+                let entrust = command == "entrustcache";
+                let id = if let Some(arg) = argument {
+                    arg.parse::<u32>().ok()
+                } else {
+                    self.world
+                        .local_caches()
+                        .iter()
+                        .find(|c| if entrust { c.can_entrust } else { c.can_take })
+                        .map(|c| c.deposit.id)
+                };
+                let Some(id) = id else {
+                    self.notice = living_text(
+                        self.locale,
+                        if entrust {
+                            "living.history.no_recipient"
+                        } else {
+                            "living.history.no_recovery"
+                        },
+                    )
+                    .into();
+                    return true;
+                };
+                if entrust {
+                    Intent::EntrustCache(id)
+                } else {
+                    Intent::RecoverCache(id)
+                }
+            }
             "production" if self.world.production().is_some() => {
                 self.notice = self.production_lines().join("\n");
                 return true;
@@ -1285,6 +1338,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.production.help"));
                     if self.debug_world {
                         self.notice.push_str(" productionlog");
+                    }
+                }
+                if self.world.road_history().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.history.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" historylog");
                     }
                 }
                 return true;
@@ -1885,6 +1946,89 @@ impl Session {
         )
     }
 
+    fn deposit_line(&self, d: sealed_sim::living::road_history::Deposit) -> String {
+        use sealed_sim::living::road_history::Route;
+        let route = living_text(
+            self.locale,
+            match d.route {
+                Route::West => "living.history.route.west",
+                Route::East => "living.history.route.east",
+            },
+        );
+        living_format(
+            self.locale,
+            "living.history.deposit",
+            &[
+                ("id", &d.id.to_string()),
+                ("route", route),
+                ("amount", &d.amount.to_string()),
+                ("days", &d.days_ago.to_string()),
+            ],
+        )
+    }
+    pub(crate) fn history_lines(&self) -> Vec<String> {
+        let known = self.world.known_deposits();
+        if known.is_empty() {
+            return vec![living_text(self.locale, "living.history.unknown").into()];
+        }
+        let mut lines = Vec::new();
+        for d in known {
+            lines.push(self.deposit_line(d));
+            if let Some(r) = self.world.known_cache_resolution(d.id) {
+                use sealed_sim::living::road_history::Method;
+                let key = match r.method {
+                    Method::Taken => "living.history.witness.taken",
+                    Method::Entrusted => "living.history.witness.entrusted",
+                    Method::Collected => "living.history.witness.collected",
+                };
+                lines.push(living_format(
+                    self.locale,
+                    key,
+                    &[
+                        ("id", &d.id.to_string()),
+                        ("tick", &r.at.to_string()),
+                        ("actor", actor_name(self.locale, &self.world, r.recipient)),
+                    ],
+                ));
+            }
+        }
+        lines
+    }
+    pub(crate) fn encounter_lines(&self) -> Vec<String> {
+        let local = self.world.local_caches();
+        if local.is_empty() {
+            return vec![living_text(self.locale, "living.history.no_local").into()];
+        }
+        let mut lines = Vec::new();
+        for c in local {
+            lines.push(self.deposit_line(c.deposit));
+            lines.push(living_format(
+                self.locale,
+                "living.history.stock",
+                &[
+                    ("stock", &c.remaining.to_string()),
+                    ("amount", &c.deposit.amount.to_string()),
+                ],
+            ));
+            lines.push(
+                living_text(
+                    self.locale,
+                    if c.remaining == 0 {
+                        "living.history.empty"
+                    } else if !c.can_take {
+                        "living.history.approach"
+                    } else if c.can_entrust {
+                        "living.history.choice"
+                    } else {
+                        "living.history.take_only"
+                    },
+                )
+                .into(),
+            );
+        }
+        lines
+    }
+
     pub(crate) fn production_lines(&self) -> Vec<String> {
         use sealed_sim::living::production::Job;
         let reports = self.world.local_production();
@@ -2091,6 +2235,12 @@ impl Session {
             if cell == GROVE {
                 return '&';
             }
+        }
+        if world
+            .road_history()
+            .is_some_and(|h| h.caches().iter().any(|c| c.deposit.position == cell))
+        {
+            return '!';
         }
         self.ground_symbol(cell)
     }
@@ -3442,6 +3592,25 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
         Outcome::HallAllocationClaimed => {
             "living.ascii.outcome_label.you_claimed_one_physical_herb_from_reed"
         }
+        Outcome::CacheRecovered { id, herbs } => {
+            return living_format(
+                locale,
+                "living.history.recovered",
+                &[("id", &id.to_string()), ("herbs", &herbs.to_string())],
+            );
+        }
+        Outcome::CacheEntrusted { id, to, herbs } => {
+            return living_format(
+                locale,
+                "living.history.entrusted",
+                &[
+                    ("id", &id.to_string()),
+                    ("herbs", &herbs.to_string()),
+                    ("actor", actor_name(locale, world, to)),
+                ],
+            );
+        }
+
         Outcome::LotSold { to, id, coins } => {
             return living_format(
                 locale,
@@ -3778,6 +3947,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         29 => "checkpoint.c42",
         30 => "checkpoint.c43",
         31 => "checkpoint.c44",
+        32 => "checkpoint.c45",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3809,10 +3979,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         29 => World::regional_knowledge_campaign(0),
         30 => World::exact_lod_campaign(0),
         31 => World::settlement_production_campaign(0),
+        32 => World::road_history_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn history_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 32);
+    if seed != 0 {
+        session.world = World::road_history_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_history_campaign(seed: u32, debug_world: bool) {
+    run_session(history_session(seed, debug_world));
 }
 
 pub(crate) fn production_session(seed: u32, debug_world: bool) -> Session {

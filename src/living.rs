@@ -39,6 +39,7 @@ mod relief;
 #[cfg(test)]
 mod relief_tests;
 mod rivalry;
+pub mod road_history;
 mod school;
 mod sect_hierarchy;
 mod social;
@@ -161,6 +162,8 @@ pub enum Intent {
     MendMeridians,
     TreatWounds,
     ClaimHallAllocation,
+    RecoverCache(u32),
+    EntrustCache(u32),
 }
 
 impl Intent {
@@ -316,6 +319,15 @@ pub enum Outcome {
     MeridiansMended,
     WoundTreated,
     HallAllocationClaimed,
+    CacheRecovered {
+        id: u32,
+        herbs: u32,
+    },
+    CacheEntrusted {
+        id: u32,
+        to: ActorId,
+        herbs: u32,
+    },
     Rejected(Rejection),
 }
 
@@ -384,6 +396,7 @@ pub struct World {
     regional_news: Option<regional_news::RegionalNews>,
     scheduler: Option<lod::Scheduler>,
     production: Option<production::Production>,
+    road_history: Option<road_history::RoadHistory>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -445,6 +458,7 @@ enum Rules {
     RegionalKnowledge,
     ExactLod,
     SettlementProduction,
+    RoadHistory,
 }
 
 impl Rules {
@@ -457,6 +471,7 @@ impl Rules {
                 | Self::RegionalKnowledge
                 | Self::ExactLod
                 | Self::SettlementProduction
+                | Self::RoadHistory
         )
     }
 
@@ -495,6 +510,7 @@ impl Rules {
                 | Self::RegionalKnowledge
                 | Self::ExactLod
                 | Self::SettlementProduction
+                | Self::RoadHistory
         )
     }
 }
@@ -626,6 +642,11 @@ impl World {
         Self::seeded(seed, Rules::SettlementProduction)
     }
 
+    /// C4.5: seed-bound prehistory and physical relief caches.
+    pub fn road_history_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::RoadHistory)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -635,6 +656,7 @@ impl World {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
@@ -643,6 +665,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -658,16 +681,26 @@ impl World {
                 .all(|site| world.walkable(site))
         );
         world.region = Some(Region::new(seed));
+        if rules == Rules::RoadHistory {
+            world.road_history = Some(road_history::RoadHistory::new(&mut world, seed));
+            world.observe_road_history();
+        }
         if matches!(
             rules,
-            Rules::RegionalKnowledge | Rules::ExactLod | Rules::SettlementProduction
+            Rules::RegionalKnowledge
+                | Rules::ExactLod
+                | Rules::SettlementProduction
+                | Rules::RoadHistory
         ) {
             world.init_regional_news();
         }
-        if matches!(rules, Rules::ExactLod | Rules::SettlementProduction) {
+        if matches!(
+            rules,
+            Rules::ExactLod | Rules::SettlementProduction | Rules::RoadHistory
+        ) {
             world.scheduler = Some(lod::Scheduler::new(&world));
         }
-        if rules == Rules::SettlementProduction {
+        if matches!(rules, Rules::SettlementProduction | Rules::RoadHistory) {
             world.production = Some(production::Production::new(&world));
         }
         world
@@ -691,6 +724,7 @@ impl World {
             regional_news: None,
             scheduler: None,
             production: None,
+            road_history: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -733,6 +767,7 @@ impl World {
                         | Rules::RegionalKnowledge
                         | Rules::ExactLod
                         | Rules::SettlementProduction
+                        | Rules::RoadHistory
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -775,6 +810,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(Company::default),
             rivalry: matches!(
@@ -805,6 +841,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -834,6 +871,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(Politics::new),
             traffic: matches!(
@@ -862,6 +900,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -889,6 +928,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -913,6 +953,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -936,6 +977,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(Information::default),
             contested: matches!(
@@ -953,6 +995,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(|| {
                 Contested::new(matches!(
@@ -969,6 +1012,7 @@ impl World {
                         | Rules::RegionalKnowledge
                         | Rules::ExactLod
                         | Rules::SettlementProduction
+                        | Rules::RoadHistory
                 ))
             }),
             martial: matches!(
@@ -984,6 +1028,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -998,6 +1043,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -1011,6 +1057,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -1023,6 +1070,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -1034,6 +1082,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1214,6 +1263,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1240,6 +1290,7 @@ impl World {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1283,6 +1334,7 @@ impl World {
             self.select_default_background();
         }
         let outcome = self.apply_player(intent).unwrap_or_else(Outcome::Rejected);
+        self.observe_road_history();
         self.advance_relief();
         self.advance_faction_agency();
         self.advance_contracts();
@@ -1293,6 +1345,7 @@ impl World {
         // 3. Decide from one snapshot; resolve movement, work and combat by actor ID.
         self.advance_npcs(intent == Intent::Guard && outcome == Outcome::Guarded);
         self.retire_scheduled_dead();
+        self.observe_road_history();
         if intent == Intent::Wait {
             self.recover_martial(PLAYER);
         }
@@ -1432,6 +1485,8 @@ impl World {
             Intent::MendMeridians => self.mend_meridians(),
             Intent::TreatWounds => self.treat_wounds(),
             Intent::ClaimHallAllocation => self.claim_hall_allocation(),
+            Intent::RecoverCache(id) => self.recover_cache(id, false),
+            Intent::EntrustCache(id) => self.recover_cache(id, true),
         }
     }
 
@@ -1456,6 +1511,7 @@ impl World {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         )
     }
 
@@ -1479,6 +1535,7 @@ impl World {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         )
     }
 
@@ -1501,6 +1558,7 @@ impl World {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         )
     }
 
@@ -1522,6 +1580,7 @@ impl World {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         )
     }
 
@@ -1542,6 +1601,7 @@ impl World {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         )
     }
 
@@ -1560,6 +1620,7 @@ impl World {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         )
     }
 

@@ -3674,6 +3674,149 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.history.approach": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.choice": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.deposit": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {
+      "amount": "C4.5 roadside relief",
+      "days": "C4.5 roadside relief",
+      "id": "C4.5 roadside relief",
+      "route": "C4.5 roadside relief"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.history.empty": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.entrusted": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {
+      "actor": "C4.5 roadside relief",
+      "herbs": "C4.5 roadside relief",
+      "id": "C4.5 roadside relief"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.history.help": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.no_local": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.no_recipient": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.no_recovery": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.pixel.hint": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {
+      "seed": "C4.5 roadside relief"
+    },
+    "surface": "living_pixel.rs"
+  },
+  "living.history.recovered": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {
+      "herbs": "C4.5 roadside relief",
+      "id": "C4.5 roadside relief"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.history.route.east": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.route.west": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.stock": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {
+      "amount": "C4.5 roadside relief",
+      "stock": "C4.5 roadside relief"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.history.take_only": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.unknown": {
+    "active": true,
+    "context": "C4.5 bounded prehistory and local encounter",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.history.witness.collected": {
+    "active": true,
+    "context": "Witnessed C4.5 cache resolution, no remote state",
+    "parameters": {
+      "actor": "C4.5 witnessed resolution",
+      "id": "C4.5 witnessed resolution",
+      "tick": "C4.5 witnessed resolution"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.history.witness.entrusted": {
+    "active": true,
+    "context": "Witnessed C4.5 cache resolution, no remote state",
+    "parameters": {
+      "actor": "C4.5 witnessed resolution",
+      "id": "C4.5 witnessed resolution",
+      "tick": "C4.5 witnessed resolution"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.history.witness.taken": {
+    "active": true,
+    "context": "Witnessed C4.5 cache resolution, no remote state",
+    "parameters": {
+      "actor": "C4.5 witnessed resolution",
+      "id": "C4.5 witnessed resolution",
+      "tick": "C4.5 witnessed resolution"
+    },
+    "surface": "living_ascii.rs"
+  },
   "living.intent.unrecordable": {
     "active": true,
     "context": "intent / unrecordable",

@@ -67,6 +67,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::RegionalKnowledge => super::regional_news::REVISION,
         Rules::ExactLod => super::lod::REVISION,
         Rules::SettlementProduction => super::production::REVISION,
+        Rules::RoadHistory => super::road_history::REVISION,
     }
 }
 
@@ -128,6 +129,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::regional_news::REVISION => Rules::RegionalKnowledge,
         super::lod::REVISION => Rules::ExactLod,
         super::production::REVISION => Rules::SettlementProduction,
+        super::road_history::REVISION => Rules::RoadHistory,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -231,6 +233,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::Invite(actor)
@@ -265,6 +268,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::Provision(actor)
@@ -299,6 +303,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::Part(actor)
@@ -332,6 +337,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::OfferAccord
@@ -365,6 +371,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::SupportHall
@@ -397,6 +404,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::PledgeLodge
@@ -429,6 +437,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::AidLodge
@@ -461,6 +470,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::RenounceLodge
@@ -486,6 +496,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::Ask(actor)
@@ -511,6 +522,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::Examine
@@ -536,6 +548,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -561,6 +574,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::Take(actor)
@@ -583,6 +597,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -607,6 +622,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::ClaimLot(value)
@@ -627,6 +643,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -647,6 +664,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::AttuneLot(value)
@@ -666,6 +684,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -684,6 +703,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::Drill(actor)
@@ -702,6 +722,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -727,6 +748,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::DrawQi
@@ -741,6 +763,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::CirculateQi
@@ -755,6 +778,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::MendMeridians
@@ -769,6 +793,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::TreatWounds
@@ -783,10 +808,13 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) =>
         {
             Intent::ClaimHallAllocation
         }
+        (42, id) if rules == Rules::RoadHistory => Intent::RecoverCache(id),
+        (43, id) if rules == Rules::RoadHistory => Intent::EntrustCache(id),
         _ => return Err(LoadError::InvalidIntent),
     })
 }
@@ -794,7 +822,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::SettlementProduction {
+        let mut bytes = if world.rules == Rules::RoadHistory {
+            b"SH:C45:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::SettlementProduction {
             b"SH:C44:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::ExactLod {
             b"SH:C43:SCENARIO:v1\0".to_vec()
@@ -808,6 +838,9 @@ fn bound_scenario_digest(world: &World) -> [u8; 32] {
         bytes.extend_from_slice(super::content::CONTENT_SHA256.as_bytes());
         bytes.extend_from_slice(super::expansion::CONTENT_SHA256.as_bytes());
         bytes.extend_from_slice(&map.digest());
+        if let Some(history) = world.road_history() {
+            bytes.extend_from_slice(&history.initial_digest());
+        }
         return sha256(&bytes);
     }
     let Some(map) = world.generated_region() else {
@@ -856,6 +889,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::RegionalKnowledge => b"SH:C10:RULES:v29".to_vec(),
         Rules::ExactLod => b"SH:C10:RULES:v30".to_vec(),
         Rules::SettlementProduction => b"SH:C10:RULES:v31".to_vec(),
+        Rules::RoadHistory => b"SH:C10:RULES:v32".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -948,6 +982,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::RegionalKnowledge
             | Rules::ExactLod
             | Rules::SettlementProduction
+            | Rules::RoadHistory
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -995,6 +1030,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::RegionalKnowledge => b"SH:C10:STATE:v29".to_vec(),
         Rules::ExactLod => b"SH:C10:STATE:v30".to_vec(),
         Rules::SettlementProduction => b"SH:C10:STATE:v31".to_vec(),
+        Rules::RoadHistory => b"SH:C10:STATE:v32".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1107,6 +1143,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1188,6 +1225,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::RegionalKnowledge
             | Rules::ExactLod
             | Rules::SettlementProduction
+            | Rules::RoadHistory
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1225,6 +1263,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::RegionalKnowledge
                     | Rules::ExactLod
                     | Rules::SettlementProduction
+                    | Rules::RoadHistory
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1269,6 +1308,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::RegionalKnowledge
             | Rules::ExactLod
             | Rules::SettlementProduction
+            | Rules::RoadHistory
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1354,6 +1394,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::RegionalKnowledge
                 | Rules::ExactLod
                 | Rules::SettlementProduction
+                | Rules::RoadHistory
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1513,6 +1554,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(production) = world.production() {
         let bytes = production.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(history) = world.road_history() {
+        let bytes = history.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }
@@ -2084,6 +2130,8 @@ impl Wire {
             Intent::MendMeridians => (39, 0),
             Intent::TreatWounds => (40, 0),
             Intent::ClaimHallAllocation => (41, 0),
+            Intent::RecoverCache(id) => (42, id),
+            Intent::EntrustCache(id) => (43, id),
         };
         let [a, b, c, d] = payload.to_le_bytes();
         [tag, a, b, c, d]
@@ -2230,6 +2278,8 @@ impl Wire {
             Some(Outcome::MeridiansMended) => 45,
             Some(Outcome::WoundTreated) => 46,
             Some(Outcome::HallAllocationClaimed) => 47,
+            Some(Outcome::CacheRecovered { .. }) => 48,
+            Some(Outcome::CacheEntrusted { .. }) => 49,
         });
         match outcome {
             Some(
@@ -2291,6 +2341,15 @@ impl Wire {
             Some(Outcome::QiCirculated { channels, blockage }) => {
                 self.u8(channels);
                 self.u8(blockage);
+            }
+            Some(Outcome::CacheRecovered { id, herbs }) => {
+                self.u32(id);
+                self.u32(herbs);
+            }
+            Some(Outcome::CacheEntrusted { id, to, herbs }) => {
+                self.u32(id);
+                self.actor(to);
+                self.u32(herbs);
             }
             Some(Outcome::Rejected(reason)) => self.u8(match reason {
                 Rejection::Dead => 0,
