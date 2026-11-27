@@ -48,6 +48,7 @@ pub struct Resolution {
 pub enum Evidence {
     Conversation,
     Register,
+    Relayed,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Acknowledgement {
@@ -301,12 +302,14 @@ impl World {
         place: Position,
     ) {
         if let Some(o) = self.obligations.as_mut() {
-            o.resolve(Resolution {
+            let resolution = Resolution {
                 team,
                 at: self.tick,
                 place,
                 result: ResultKind::from_outcome(outcome),
-            });
+            };
+            o.resolve(resolution);
+            self.open_message(resolution);
         }
     }
     /// A current commitment promotes its existing delivery goal above
@@ -347,6 +350,13 @@ impl World {
                     .as_mut()
                     .unwrap()
                     .forget(t.carrier, self.tick);
+                self.finish_message(
+                    r,
+                    super::communication::Kind::Unreported,
+                    t.carrier,
+                    r.place,
+                    false,
+                );
                 continue;
             }
             let destination = t.route.destination(self);
@@ -365,18 +375,31 @@ impl World {
                 && !self.social.relationship(t.carrier, t.grower).refuses_aid()
                 && !matches!(g.activity.goal, Goal::Retreat | Goal::Retaliate)
                 && !matches!(c.activity.goal, Goal::Retreat | Goal::Retaliate);
+            let relay = self.relay_delivery(r);
             let evidence = if conversation {
                 Evidence::Conversation
             } else if manifest {
                 Evidence::Register
+            } else if relay.is_some() {
+                Evidence::Relayed
             } else {
                 // A dead carrier cannot report losses, but an already posted
                 // successful manifest can still be read until notice expiry.
-                if !c.alive() && r.result != ResultKind::Fulfilled {
+                if !c.alive()
+                    && r.result != ResultKind::Fulfilled
+                    && !self.has_relay(r.team.carrier)
+                {
                     self.obligations
                         .as_mut()
                         .unwrap()
                         .forget(t.carrier, self.tick);
+                    self.finish_message(
+                        r,
+                        super::communication::Kind::Unreported,
+                        t.carrier,
+                        r.place,
+                        false,
+                    );
                 }
                 continue;
             };
@@ -399,7 +422,20 @@ impl World {
                 evidence,
                 regard_change,
             };
+            let (kind, holder, public) = match evidence {
+                Evidence::Conversation => (super::communication::Kind::Direct, t.carrier, seen),
+                Evidence::Register => (super::communication::Kind::Register, t.carrier, false),
+                Evidence::Relayed => {
+                    let holder = relay.expect("validated relay");
+                    (
+                        super::communication::Kind::Relayed,
+                        holder,
+                        self.player_sees(place) && self.player_sees(self.npcs[&holder].position),
+                    )
+                }
+            };
             self.obligations.as_mut().unwrap().acknowledge(ack, seen);
+            self.finish_message(r, kind, holder, place, public);
         }
     }
 }

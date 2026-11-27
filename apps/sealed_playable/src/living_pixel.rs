@@ -7,10 +7,10 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 use crate::{
     clock,
     living_ascii::{
-        Session, bonds_session, campaign_session, cooperation_session, encounter_session,
-        expanded_session, favors_session, generated_session, history_session, knowledge_session,
-        lod_session, obligations_session, outcome_label, production_session, requests_session,
-        social_network_session,
+        Session, bonds_session, campaign_session, communication_session, cooperation_session,
+        encounter_session, expanded_session, favors_session, generated_session, history_session,
+        knowledge_session, lod_session, obligations_session, outcome_label, production_session,
+        requests_session, social_network_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -66,6 +66,10 @@ pub(crate) fn run_requests(seed: u32) {
 
 pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
+}
+
+pub(crate) fn run_communication(seed: u32) {
+    run_session(communication_session(seed, false));
 }
 
 pub(crate) fn run_obligations(seed: u32) {
@@ -173,6 +177,12 @@ fn keyboard(
         game.session.input("contacts 2");
     } else if keys.just_pressed(KeyCode::F2) && game.session.world.generated_region().is_some() {
         game.session.input("survey");
+    } else if game.session.world.communication().is_some()
+        && keys.just_pressed(KeyCode::F3)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+        && (keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight))
+    {
+        game.session.input("messages 2");
     } else if game.session.world.social_network().is_some()
         && keys.just_pressed(KeyCode::F3)
         && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
@@ -434,7 +444,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     if world.favors().is_some() {
         label(
             &mut commands,
-            tr(if world.obligations().is_some() {
+            tr(if world.communication().is_some() {
+                "living.message.pixel.hint"
+            } else if world.obligations().is_some() {
                 "living.obligation.pixel.hint"
             } else if world.cooperation().is_some() {
                 "living.team.pixel.hint"
@@ -1815,6 +1827,73 @@ mod tests {
         assert!(text(&mut app).contains("Belum ada konfirmasi janji yang disaksikan."));
         press(&mut app, KeyCode::F4, true, false);
         assert!(text(&mut app).contains("Catatan t37 #0:"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+    }
+
+    #[test]
+    fn c53_natural_witness_keyboard_projection_is_read_only_and_bilingual() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/living/c53_communication_golden_v1.json"
+        ))
+        .unwrap();
+        let row = fixture["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["witnessed"].as_bool() == Some(true))
+            .unwrap();
+        let mut session = communication_session(row["seed"].as_u64().unwrap() as u32, false);
+        for cmd in row["commands"].as_array().unwrap() {
+            assert!(session.input(cmd.as_str().unwrap()));
+        }
+        assert!(session.world.witnessed_messages().next().is_some());
+        let before = session.world.checkpoint();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let press = |app: &mut App, key, ctrl: bool, shift: bool| {
+            {
+                let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                keys.clear();
+                keys.release(KeyCode::ControlLeft);
+                keys.release(KeyCode::ShiftLeft);
+                if ctrl {
+                    keys.press(KeyCode::ControlLeft);
+                }
+                if shift {
+                    keys.press(KeyCode::ShiftLeft);
+                }
+                keys.release(key);
+                keys.press(key);
+            }
+            app.update();
+        };
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("Ctrl+Shift+F3 messages"));
+        press(&mut app, KeyCode::F3, true, true);
+        assert!(text(&mut app).contains("t71 #0: Bao Jun told Mei Fen: delivery complete."));
+        press(&mut app, KeyCode::F3, true, false);
+        assert!(!text(&mut app).contains("Bao Jun told Mei Fen"));
+        press(&mut app, KeyCode::Tab, false, false);
+        press(&mut app, KeyCode::F3, true, true);
+        assert!(
+            text(&mut app).contains("t71 #0: Bao Jun memberi tahu Mei Fen: pengiriman selesai.")
+        );
         assert_eq!(
             app.world().resource::<Game>().session.world.checkpoint(),
             before

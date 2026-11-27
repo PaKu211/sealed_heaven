@@ -107,6 +107,7 @@ pub fn launch(args: &[String]) -> Result<(), String> {
             "--c50" if revision.is_none() => revision = Some(37),
             "--c51" if revision.is_none() => revision = Some(38),
             "--c52" if revision.is_none() => revision = Some(39),
+            "--c53" if revision.is_none() => revision = Some(40),
             "--pixel" if !pixel => pixel = true,
             "--debug-world" if !debug => debug = true,
             "--seed" if selected_seed.is_none() => {
@@ -123,14 +124,16 @@ pub fn launch(args: &[String]) -> Result<(), String> {
     }
     if revision.is_none() || (pixel && debug) {
         return Err(
-            "usage: --c40 | --c41 | --c42 | --c43 | --c44 | --c45 | --c46 | --c47 | --c48 | --c49 | --c50 | --c51 | --c52 [--seed N] [--pixel | --debug-world]"
+            "usage: --c40 | --c41 | --c42 | --c43 | --c44 | --c45 | --c46 | --c47 | --c48 | --c49 | --c50 | --c51 | --c52 | --c53 [--seed N] [--pixel | --debug-world]"
                 .into(),
         );
     }
     let seed = selected_seed.unwrap_or(0);
     if pixel {
         #[cfg(feature = "desktop")]
-        if revision == Some(39) {
+        if revision == Some(40) {
+            sealed_playable::ascii::run_communication_window(seed);
+        } else if revision == Some(39) {
             sealed_playable::ascii::run_obligations_window(seed);
         } else if revision == Some(38) {
             sealed_playable::ascii::run_cooperation_window(seed);
@@ -160,7 +163,9 @@ pub fn launch(args: &[String]) -> Result<(), String> {
         #[cfg(not(feature = "desktop"))]
         return Err("The window requires the desktop feature.".into());
     } else {
-        if revision == Some(39) {
+        if revision == Some(40) {
+            sealed_playable::ascii::run_communication_campaign(seed, debug);
+        } else if revision == Some(39) {
             sealed_playable::ascii::run_obligations_campaign(seed, debug);
         } else if revision == Some(38) {
             sealed_playable::ascii::run_cooperation_campaign(seed, debug);

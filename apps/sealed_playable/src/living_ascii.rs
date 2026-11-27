@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 39 {
+        if self.world.checkpoint_revision() == 40 {
+            World::communication_campaign(seed)
+        } else if self.world.checkpoint_revision() == 39 {
             World::obligations_campaign(seed)
         } else if self.world.checkpoint_revision() == 38 {
             World::cooperation_campaign(seed)
@@ -160,6 +162,7 @@ impl Session {
                         | "questlog"
                         | "favors"
                         | "favorlog"
+                        | "messages"
                         | "obligations"
                         | "teams"
                         | "sociallog"
@@ -1116,6 +1119,18 @@ impl Session {
                 };
                 return true;
             }
+            "messages" if self.world.communication().is_some() => {
+                let count = argument
+                    .and_then(|n| n.parse::<usize>().ok())
+                    .unwrap_or(12)
+                    .clamp(1, 48);
+                self.notice = self.message_lines(count).join("\n");
+                return true;
+            }
+            "messagedebug" if self.debug_world && self.world.communication().is_some() => {
+                self.notice = format!("{:?}", self.world.communication().unwrap());
+                return true;
+            }
             "obligations" if self.world.obligations().is_some() => {
                 let count = argument
                     .and_then(|n| n.parse::<usize>().ok())
@@ -1554,6 +1569,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.communication().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.message.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" messagedebug");
                     }
                 }
                 if self.world.obligations().is_some() {
@@ -2211,6 +2234,56 @@ impl Session {
             ],
         )
     }
+    fn message_line(&self, e: &sealed_sim::living::communication::Event) -> String {
+        use sealed_sim::living::{communication::Kind, obligations::ResultKind};
+        let result = living_text(
+            self.locale,
+            match e.result {
+                ResultKind::Fulfilled => "living.message.result.fulfilled",
+                ResultKind::ChangedCargo => "living.message.result.changed",
+                ResultKind::Released => "living.message.result.released",
+                ResultKind::Expired => "living.message.result.expired",
+                ResultKind::CarrierLost => "living.message.result.lost",
+            },
+        );
+        let key = match e.kind {
+            Kind::Handoff => "living.message.handoff",
+            Kind::Direct => "living.message.direct",
+            Kind::Relayed => "living.message.relayed",
+            _ => return String::new(), // private terminal states never projected
+        };
+        let id = e.project.to_string();
+        let at = e.at.to_string();
+        let mut params = vec![
+            ("id", id.as_str()),
+            ("at", at.as_str()),
+            ("origin", actor_name(self.locale, &self.world, e.origin)),
+            (
+                "recipient",
+                actor_name(self.locale, &self.world, e.recipient),
+            ),
+            ("result", result),
+        ];
+        if e.kind != Kind::Direct {
+            params.push(("holder", actor_name(self.locale, &self.world, e.holder)));
+        }
+        living_format(self.locale, key, &params)
+    }
+    pub(crate) fn message_lines(&self, count: usize) -> Vec<String> {
+        let mut rows = self
+            .world
+            .witnessed_messages()
+            .rev()
+            .take(count)
+            .map(|e| self.message_line(e))
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+        if rows.is_empty() {
+            rows.push(living_text(self.locale, "living.message.empty").into());
+        }
+        rows
+    }
+
     fn obligation_line(&self, e: &sealed_sim::living::obligations::Witnessed) -> String {
         use sealed_sim::living::obligations::ResultKind;
         let key = match e.result {
@@ -4102,6 +4175,7 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::DeliverFrontierFreight => "living.expansion.goal.deliver",
         Goal::SurveyWillowford => "living.regional.goal.survey_market",
         Goal::SurveyPinefordDepot => "living.regional.goal.survey_depot",
+        Goal::CarryMessage(_) => "living.message.goal",
         Goal::Report { .. } => "living.ascii.goal_label.seeking_someone_to_report_to",
         Goal::Retreat => "living.ascii.goal_label.retreating",
         Goal::Retaliate => "living.ascii.goal_label.retaliating",
@@ -4722,6 +4796,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         37 => "checkpoint.c50",
         38 => "checkpoint.c51",
         39 => "checkpoint.c52",
+        40 => "checkpoint.c53",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -4761,12 +4836,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         37 => World::social_network_campaign(0),
         38 => World::cooperation_campaign(0),
         39 => World::obligations_campaign(0),
+        40 => World::communication_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn communication_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 40);
+    if seed != 0 {
+        session.world = World::communication_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_communication_campaign(seed: u32, debug_world: bool) {
+    run_session(communication_session(seed, debug_world));
+}
 pub(crate) fn obligations_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 39);
     if seed != 0 {
@@ -4958,6 +5044,57 @@ fn run_session(mut session: Session) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn c53_message_templates_match_exact_params_and_preserve_provenance() {
+        use sealed_sim::living::{
+            communication::{Event, Kind},
+            obligations::ResultKind,
+        };
+        let mut session = communication_session(3, false);
+        let before = session.world.checkpoint();
+        let mut event = Event {
+            project: 0,
+            at: 71,
+            origin: ActorId::new(32),
+            recipient: ActorId::new(31),
+            holder: ActorId::new(2),
+            kind: Kind::Direct,
+            result: ResultKind::Fulfilled,
+            place: Position { x: 28, y: 2 },
+        };
+        for (kind, en, id) in [
+            (Kind::Direct, "told", "memberi tahu"),
+            (Kind::Handoff, "entrusted", "menitipkan"),
+            (Kind::Relayed, "relayed", "meneruskan"),
+        ] {
+            event.kind = kind;
+            for result in [
+                ResultKind::Fulfilled,
+                ResultKind::ChangedCargo,
+                ResultKind::Released,
+                ResultKind::Expired,
+            ] {
+                event.result = result;
+                assert!(session.input("lang en"));
+                let line = session.message_line(&event);
+                assert!(
+                    line.contains(en) && line.contains("Bao Jun") && line.contains("Mei Fen"),
+                    "{line}"
+                );
+                assert_eq!(line.contains("Shen Wei"), kind != Kind::Direct);
+                assert!(session.input("lang id"));
+                let line = session.message_line(&event);
+                assert!(
+                    line.contains(id) && line.contains("Bao Jun") && line.contains("Mei Fen"),
+                    "{line}"
+                );
+            }
+        }
+        event.kind = Kind::Unreported;
+        assert!(session.message_line(&event).is_empty());
+        assert_eq!(session.world.checkpoint(), before);
+    }
 
     #[test]
     fn c52_witnessed_event_formatting_is_bilingual_without_private_scores() {

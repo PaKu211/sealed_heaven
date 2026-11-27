@@ -108,6 +108,7 @@ pub enum Goal {
     DeliverFrontierFreight,
     SurveyWillowford,
     SurveyPinefordDepot,
+    CarryMessage(u32),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -357,6 +358,7 @@ impl World {
             || audit_goal.is_some()
             || dispute_goal.is_some()
             || sect_duty_in_progress;
+        let message = self.message_plan(npc);
         let plans = [
             (
                 100,
@@ -450,7 +452,11 @@ impl World {
             ),
             (
                 54 + u16::from(npc.fatigue),
-                resting.then_some(Goal::Rest),
+                resting.then_some(if !off_duty && self.message_camp(npc) {
+                    Goal::CampRest
+                } else {
+                    Goal::Rest
+                }),
                 DecisionReason::Fatigue,
             ),
             (
@@ -462,6 +468,11 @@ impl World {
                 49,
                 self.obligation_delivery_goal(npc),
                 DecisionReason::InstitutionalObligation,
+            ),
+            (
+                message.map_or(0, |(score, _)| score),
+                message.map(|(_, goal)| goal),
+                DecisionReason::KnownOpportunity,
             ),
             (20, Some(duty), ambition_reason(npc, duty)),
         ];
@@ -542,6 +553,8 @@ impl World {
             || self.character_agency()?.people[&id].suspended.is_some()
             || self.company_goal(npc).is_some()
             || self.obligation_delivery_goal(npc).is_some()
+            || self.message_plan(npc).is_some()
+            || self.message_camp(npc)
             || self.martial_goal(npc).is_some()
             || self.npc_meridian_goal(id).is_some()
             || self.report_goal(npc).is_some()
@@ -837,6 +850,7 @@ impl World {
                 let _ = event;
             }
             Goal::InvestigateDispute(dispute_id) => self.investigate_dispute(id, dispute_id),
+            Goal::CarryMessage(project) => self.work_message(id, project),
         }
     }
 

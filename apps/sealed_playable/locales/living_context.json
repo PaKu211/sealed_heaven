@@ -4165,6 +4165,98 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.message.direct": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {
+      "at": "exchange tick",
+      "id": "stable project ID",
+      "origin": "original reporting actor",
+      "recipient": "addressed recipient",
+      "result": "reported material outcome"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.message.empty": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.message.goal": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.message.handoff": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {
+      "at": "exchange tick",
+      "holder": "actual messenger",
+      "id": "stable project ID",
+      "origin": "original reporting actor",
+      "recipient": "addressed recipient",
+      "result": "reported material outcome"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.message.help": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.message.pixel.hint": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.message.relayed": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {
+      "at": "exchange tick",
+      "holder": "actual messenger",
+      "id": "stable project ID",
+      "origin": "original reporting actor",
+      "recipient": "addressed recipient",
+      "result": "reported material outcome"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.message.result.changed": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.message.result.expired": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.message.result.fulfilled": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.message.result.lost": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.message.result.released": {
+    "active": true,
+    "context": "C5.3 witnessed message provenance; never private search targets or trust scores",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.network.aid": {
     "active": true,
     "context": "C5.0 witnessed NPC social interaction; no private scores or remote tracking",

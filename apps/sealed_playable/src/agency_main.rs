@@ -31,6 +31,7 @@ fn main() {
                 | "--c50"
                 | "--c51"
                 | "--c52"
+                | "--c53"
         )
     }) {
         let result = if options.iter().any(|arg| arg == "--worldgen-info") {

@@ -75,6 +75,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::SocialNetworks => super::social_network::REVISION,
         Rules::CollectiveAgency => super::cooperation::REVISION,
         Rules::DynamicObligations => super::obligations::REVISION,
+        Rules::SituatedCommunication => super::communication::REVISION,
     }
 }
 
@@ -144,6 +145,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::social_network::REVISION => Rules::SocialNetworks,
         super::cooperation::REVISION => Rules::CollectiveAgency,
         super::obligations::REVISION => Rules::DynamicObligations,
+        super::communication::REVISION => Rules::SituatedCommunication,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -255,6 +257,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::Invite(actor)
@@ -297,6 +300,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::Provision(actor)
@@ -339,6 +343,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::Part(actor)
@@ -380,6 +385,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::OfferAccord
@@ -421,6 +427,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::SupportHall
@@ -461,6 +468,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::PledgeLodge
@@ -501,6 +509,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::AidLodge
@@ -541,6 +550,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::RenounceLodge
@@ -574,6 +584,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::Ask(actor)
@@ -607,6 +618,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::Examine
@@ -640,6 +652,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -673,6 +686,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::Take(actor)
@@ -703,6 +717,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -735,6 +750,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::ClaimLot(value)
@@ -763,6 +779,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -791,6 +808,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::AttuneLot(value)
@@ -818,6 +836,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -844,6 +863,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::Drill(actor)
@@ -870,6 +890,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -903,6 +924,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::DrawQi
@@ -925,6 +947,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::CirculateQi
@@ -947,6 +970,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::MendMeridians
@@ -969,6 +993,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::TreatWounds
@@ -991,6 +1016,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -1006,6 +1032,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::RecoverCache(id)
@@ -1021,6 +1048,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::EntrustCache(id)
@@ -1035,6 +1063,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::AcceptRequest(id)
@@ -1049,6 +1078,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::DeclineRequest(id)
@@ -1063,6 +1093,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::AbandonRequest(id)
@@ -1076,6 +1107,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::AcceptFavor(id)
@@ -1089,6 +1121,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::DeclineFavor(id)
@@ -1102,6 +1135,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::WithdrawFavor(id)
@@ -1115,6 +1149,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::FundFavor(id)
@@ -1127,6 +1162,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::RequestAid(ActorId::new(id))
@@ -1139,6 +1175,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::RepayAid(ActorId::new(id))
@@ -1151,6 +1188,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) =>
         {
             Intent::WaiveAid(ActorId::new(id))
@@ -1162,7 +1200,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::DynamicObligations {
+        let mut bytes = if world.rules == Rules::SituatedCommunication {
+            b"SH:C53:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::DynamicObligations {
             b"SH:C52:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::CollectiveAgency {
             b"SH:C51:SCENARIO:v1\0".to_vec()
@@ -1251,6 +1291,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::SocialNetworks => b"SH:C10:RULES:v37".to_vec(),
         Rules::CollectiveAgency => b"SH:C10:RULES:v38".to_vec(),
         Rules::DynamicObligations => b"SH:C10:RULES:v39".to_vec(),
+        Rules::SituatedCommunication => b"SH:C10:RULES:v40".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -1351,6 +1392,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::SocialNetworks
             | Rules::CollectiveAgency
             | Rules::DynamicObligations
+            | Rules::SituatedCommunication
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -1406,6 +1448,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::SocialNetworks => b"SH:C10:STATE:v37".to_vec(),
         Rules::CollectiveAgency => b"SH:C10:STATE:v38".to_vec(),
         Rules::DynamicObligations => b"SH:C10:STATE:v39".to_vec(),
+        Rules::SituatedCommunication => b"SH:C10:STATE:v40".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1526,6 +1569,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1615,6 +1659,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SocialNetworks
             | Rules::CollectiveAgency
             | Rules::DynamicObligations
+            | Rules::SituatedCommunication
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1660,6 +1705,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1712,6 +1758,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SocialNetworks
             | Rules::CollectiveAgency
             | Rules::DynamicObligations
+            | Rules::SituatedCommunication
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1805,6 +1852,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -2004,6 +2052,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(obligations) = world.obligations() {
         let bytes = obligations.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(communication) = world.communication() {
+        let bytes = communication.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }
@@ -2654,6 +2707,7 @@ impl Wire {
             Goal::DeliverFrontierFreight => 53,
             Goal::SurveyWillowford => 54,
             Goal::SurveyPinefordDepot => 55,
+            Goal::CarryMessage(_) => 56,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),
@@ -2678,7 +2732,7 @@ impl Wire {
                 self.actor(recipient);
                 self.u32(event.0);
             }
-            Goal::InvestigateDispute(id) => self.u32(id),
+            Goal::InvestigateDispute(id) | Goal::CarryMessage(id) => self.u32(id),
             _ => {}
         }
     }

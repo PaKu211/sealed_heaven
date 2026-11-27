@@ -3,6 +3,7 @@
 
 mod character_agency;
 mod checkpoint;
+pub mod communication;
 mod company;
 #[cfg(test)]
 mod consequences_tests;
@@ -438,6 +439,7 @@ pub struct World {
     social_network: Option<social_network::SocialNetwork>,
     cooperation: Option<cooperation::Cooperation>,
     obligations: Option<obligations::Obligations>,
+    communication: Option<communication::Communication>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -507,6 +509,7 @@ enum Rules {
     SocialNetworks,
     CollectiveAgency,
     DynamicObligations,
+    SituatedCommunication,
 }
 
 impl Rules {
@@ -527,6 +530,7 @@ impl Rules {
                 | Self::SocialNetworks
                 | Self::CollectiveAgency
                 | Self::DynamicObligations
+                | Self::SituatedCommunication
         )
     }
 
@@ -573,6 +577,7 @@ impl Rules {
                 | Self::SocialNetworks
                 | Self::CollectiveAgency
                 | Self::DynamicObligations
+                | Self::SituatedCommunication
         )
     }
 }
@@ -744,6 +749,11 @@ impl World {
         Self::seeded(seed, Rules::DynamicObligations)
     }
 
+    /// C5.3: physical delivery of situated commitment reports.
+    pub fn communication_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::SituatedCommunication)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -761,6 +771,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
@@ -777,6 +788,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -802,6 +814,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.road_history = Some(road_history::RoadHistory::new(&mut world, seed));
             world.observe_road_history();
@@ -819,6 +832,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.init_regional_news();
         }
@@ -834,6 +848,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.scheduler = Some(lod::Scheduler::new(&world));
         }
@@ -848,6 +863,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.production = Some(production::Production::new(&world));
         }
@@ -860,6 +876,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.requests = Some(requests::Requests::default());
             world.advance_requests();
@@ -872,6 +889,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.favors = Some(favors::Favors::default());
         }
@@ -882,6 +900,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.reciprocity = Some(reciprocity::Reciprocity::default());
         }
@@ -891,20 +910,33 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.encounters = Some(encounters::Encounters::default());
         }
         if matches!(
             rules,
-            Rules::SocialNetworks | Rules::CollectiveAgency | Rules::DynamicObligations
+            Rules::SocialNetworks
+                | Rules::CollectiveAgency
+                | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         ) {
             world.social_network = Some(social_network::SocialNetwork::default());
         }
-        if matches!(rules, Rules::CollectiveAgency | Rules::DynamicObligations) {
+        if matches!(
+            rules,
+            Rules::CollectiveAgency | Rules::DynamicObligations | Rules::SituatedCommunication
+        ) {
             world.cooperation = Some(cooperation::Cooperation::default());
         }
-        if rules == Rules::DynamicObligations {
+        if matches!(
+            rules,
+            Rules::DynamicObligations | Rules::SituatedCommunication
+        ) {
             world.obligations = Some(obligations::Obligations::default());
+        }
+        if rules == Rules::SituatedCommunication {
+            world.communication = Some(communication::Communication::default());
         }
         world
     }
@@ -935,6 +967,7 @@ impl World {
             social_network: None,
             cooperation: None,
             obligations: None,
+            communication: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -985,6 +1018,7 @@ impl World {
                         | Rules::SocialNetworks
                         | Rules::CollectiveAgency
                         | Rules::DynamicObligations
+                        | Rules::SituatedCommunication
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -1035,6 +1069,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(Company::default),
             rivalry: matches!(
@@ -1073,6 +1108,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -1110,6 +1146,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(Politics::new),
             traffic: matches!(
@@ -1146,6 +1183,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -1181,6 +1219,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -1213,6 +1252,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -1244,6 +1284,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(Information::default),
             contested: matches!(
@@ -1269,6 +1310,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(|| {
                 Contested::new(matches!(
@@ -1293,6 +1335,7 @@ impl World {
                         | Rules::SocialNetworks
                         | Rules::CollectiveAgency
                         | Rules::DynamicObligations
+                        | Rules::SituatedCommunication
                 ))
             }),
             martial: matches!(
@@ -1316,6 +1359,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -1338,6 +1382,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -1359,6 +1404,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -1379,6 +1425,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -1398,6 +1445,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1586,6 +1634,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1620,6 +1669,7 @@ impl World {
                     | Rules::SocialNetworks
                     | Rules::CollectiveAgency
                     | Rules::DynamicObligations
+                    | Rules::SituatedCommunication
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1682,6 +1732,7 @@ impl World {
         self.reconcile_cooperation();
         self.observe_cooperation_receipts();
         self.advance_obligations();
+        self.delegate_messages();
         self.advance_social_network();
         self.observe_road_history();
         self.advance_requests();
@@ -1870,6 +1921,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         )
     }
 
@@ -1901,6 +1953,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         )
     }
 
@@ -1931,6 +1984,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         )
     }
 
@@ -1960,6 +2014,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         )
     }
 
@@ -1988,6 +2043,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         )
     }
 
@@ -2014,6 +2070,7 @@ impl World {
                 | Rules::SocialNetworks
                 | Rules::CollectiveAgency
                 | Rules::DynamicObligations
+                | Rules::SituatedCommunication
         )
     }
 

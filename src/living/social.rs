@@ -531,6 +531,7 @@ impl World {
                     | super::Rules::SocialNetworks
                     | super::Rules::CollectiveAgency
                     | super::Rules::DynamicObligations
+                    | super::Rules::SituatedCommunication
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

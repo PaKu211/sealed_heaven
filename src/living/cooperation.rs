@@ -35,7 +35,7 @@ impl Route {
             Self::Willowford => (Goal::StockFrontierDepot, Goal::CollectFrontierFreight),
         }
     }
-    fn hub(self) -> Position {
+    pub(super) fn hub(self) -> Position {
         match self {
             Self::Qinghe => Region::sites().market,
             Self::Willowford => expansion::DEPOT,
@@ -592,6 +592,107 @@ mod tests {
         assert_eq!(w.dispatch_amount(route, a, b), Some((2, 2)), "{route:?}");
         assert_eq!(collect, route.goals().1);
         (w, a, b, plans)
+    }
+
+    #[test]
+    fn c53_real_delivery_creates_one_report_and_search_uses_only_known_sites() {
+        use crate::living::communication::{Kind, SEARCH_BUDGET};
+        use crate::living::navigation::distance;
+        let (mut w, a, b, plans) = fixture_for(World::communication_campaign(0), Route::Qinghe);
+        let supply = w.supply.shrine;
+        w.commit_cooperative_dispatches(&plans);
+        assert!(w.communication().unwrap().messages().is_empty());
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().position = w.scenario.shrine;
+        w.unload_regional_cargo(b, false);
+        assert_eq!(w.supply.shrine, supply + 2);
+        assert_eq!(w.communication().unwrap().counts(), (1, 0, 0, 0));
+        let m = w.communication().unwrap().messages()[&b];
+        assert_eq!((m.origin, m.recipient, m.holder), (b, a, b));
+        assert_eq!(
+            w.message_plan(&w.npcs[&b]),
+            Some((45, Goal::CarryMessage(m.project)))
+        );
+        assert!(matches!(w.choose_goal(&w.npcs[&b]), Goal::CarryMessage(_)));
+        let before = w.npcs[&b].position;
+        w.traffic.as_mut().unwrap().begin_tick();
+        w.work_message(b, m.project);
+        assert_eq!(distance(before, w.npcs[&b].position), 1);
+        assert_eq!(w.communication().unwrap().messages()[&b].effort, 1);
+        assert_eq!(w.supply.shrine, supply + 2);
+        w.npcs.get_mut(&b).unwrap().hp -= 1;
+        assert!(w.message_plan(&w.npcs[&b]).is_none());
+        w.npcs.get_mut(&b).unwrap().hp += 1;
+        let threshold = w.npcs[&b].definition.rest_threshold;
+        w.npcs.get_mut(&b).unwrap().fatigue = threshold;
+        assert!(w.message_plan(&w.npcs[&b]).is_none());
+        assert!(w.message_camp(&w.npcs[&b]));
+        w.npcs.get_mut(&b).unwrap().fatigue = 0;
+        let near = w.npcs[&a].position;
+        let cell = DIRECTIONS
+            .into_iter()
+            .filter_map(|d| navigation::moved(near, d))
+            .find(|&p| w.walkable(p))
+            .unwrap();
+        w.npcs.get_mut(&b).unwrap().position = cell;
+        w.player.position = near;
+        let initial = w.social.relationship(a, b).regard;
+        w.advance_obligations();
+        assert_eq!(w.communication().unwrap().counts(), (1, 1, 0, 0));
+        assert_eq!(
+            w.communication().unwrap().history().back().unwrap().kind,
+            Kind::Direct
+        );
+        assert_eq!(w.witnessed_messages().count(), 1);
+        assert_eq!(w.social.relationship(a, b).regard, (initial + 1).min(8));
+        assert!(w.communication().unwrap().messages().is_empty());
+        assert!(w.message_plan(&w.npcs[&b]).is_none());
+        let snapshot = w.clone();
+        w.advance_obligations();
+        w.delegate_messages();
+        assert_eq!(w, snapshot);
+        assert!(m.effort < SEARCH_BUDGET);
+    }
+
+    #[test]
+    fn c53_natural_reports_reach_partners_with_physical_effort_and_replay() {
+        let mut delivered = 0;
+        for seed in [0, 3, 7, 42] {
+            let mut w = World::communication_campaign(seed);
+            let mut twin = w.clone();
+            let mut effort = 0u32;
+            for _ in 0..2000 {
+                assert_eq!(
+                    w.step(w.tick(), Intent::Wait),
+                    twin.step(twin.tick(), Intent::Wait)
+                );
+                if w.npcs()
+                    .any(|n| matches!(n.activity.goal, Goal::CarryMessage(_)))
+                {
+                    effort += 1;
+                }
+            }
+            assert_eq!(w, twin);
+            assert_eq!(World::restore(&w.checkpoint()).unwrap(), w);
+            let c = w.communication().unwrap();
+            let (created, done, expired, handoffs) = c.counts();
+            assert_eq!(created, done + expired + c.messages().len() as u32);
+            assert_eq!(done, w.obligations().unwrap().counts().2);
+            delivered += done;
+            println!(
+                "seed {seed}: messages={:?} goal_ticks={effort} events={:?}",
+                c.counts(),
+                c.history()
+            );
+            if created > 0 {
+                assert!(effort > 0);
+            }
+            assert!(handoffs <= created);
+        }
+        assert!(
+            delivered >= 2,
+            "active report delivery should improve the prior natural 1/3 baseline"
+        );
     }
 
     #[test]
