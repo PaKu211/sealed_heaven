@@ -236,7 +236,7 @@ impl Rumors {
         }
         true
     }
-    fn prune(&mut self, now: u64) {
+    fn prune(&mut self, now: u64, retain_reported: bool) {
         self.local.retain(|_, s| s.fresh(now));
         self.reports.retain(|_, a| a.fresh(now));
         // Verification state is bounded per actor/site and removed when no
@@ -245,7 +245,10 @@ impl Rumors {
             .attempts
             .keys()
             .copied()
-            .filter(|&(a, s)| self.view(a, s, now).status != Status::Contested)
+            .filter(|&(a, s)| {
+                let status = self.view(a, s, now).status;
+                status != Status::Contested && !(retain_reported && status == Status::Reported)
+            })
             .collect();
         for k in stale {
             self.attempts.remove(&k);
@@ -446,7 +449,11 @@ impl World {
         if self.rumors.is_none() {
             return;
         }
-        self.rumors.as_mut().unwrap().prune(self.tick);
+        let retain_reported = self.development.is_some();
+        self.rumors
+            .as_mut()
+            .unwrap()
+            .prune(self.tick, retain_reported);
         let local: BTreeMap<_, _> = self
             .npcs
             .values()
@@ -510,23 +517,52 @@ impl World {
         {
             return None;
         }
+        let available = |s: Site| {
+            r.attempts
+                .get(&(n.id(), s))
+                .is_none_or(|a| self.tick >= a.retry_at)
+        };
+        // Preserve the established contested-work ordering. Learned
+        // single-account leads are strictly secondary and optional.
         Site::ALL
             .into_iter()
-            .find(|&s| {
-                r.view(n.id(), s, self.tick).status == Status::Contested
-                    && r.attempts
-                        .get(&(n.id(), s))
-                        .is_none_or(|a| self.tick >= a.retry_at)
+            .find(|&s| available(s) && r.view(n.id(), s, self.tick).status == Status::Contested)
+            .or_else(|| {
+                Site::ALL
+                    .into_iter()
+                    .filter(|&s| available(s))
+                    .filter_map(|s| {
+                        self.development_report_lead(n.id(), s).map(|confidence| {
+                            (
+                                self.development()
+                                    .is_some_and(|d| d.efforts().contains_key(&(n.id(), s))),
+                                r.view(n.id(), s, self.tick).low.is_some(),
+                                confidence,
+                                Reverse(s),
+                            )
+                        })
+                    })
+                    .max()
+                    .map(|(_, _, _, Reverse(s))| s)
             })
             .map(Goal::VerifyRumor)
     }
     pub(super) fn work_verification(&mut self, id: ActorId, site: Site) {
         let n = self.npcs[&id];
+        let r = self.rumors().unwrap();
+        let status = r.view(id, site, self.tick).status;
+        let extended =
+            status == Status::Reported && self.development_report_lead(id, site).is_some();
         if !self.verification_eligible(&n)
-            || self.rumors().unwrap().view(id, site, self.tick).status != Status::Contested
+            || (status != Status::Contested && !extended)
+            || (self.development.is_some()
+                && r.attempts
+                    .get(&(id, site))
+                    .is_some_and(|a| self.tick < a.retry_at))
         {
             return;
         }
+        self.note_inquiry_effort(id, site, extended);
         let target = site.position(self);
         self.travel(id, target, 1);
         let a = self
@@ -584,6 +620,126 @@ mod tests {
         let now = w.tick;
         assert!(w.rumors.as_mut().unwrap().receive(to, from, a, now));
         a
+    }
+
+    #[test]
+    fn c56_learned_inquiry_extends_real_work_without_overriding_safety_or_trust() {
+        use crate::living::development::{Focus, SETBACK_YIELD};
+        let mut w = World::development_campaign(3);
+        w.rumors = Some(Rumors::default());
+        let site = S.position(&w);
+        place(&mut w, PLAYER, row(0));
+        place(&mut w, A, row(1));
+        place(&mut w, B, row(2));
+        w.social.meet(A, B);
+        for at in [10, 50, 90] {
+            place(&mut w, B, row(2));
+            known(&mut w, A, true, at);
+            let a = transfer(&mut w, A, B);
+            w.story_account(B, a);
+            let before = w.development().unwrap().profiles()[&B].checked;
+            w.tick += 1;
+            w.region.as_mut().unwrap().market_herbs = 0;
+            place(&mut w, B, site);
+            w.observe_regional(1);
+            assert_eq!(w.development().unwrap().profiles()[&B].checked, before + 1);
+        }
+        let profile = w.development().unwrap().profiles()[&B];
+        assert!(profile.inquiry_points >= 3);
+        assert_eq!(profile.focus, Focus::Inquiry);
+        // A credible report that supplies recovered is also useful once
+        // the prior local check is stale. A real check yields before more optional work.
+        let mut recovery = w.clone();
+        place(&mut recovery, B, row(2));
+        known(&mut recovery, A, false, 300);
+        let report = transfer(&mut recovery, A, B);
+        recovery.story_account(B, report);
+        assert_eq!(
+            recovery.rumors().unwrap().view(B, S, 300).status,
+            Status::Reported
+        );
+        assert_eq!(
+            recovery.rumor_goal(&recovery.npcs[&B], Goal::Patrol),
+            Some(Goal::VerifyRumor(S))
+        );
+        recovery.traffic.as_mut().unwrap().begin_tick();
+        recovery.work_verification(B, S);
+        recovery.tick += 1;
+        recovery.region.as_mut().unwrap().market_herbs = 20;
+        place(&mut recovery, B, site);
+        recovery.observe_regional(1);
+        assert_eq!(
+            recovery.development().unwrap().profiles()[&B].inquiry_retry_at,
+            recovery.tick + crate::living::development::CHECK_YIELD
+        );
+        assert!(
+            !recovery
+                .development()
+                .unwrap()
+                .efforts()
+                .contains_key(&(B, S))
+        );
+        place(&mut w, B, row(2));
+        known(&mut w, A, true, 130);
+        let a = transfer(&mut w, A, B);
+        w.story_account(B, a);
+        assert_eq!(
+            w.rumors().unwrap().view(B, S, w.tick).status,
+            Status::Reported
+        );
+        assert_eq!(
+            w.rumor_goal(&w.npcs[&B], Goal::Patrol),
+            Some(Goal::VerifyRumor(S))
+        );
+        assert!(w.rumor_goal(&w.npcs[&B], Goal::DeliverFreight).is_none());
+        let mut alternate = w.clone();
+        alternate.region.as_mut().unwrap().market_herbs = 20;
+        assert_eq!(
+            alternate.rumor_goal(&alternate.npcs[&B], Goal::Patrol),
+            w.rumor_goal(&w.npcs[&B], Goal::Patrol)
+        );
+        let old = w.social.relations[&(B, A)].regard;
+        w.social.relations.get_mut(&(B, A)).unwrap().regard = -1;
+        assert!(w.rumor_goal(&w.npcs[&B], Goal::Patrol).is_none());
+        w.social.relations.get_mut(&(B, A)).unwrap().regard = old;
+        w.npcs.get_mut(&B).unwrap().hp -= 1;
+        assert!(w.rumor_goal(&w.npcs[&B], Goal::Patrol).is_none());
+        w.npcs.get_mut(&B).unwrap().hp += 1;
+        let threshold = w.npcs[&B].definition.rest_threshold;
+        w.npcs.get_mut(&B).unwrap().fatigue = threshold;
+        assert!(w.rumor_goal(&w.npcs[&B], Goal::Patrol).is_none());
+        w.npcs.get_mut(&B).unwrap().fatigue = 0;
+        // The same physical movement and search budget apply to extended work.
+        w.rumors.as_mut().unwrap().attempts.insert(
+            (B, S),
+            Attempt {
+                spent: VERIFY_BUDGET - 1,
+                retry_at: 0,
+            },
+        );
+        w.traffic.as_mut().unwrap().begin_tick();
+        let pos = w.npcs[&B].position;
+        w.work_verification(B, S);
+        assert!(super::super::navigation::distance(pos, w.npcs[&B].position) <= 1);
+        let e = w.development().unwrap().efforts()[&(B, S)];
+        assert_eq!((e.ticks, e.extended_ticks), (1, 1));
+        let attempt = w.rumors().unwrap().attempts()[&(B, S)];
+        assert_eq!(
+            (attempt.spent, attempt.retry_at),
+            (0, w.tick + VERIFY_YIELD)
+        );
+        w.rumors.as_mut().unwrap().prune(w.tick, true);
+        assert_eq!(w.rumors().unwrap().attempts()[&(B, S)], attempt);
+        assert!(w.rumor_goal(&w.npcs[&B], Goal::Patrol).is_none());
+        w.work_verification(B, S);
+        assert_eq!(w.development().unwrap().efforts()[&(B, S)], e);
+        w.tick = 130 + LIFETIME;
+        w.expire_inquiries();
+        let p = w.development().unwrap().profiles()[&B];
+        assert_eq!(p.attempted_setbacks, 1);
+        assert_eq!(p.inquiry_retry_at, w.tick + SETBACK_YIELD);
+        assert_eq!(p.inquiry_points, profile.inquiry_points - 1);
+        assert!(!w.development().unwrap().efforts().contains_key(&(B, S)));
     }
 
     #[test]

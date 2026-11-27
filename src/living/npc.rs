@@ -466,7 +466,7 @@ impl World {
                 DecisionReason::PhysicalRecovery,
             ),
             (
-                49,
+                49 + self.development_delivery_bonus(npc),
                 self.obligation_delivery_goal(npc),
                 DecisionReason::InstitutionalObligation,
             ),

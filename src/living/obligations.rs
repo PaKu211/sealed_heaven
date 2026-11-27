@@ -288,6 +288,8 @@ impl World {
         self.obligations().is_none_or(|o| {
             !o.pending.contains_key(&carrier)
                 && self.tick >= o.reliability(grower, carrier).retry_at
+                && self.development_can_partner(grower, carrier)
+                && self.development_can_partner(carrier, grower)
         })
     }
     pub(super) fn open_obligation(&mut self, team: Team) {

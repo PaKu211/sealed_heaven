@@ -31,6 +31,7 @@ pub(crate) struct Session {
     news_cursor: usize,
     rumor_cursor: usize,
     story_cursor: usize,
+    profile_cursor: usize,
 }
 
 impl Session {
@@ -44,11 +45,14 @@ impl Session {
             news_cursor: 0,
             rumor_cursor: 0,
             story_cursor: 0,
+            profile_cursor: 0,
         }
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 42 {
+        if self.world.checkpoint_revision() == 43 {
+            World::development_campaign(seed)
+        } else if self.world.checkpoint_revision() == 42 {
             World::narrative_campaign(seed)
         } else if self.world.checkpoint_revision() == 41 {
             World::rumor_campaign(seed)
@@ -1128,6 +1132,21 @@ impl Session {
                 };
                 return true;
             }
+            "profiles" if self.world.development().is_some() => {
+                self.notice = self.profile_lines().join("\n");
+                return true;
+            }
+            "profilesnext" if self.world.development().is_some() => {
+                let pages = self.profile_lines();
+                let page = self.profile_cursor % pages.len();
+                self.notice = format!("{}/{}  {}", page + 1, pages.len(), pages[page]);
+                self.profile_cursor = (page + 1) % pages.len();
+                return true;
+            }
+            "profiledebug" if self.debug_world && self.world.development().is_some() => {
+                self.notice = format!("{:?}", self.world.development().unwrap());
+                return true;
+            }
             "stories" if self.world.narrative().is_some() => {
                 self.notice = self.story_lines().join("\n");
                 return true;
@@ -1620,6 +1639,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.favor.help"));
                     if self.debug_world {
                         self.notice.push_str(" favordebug");
+                    }
+                }
+                if self.world.development().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.profile.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" profiledebug");
                     }
                 }
                 if self.world.narrative().is_some() {
@@ -2301,6 +2328,38 @@ impl Session {
             ],
         )
     }
+    pub(crate) fn profile_lines(&self) -> Vec<String> {
+        use sealed_sim::living::development::Focus;
+        let mut profiles = self.world.known_pursuits().collect::<Vec<_>>();
+        profiles.sort_by_key(|p| std::cmp::Reverse((p.at, std::cmp::Reverse(p.actor))));
+        let mut rows = profiles
+            .into_iter()
+            .map(|p| {
+                let focus = living_text(
+                    self.locale,
+                    match p.focus {
+                        Focus::Vocation => "living.profile.vocation",
+                        Focus::Inquiry => "living.profile.inquiry",
+                        Focus::Partnership => "living.profile.partnership",
+                    },
+                );
+                living_format(
+                    self.locale,
+                    "living.profile.line",
+                    &[
+                        ("actor", actor_name(self.locale, &self.world, p.actor)),
+                        ("at", &p.at.to_string()),
+                        ("focus", focus),
+                    ],
+                )
+            })
+            .collect::<Vec<_>>();
+        if rows.is_empty() {
+            rows.push(living_text(self.locale, "living.profile.empty").into());
+        }
+        rows
+    }
+
     pub(crate) fn story_lines(&self) -> Vec<String> {
         use sealed_sim::living::{
             cooperation::{Evidence, Route},
@@ -5073,6 +5132,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         40 => "checkpoint.c53",
         41 => "checkpoint.c54",
         42 => "checkpoint.c55",
+        43 => "checkpoint.c56",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -5115,12 +5175,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         40 => World::communication_campaign(0),
         41 => World::rumor_campaign(0),
         42 => World::narrative_campaign(0),
+        43 => World::development_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn development_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 43);
+    if seed != 0 {
+        session.world = World::development_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_development_campaign(seed: u32, debug_world: bool) {
+    run_session(development_session(seed, debug_world));
+}
 pub(crate) fn narrative_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 42);
     if seed != 0 {

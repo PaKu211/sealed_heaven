@@ -576,6 +576,7 @@ impl World {
         if let Some(p) = receipt {
             n.receipt(p, self.tick);
         }
+        self.learn_own_resolution(r);
     }
     pub(super) fn story_register(&mut self, r: Witnessed) {
         if let Some(n) = self.narrative.as_mut() {
@@ -587,6 +588,7 @@ impl World {
         if let Some(n) = self.narrative.as_mut() {
             n.report(m, seen);
         }
+        self.learn_reported_resolution(m);
     }
     pub(super) fn story_account(&mut self, actor: ActorId, a: Account) {
         if self.narrative.is_none() {
@@ -599,6 +601,13 @@ impl World {
             .account(actor, a, v, self.tick);
     }
     pub(super) fn story_check(&mut self, actor: ActorId, s: Sample) {
+        if let Some(i) = self
+            .narrative()
+            .and_then(|n| n.active_inquiries().get(&(actor, s.site)))
+            .copied()
+        {
+            self.learn_inquiry_end(i, InquiryEnd::Checked(s));
+        }
         if let Some(n) = self.narrative.as_mut() {
             n.end_inquiry(actor, s.site, InquiryEnd::Checked(s));
         }
@@ -624,9 +633,13 @@ impl World {
                     )
             })
             .collect();
-        let n = self.narrative.as_mut().unwrap();
         for (a, s) in stale {
-            n.end_inquiry(a, s, InquiryEnd::Lapsed(self.tick));
+            let i = self.narrative().unwrap().active_inquiries()[&(a, s)];
+            self.learn_inquiry_end(i, InquiryEnd::Lapsed(self.tick));
+            self.narrative
+                .as_mut()
+                .unwrap()
+                .end_inquiry(a, s, InquiryEnd::Lapsed(self.tick));
         }
     }
 }

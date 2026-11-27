@@ -599,6 +599,126 @@ mod tests {
     }
 
     #[test]
+    fn c56_success_changes_personal_focus_only_when_each_partner_knows() {
+        use crate::living::development::{Cause, Focus, ProjectEvidence};
+        let (mut w, a, b, plans) = fixture_for(World::development_campaign(0), Route::Qinghe);
+        w.commit_cooperative_dispatches(&plans);
+        let id = w.cooperation().unwrap().active()[&b].id;
+        let initial = w.development().unwrap().profiles()[&a];
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().position = w.scenario.shrine;
+        w.unload_regional_cargo(b, false);
+        let d = w.development().unwrap();
+        assert_eq!(d.profiles()[&a], initial);
+        assert_eq!(d.profiles()[&b].focus, Focus::Partnership);
+        assert_eq!(d.profiles()[&b].successful_projects, 1);
+        assert_eq!(d.partners()[&(b, a)].last_project, id);
+        assert!(!d.partners().contains_key(&(a, b)));
+        assert!(matches!(
+            d.history().back().unwrap().cause,
+            Cause::Project {
+                evidence: ProjectEvidence::OwnWork,
+                ..
+            }
+        ));
+        assert_eq!(w.development_partner_bonus(b, a), 2);
+        w.advance_obligations();
+        assert_eq!(w.development().unwrap().profiles()[&a], initial);
+        let near = w.npcs[&a].position;
+        let cell = DIRECTIONS
+            .into_iter()
+            .filter_map(|d| navigation::moved(near, d))
+            .find(|&p| w.walkable(p))
+            .unwrap();
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().position = cell;
+        w.advance_obligations();
+        let d = w.development().unwrap();
+        assert_eq!(d.profiles()[&a].focus, Focus::Partnership);
+        assert_eq!(d.profiles()[&a].successful_projects, 1);
+        assert_eq!(d.profiles()[&b].successful_projects, 1);
+        assert_eq!(d.partners()[&(a, b)].learned_at, 12);
+        assert!(matches!(
+            d.history().back().unwrap().cause,
+            Cause::Project {
+                evidence: ProjectEvidence::Conversation,
+                ..
+            }
+        ));
+        let snapshot = d.clone();
+        w.advance_obligations();
+        assert_eq!(w.development().unwrap(), &snapshot);
+        assert_eq!(w.development().unwrap().known().len(), 0);
+    }
+
+    #[test]
+    fn c56_disruption_creates_bounded_directional_caution_not_remote_blame() {
+        use crate::living::development::{Cause, PARTNER_YIELD};
+        use crate::living::obligations::ResultKind;
+        let (mut w, a, b, plans) = fixture_for(World::development_campaign(0), Route::Qinghe);
+        w.commit_cooperative_dispatches(&plans);
+        let initial = w.social.relationship(a, b);
+        let hub = w.npcs[&a].position;
+        w.tick += 1;
+        // Controlled interruption: return one item to actual market stock.
+        w.npcs.get_mut(&b).unwrap().herbs -= 1;
+        w.region.as_mut().unwrap().market_herbs += 1;
+        w.npcs.get_mut(&b).unwrap().position = w.scenario.shrine;
+        w.reconcile_cooperation();
+        assert!(!w.development_can_partner(b, a));
+        assert!(w.development_can_partner(a, b));
+        assert_eq!(w.social.relationship(a, b), initial);
+        assert_eq!(
+            w.development().unwrap().profiles()[&a].disrupted_projects,
+            0
+        );
+        w.advance_obligations();
+        assert!(w.development_can_partner(a, b));
+        w.tick += 1;
+        let cell = DIRECTIONS
+            .into_iter()
+            .filter_map(|d| navigation::moved(hub, d))
+            .find(|&p| w.walkable(p))
+            .unwrap();
+        w.npcs.get_mut(&b).unwrap().position = cell;
+        w.advance_obligations();
+        assert_eq!(w.social.relationship(a, b), initial);
+        assert_eq!(
+            w.development().unwrap().profiles()[&a].disrupted_projects,
+            1
+        );
+        assert!(!w.development_can_partner(a, b));
+        assert!(!w.can_offer_commitment(a, b));
+        let d = w.development().unwrap();
+        assert_eq!(d.partners()[&(b, a)].retry_at, 11 + PARTNER_YIELD);
+        assert_eq!(d.partners()[&(a, b)].retry_at, 12 + PARTNER_YIELD);
+        assert!(matches!(
+            d.history().back().unwrap().cause,
+            Cause::Project {
+                result: ResultKind::ChangedCargo,
+                ..
+            }
+        ));
+        w.tick = 11 + PARTNER_YIELD;
+        assert!(w.development_can_partner(b, a) && !w.development_can_partner(a, b));
+        w.tick += 1;
+        assert!(w.can_offer_commitment(a, b));
+        assert_eq!(w.social.relationship(a, b), initial);
+    }
+
+    #[test]
+    fn c56_carrier_loss_does_not_teach_a_dead_carrier_or_uninformed_partner() {
+        let (mut w, a, b, plans) = fixture_for(World::development_campaign(0), Route::Qinghe);
+        w.commit_cooperative_dispatches(&plans);
+        let snapshot = w.development().unwrap().clone();
+        w.tick += 1;
+        w.npcs.get_mut(&b).unwrap().hp = 0;
+        w.reconcile_cooperation();
+        assert_eq!(w.development().unwrap(), &snapshot);
+        assert!(w.development_can_partner(a, b));
+    }
+
+    #[test]
     fn c55_real_project_has_causal_chain_and_evidence_only_projection() {
         use crate::living::{communication::Kind, obligations::ResultKind};
         let (mut w, a, b, plans) = fixture_for(World::narrative_campaign(0), Route::Qinghe);

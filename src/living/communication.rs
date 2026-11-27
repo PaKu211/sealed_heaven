@@ -230,7 +230,11 @@ impl World {
         }
         // Urgent disruption/near-expiry reports outrank routine work only.
         let urgent = r.result != ResultKind::Fulfilled || self.tick.saturating_sub(r.at) >= 360;
-        Some((if urgent { 50 } else { 45 }, Goal::CarryMessage(m.project)))
+        let score = if urgent { 50 } else { 45 };
+        Some((
+            (score + self.development_partner_bonus(n.id(), m.recipient)).min(51),
+            Goal::CarryMessage(m.project),
+        ))
     }
     pub(super) fn message_camp(&self, n: &Npc) -> bool {
         self.message_for(n).is_some()

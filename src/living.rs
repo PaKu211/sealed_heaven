@@ -16,6 +16,7 @@ mod contracts;
 #[cfg(test)]
 mod contracts_tests;
 pub mod cooperation;
+pub mod development;
 pub mod encounters;
 pub mod expansion;
 mod faction_agency;
@@ -444,6 +445,7 @@ pub struct World {
     communication: Option<communication::Communication>,
     rumors: Option<rumors::Rumors>,
     narrative: Option<narrative::Narrative>,
+    development: Option<development::Development>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -516,6 +518,7 @@ enum Rules {
     SituatedCommunication,
     InformationNetworks,
     CausalNarratives,
+    PersonalDevelopment,
 }
 
 impl Rules {
@@ -539,6 +542,7 @@ impl Rules {
                 | Self::SituatedCommunication
                 | Self::InformationNetworks
                 | Self::CausalNarratives
+                | Self::PersonalDevelopment
         )
     }
 
@@ -588,6 +592,7 @@ impl Rules {
                 | Self::SituatedCommunication
                 | Self::InformationNetworks
                 | Self::CausalNarratives
+                | Self::PersonalDevelopment
         )
     }
 }
@@ -774,6 +779,11 @@ impl World {
         Self::seeded(seed, Rules::CausalNarratives)
     }
 
+    /// C5.6: evidence-based personal development and adaptive pursuits.
+    pub fn development_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::PersonalDevelopment)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -794,6 +804,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
@@ -813,6 +824,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -841,6 +853,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.road_history = Some(road_history::RoadHistory::new(&mut world, seed));
             world.observe_road_history();
@@ -861,6 +874,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.init_regional_news();
         }
@@ -879,6 +893,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.scheduler = Some(lod::Scheduler::new(&world));
         }
@@ -896,6 +911,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.production = Some(production::Production::new(&world));
         }
@@ -911,6 +927,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.requests = Some(requests::Requests::default());
             world.advance_requests();
@@ -926,6 +943,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.favors = Some(favors::Favors::default());
         }
@@ -939,6 +957,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.reciprocity = Some(reciprocity::Reciprocity::default());
         }
@@ -951,6 +970,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.encounters = Some(encounters::Encounters::default());
         }
@@ -962,6 +982,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.social_network = Some(social_network::SocialNetwork::default());
         }
@@ -972,6 +993,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.cooperation = Some(cooperation::Cooperation::default());
         }
@@ -981,21 +1003,31 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.obligations = Some(obligations::Obligations::default());
         }
         if matches!(
             rules,
-            Rules::SituatedCommunication | Rules::InformationNetworks | Rules::CausalNarratives
+            Rules::SituatedCommunication
+                | Rules::InformationNetworks
+                | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             world.communication = Some(communication::Communication::default());
         }
-        if matches!(rules, Rules::InformationNetworks | Rules::CausalNarratives) {
+        if matches!(
+            rules,
+            Rules::InformationNetworks | Rules::CausalNarratives | Rules::PersonalDevelopment
+        ) {
             world.rumors = Some(rumors::Rumors::default());
             world.observe_regional(0);
         }
-        if rules == Rules::CausalNarratives {
+        if matches!(rules, Rules::CausalNarratives | Rules::PersonalDevelopment) {
             world.narrative = Some(narrative::Narrative::default());
+        }
+        if rules == Rules::PersonalDevelopment {
+            world.development = Some(development::Development::new(world.npcs.keys().copied()));
         }
         world
     }
@@ -1029,6 +1061,7 @@ impl World {
             communication: None,
             rumors: None,
             narrative: None,
+            development: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -1082,6 +1115,7 @@ impl World {
                         | Rules::SituatedCommunication
                         | Rules::InformationNetworks
                         | Rules::CausalNarratives
+                        | Rules::PersonalDevelopment
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -1135,6 +1169,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(Company::default),
             rivalry: matches!(
@@ -1176,6 +1211,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -1216,6 +1252,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(Politics::new),
             traffic: matches!(
@@ -1255,6 +1292,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -1293,6 +1331,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -1328,6 +1367,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -1362,6 +1402,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(Information::default),
             contested: matches!(
@@ -1390,6 +1431,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(|| {
                 Contested::new(matches!(
@@ -1417,6 +1459,7 @@ impl World {
                         | Rules::SituatedCommunication
                         | Rules::InformationNetworks
                         | Rules::CausalNarratives
+                        | Rules::PersonalDevelopment
                 ))
             }),
             martial: matches!(
@@ -1443,6 +1486,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -1468,6 +1512,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -1492,6 +1537,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -1515,6 +1561,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -1537,6 +1584,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1728,6 +1776,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1765,6 +1814,7 @@ impl World {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -2022,6 +2072,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         )
     }
 
@@ -2056,6 +2107,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         )
     }
 
@@ -2089,6 +2141,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         )
     }
 
@@ -2121,6 +2174,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         )
     }
 
@@ -2152,6 +2206,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         )
     }
 
@@ -2181,6 +2236,7 @@ impl World {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         )
     }
 
@@ -2278,6 +2334,7 @@ impl World {
         }
         self.regional_conversation(id);
         self.rumor_conversation(id);
+        self.disclose_development(id);
         self.discuss_favor(id);
         Ok(Outcome::Spoke(id))
     }

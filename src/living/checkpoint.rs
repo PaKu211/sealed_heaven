@@ -78,6 +78,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::SituatedCommunication => super::communication::REVISION,
         Rules::InformationNetworks => super::rumors::REVISION,
         Rules::CausalNarratives => super::narrative::REVISION,
+        Rules::PersonalDevelopment => super::development::REVISION,
     }
 }
 
@@ -150,6 +151,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::communication::REVISION => Rules::SituatedCommunication,
         super::rumors::REVISION => Rules::InformationNetworks,
         super::narrative::REVISION => Rules::CausalNarratives,
+        super::development::REVISION => Rules::PersonalDevelopment,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -264,6 +266,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::Invite(actor)
@@ -309,6 +312,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::Provision(actor)
@@ -354,6 +358,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::Part(actor)
@@ -398,6 +403,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::OfferAccord
@@ -442,6 +448,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::SupportHall
@@ -485,6 +492,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::PledgeLodge
@@ -528,6 +536,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::AidLodge
@@ -571,6 +580,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::RenounceLodge
@@ -607,6 +617,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::Ask(actor)
@@ -643,6 +654,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::Examine
@@ -679,6 +691,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -715,6 +728,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::Take(actor)
@@ -748,6 +762,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -783,6 +798,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::ClaimLot(value)
@@ -814,6 +830,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -845,6 +862,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::AttuneLot(value)
@@ -875,6 +893,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -904,6 +923,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::Drill(actor)
@@ -933,6 +953,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -969,6 +990,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::DrawQi
@@ -994,6 +1016,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::CirculateQi
@@ -1019,6 +1042,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::MendMeridians
@@ -1044,6 +1068,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::TreatWounds
@@ -1069,6 +1094,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -1087,6 +1113,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::RecoverCache(id)
@@ -1105,6 +1132,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::EntrustCache(id)
@@ -1122,6 +1150,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::AcceptRequest(id)
@@ -1139,6 +1168,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::DeclineRequest(id)
@@ -1156,6 +1186,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::AbandonRequest(id)
@@ -1172,6 +1203,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::AcceptFavor(id)
@@ -1188,6 +1220,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::DeclineFavor(id)
@@ -1204,6 +1237,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::WithdrawFavor(id)
@@ -1220,6 +1254,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::FundFavor(id)
@@ -1235,6 +1270,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::RequestAid(ActorId::new(id))
@@ -1250,6 +1286,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::RepayAid(ActorId::new(id))
@@ -1265,6 +1302,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) =>
         {
             Intent::WaiveAid(ActorId::new(id))
@@ -1276,7 +1314,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::CausalNarratives {
+        let mut bytes = if world.rules == Rules::PersonalDevelopment {
+            b"SH:C56:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::CausalNarratives {
             b"SH:C55:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::InformationNetworks {
             b"SH:C54:SCENARIO:v1\0".to_vec()
@@ -1374,6 +1414,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::SituatedCommunication => b"SH:C10:RULES:v40".to_vec(),
         Rules::InformationNetworks => b"SH:C10:RULES:v41".to_vec(),
         Rules::CausalNarratives => b"SH:C10:RULES:v42".to_vec(),
+        Rules::PersonalDevelopment => b"SH:C10:RULES:v43".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -1477,6 +1518,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::SituatedCommunication
             | Rules::InformationNetworks
             | Rules::CausalNarratives
+            | Rules::PersonalDevelopment
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -1535,6 +1577,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::SituatedCommunication => b"SH:C10:STATE:v40".to_vec(),
         Rules::InformationNetworks => b"SH:C10:STATE:v41".to_vec(),
         Rules::CausalNarratives => b"SH:C10:STATE:v42".to_vec(),
+        Rules::PersonalDevelopment => b"SH:C10:STATE:v43".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1658,6 +1701,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1750,6 +1794,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SituatedCommunication
             | Rules::InformationNetworks
             | Rules::CausalNarratives
+            | Rules::PersonalDevelopment
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1798,6 +1843,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::SituatedCommunication
                     | Rules::InformationNetworks
                     | Rules::CausalNarratives
+                    | Rules::PersonalDevelopment
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1853,6 +1899,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SituatedCommunication
             | Rules::InformationNetworks
             | Rules::CausalNarratives
+            | Rules::PersonalDevelopment
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1949,6 +1996,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SituatedCommunication
                 | Rules::InformationNetworks
                 | Rules::CausalNarratives
+                | Rules::PersonalDevelopment
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -2163,6 +2211,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(narrative) = world.narrative() {
         let bytes = narrative.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(development) = world.development() {
+        let bytes = development.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }

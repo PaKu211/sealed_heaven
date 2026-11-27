@@ -2,7 +2,7 @@
 
 ## Current regional campaign
 
-C5.5: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c55 --pixel`. Omit `--pixel` for ASCII. `stories` / Ctrl+F10 show player-known causal episodes; save slot `checkpoint.c55`. See the [C5.5 specification](../../C5_5_EMERGENT_CAUSAL_NARRATIVES.md). The C0.4 material below is retained as historical documentation.
+C5.6: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c56 --pixel`. Omit `--pixel` for ASCII. `profiles` / Ctrl+F11 show dated disclosed pursuits; save slot `checkpoint.c56`. See the [C5.6 specification](../../C5_6_LONG_TERM_CHARACTER_AGENCY.md). The C0.4 material below is retained as historical documentation.
 
 **Current acceptance: C0.4 independent audit PASS.**
 Native evidence is `../../docs/evidence/c04-native-acceptance/`. The verdict is

@@ -4629,6 +4629,52 @@
     "parameters": {},
     "surface": "living_ascii.rs"
   },
+  "living.profile.empty": {
+    "active": true,
+    "context": "C5.6 last shared personal pursuit only; no private scores, partner histories or current hidden focus",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.profile.help": {
+    "active": true,
+    "context": "C5.6 last shared personal pursuit only; no private scores, partner histories or current hidden focus",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.profile.inquiry": {
+    "active": true,
+    "context": "C5.6 last shared personal pursuit only; no private scores, partner histories or current hidden focus",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.profile.line": {
+    "active": true,
+    "context": "C5.6 last shared personal pursuit only; no private scores, partner histories or current hidden focus",
+    "parameters": {
+      "actor": "actor who shared their focus",
+      "at": "last physical conversation tick",
+      "focus": "dated disclosed personal pursuit, not live or private motivation"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.profile.partnership": {
+    "active": true,
+    "context": "C5.6 last shared personal pursuit only; no private scores, partner histories or current hidden focus",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.profile.pixel.hint": {
+    "active": true,
+    "context": "C5.6 last shared personal pursuit only; no private scores, partner histories or current hidden focus",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.profile.vocation": {
+    "active": true,
+    "context": "C5.6 last shared personal pursuit only; no private scores, partner histories or current hidden focus",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.quest.abandon_outcome": {
     "active": true,
     "context": "C4.6 optional player requests and remembered outcomes",
