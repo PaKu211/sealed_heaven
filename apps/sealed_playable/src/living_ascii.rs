@@ -18,7 +18,7 @@ use sealed_sim::living::{
 use crate::{
     clock,
     locale::Locale,
-    locale_living::{living_format, living_text},
+    locale_living::{living_format, living_plural, living_text},
     persistence,
 };
 
@@ -126,12 +126,8 @@ impl Session {
                         | "agency"
                 ))
         {
-            self.notice = text(
-                self.locale,
-                "Use one command at a time.",
-                "Masukkan satu perintah.",
-            )
-            .into();
+            self.notice =
+                living_text(self.locale, "living.ascii.input.use_one_command_at_a_time").into();
             return true;
         }
         let intent = match command {
@@ -159,10 +155,9 @@ impl Session {
             "treatwounds" if self.world.injuries().is_some() => Intent::TreatWounds,
             "allocate" if self.world.sect_hierarchy().is_some() => Intent::ClaimHallAllocation,
             "allocate" => {
-                self.notice = text(
+                self.notice = living_text(
                     self.locale,
-                    "Hall allocations require a new C3.5 sect hierarchy campaign.",
-                    "Alokasi balai memerlukan kampanye hierarki sekte C3.5 baru.",
+                    "living.ascii.input.hall_allocations_require_a_new_c3_5",
                 )
                 .into();
                 return true;
@@ -172,43 +167,36 @@ impl Session {
                 let mut parts = Vec::new();
                 if let Some(player) = hierarchy.player {
                     let duty = match player.duty {
-                        SectDuty::Unassigned => text(self.locale, "none", "tidak ada"),
+                        SectDuty::Unassigned => living_text(self.locale, "living.ascii.input.none"),
                         SectDuty::Carrying => {
-                            text(self.locale, "carrying offering", "membawa titipan")
+                            living_text(self.locale, "living.ascii.input.carrying_offering")
                         }
                         SectDuty::Delivered => {
-                            text(self.locale, "awaiting report", "menunggu laporan")
+                            living_text(self.locale, "living.ascii.input.awaiting_report")
                         }
                     };
                     let allocation =
                         if !matches!(player.rank, HallRank::SeniorDisciple | HallRank::Elder) {
-                            text(
-                                self.locale,
-                                "requires senior disciple",
-                                "butuh murid senior",
-                            )
+                            living_text(self.locale, "living.ascii.input.requires_senior_disciple")
                         } else if player.allocation_claimed {
-                            text(self.locale, "claimed", "sudah diambil")
+                            living_text(self.locale, "living.ascii.input.claimed")
                         } else {
-                            text(self.locale, "available", "tersedia")
+                            living_text(self.locale, "living.ascii.input.available")
                         };
-                    parts.push(format!(
-                        "{}: {} ({} {}); {}: {duty}; {}: {allocation}",
-                        text(self.locale, "Reed Hall", "Balai Alang-alang"),
-                        hall_rank_label(self.locale, player.rank),
-                        player.merit,
-                        text(self.locale, "merit", "jasa"),
-                        text(self.locale, "duty", "tugas"),
-                        text(self.locale, "allocation", "alokasi"),
+                    parts.push(living_format(
+                        self.locale,
+                        "living.ascii.input.template.reed_hall_rank_player_merit_merit",
+                        &[
+                            ("rank", hall_rank_label(self.locale, player.rank)),
+                            ("player_merit", &format!("{}", player.merit)),
+                            ("duty_2", duty),
+                            ("allocation_2", allocation),
+                        ],
                     ));
                 } else {
                     parts.push(
-                        text(
-                            self.locale,
-                            "Not enrolled in Reed Hall.",
-                            "Belum terdaftar di Balai Alang-alang.",
-                        )
-                        .into(),
+                        living_text(self.locale, "living.ascii.input.not_enrolled_in_reed_hall")
+                            .into(),
                     );
                 }
                 for (&id, &member) in &hierarchy.members {
@@ -216,10 +204,13 @@ impl Session {
                         && npc.alive()
                         && self.world.player_sees(npc.position)
                     {
-                        parts.push(format!(
-                            "{}: {}",
-                            npc.definition.name,
-                            hall_rank_label(self.locale, member.rank)
+                        parts.push(living_format(
+                            self.locale,
+                            "living.ascii.input.template.npc_definition_name_rank",
+                            &[
+                                ("npc_definition_name", npc.definition.name),
+                                ("rank", hall_rank_label(self.locale, member.rank)),
+                            ],
                         ));
                     }
                 }
@@ -240,67 +231,70 @@ impl Session {
                         let actor = actor_name(self.locale, &self.world, event.actor);
                         let rank = hall_rank_label(self.locale, event.rank);
                         match event.kind {
-                            HierarchyEventKind::DutyAccepted => format!(
-                                "#{} t{} {actor} {}",
-                                event.id,
-                                event.at,
-                                text(
-                                    self.locale,
-                                    "accepted a Reed Hall duty",
-                                    "menerima tugas Balai Alang-alang"
-                                )
+                            HierarchyEventKind::DutyAccepted => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_accepted",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                ],
                             ),
-                            HierarchyEventKind::DutyDelivered => format!(
-                                "#{} t{} {actor} {}",
-                                event.id,
-                                event.at,
-                                text(
-                                    self.locale,
-                                    "delivered a Hall offering to the shrine",
-                                    "mengantar persembahan balai ke kuil"
-                                )
+                            HierarchyEventKind::DutyDelivered => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_delivered",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                ],
                             ),
-                            HierarchyEventKind::MeritEarned => format!(
-                                "#{} t{} {actor} {} ({})",
-                                event.id,
-                                event.at,
-                                text(
-                                    self.locale,
-                                    "earned Reed Hall merit",
-                                    "meraih jasa Balai Alang-alang"
-                                ),
-                                event.merit
+                            HierarchyEventKind::MeritEarned => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_earned",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                    ("event_merit", &format!("{}", event.merit)),
+                                ],
                             ),
-                            HierarchyEventKind::Promoted => format!(
-                                "#{} t{} {actor} {} {rank}",
-                                event.id,
-                                event.at,
-                                text(self.locale, "promoted to", "naik pangkat menjadi")
+                            HierarchyEventKind::Promoted => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_promoted",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                    ("rank", rank),
+                                ],
                             ),
-                            HierarchyEventKind::AllocationClaimed => format!(
-                                "#{} t{} {actor} {}",
-                                event.id,
-                                event.at,
-                                text(
-                                    self.locale,
-                                    "claimed a physical Hall herb allocation",
-                                    "mengambil alokasi herba fisik balai"
-                                )
+                            HierarchyEventKind::AllocationClaimed => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_claimed",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                ],
                             ),
-                            HierarchyEventKind::OfficeAssumed => format!(
-                                "#{} t{} {actor} {} {rank}",
-                                event.id,
-                                event.at,
-                                text(self.locale, "assumed office as", "menjabat sebagai")
+                            HierarchyEventKind::OfficeAssumed => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_assumed",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                    ("rank", rank),
+                                ],
                             ),
                         }
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed sect hierarchy events.",
-                        "Belum ada peristiwa hierarki sekte yang kamu saksikan.",
+                        "living.ascii.input.no_witnessed_sect_hierarchy_events",
                     )
                     .into()
                 } else {
@@ -310,7 +304,14 @@ impl Session {
             }
             "wounds" if self.world.injuries().is_some() => {
                 let state = self.world.injuries().unwrap().people[&PLAYER];
-                self.notice = format!("Arm wounds: {}; leg wounds: {}", state.arms, state.legs);
+                self.notice = living_format(
+                    self.locale,
+                    "living.ascii.input.template.state_arms_state_legs",
+                    &[
+                        ("state_arms", &format!("{}", state.arms)),
+                        ("state_legs", &format!("{}", state.legs)),
+                    ],
+                );
                 return true;
             }
             "woundlog" if self.world.injuries().is_some() => {
@@ -322,17 +323,20 @@ impl Session {
                     .iter()
                     .filter(|event| event.witnessed)
                     .map(|event| {
-                        format!(
-                            "#{} t{} {} {:?}",
-                            event.id,
-                            event.at,
-                            actor_name(self.locale, &self.world, event.actor),
-                            event.kind
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.event_id_event_at_actor_event",
+                            &[
+                                ("event_id", &format!("{}", event.id)),
+                                ("event_at", &format!("{}", event.at)),
+                                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                                ("event_kind", &format!("{:?}", event.kind)),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    "No witnessed wounds.".into()
+                    living_text(self.locale, "living.ascii.woundlog.empty").into()
                 } else {
                     lines.join("\n")
                 };
@@ -349,10 +353,9 @@ impl Session {
                     .npc(id)
                     .filter(|npc| npc.alive() && self.world.player_sees(npc.position))
                 else {
-                    self.notice = text(
+                    self.notice = living_text(
                         self.locale,
-                        "That character is not visible.",
-                        "Tokoh itu tidak terlihat.",
+                        "living.ascii.input.that_character_is_not_visible",
                     )
                     .into();
                     return true;
@@ -371,29 +374,33 @@ impl Session {
                     });
                 self.notice = observed.map_or_else(
                     || {
-                        format!(
-                            "{}: {}",
-                            npc.definition.name,
-                            text(
-                                self.locale,
-                                "you have not witnessed a change of purpose",
-                                "kamu belum menyaksikan perubahan tujuannya",
-                            )
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.npc_definition_name_you_have_not",
+                            &[("npc_definition_name", npc.definition.name)],
                         )
                     },
                     |event| {
-                        format!(
-                            "{}: {} {} — {}",
-                            npc.definition.name,
-                            text(self.locale, "you observed", "kamu menyaksikan"),
-                            event
-                                .goal
-                                .map(|goal| goal_label(self.locale, goal))
-                                .unwrap_or("?"),
-                            event
-                                .reason
-                                .map(|reason| decision_reason_label(self.locale, reason))
-                                .unwrap_or("?")
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.npc_definition_name_you_observed_event",
+                            &[
+                                ("npc_definition_name", npc.definition.name),
+                                (
+                                    "event_goal_map_goal_goal_label",
+                                    event
+                                        .goal
+                                        .map(|goal| goal_label(self.locale, goal))
+                                        .unwrap_or("?"),
+                                ),
+                                (
+                                    "event_reason_map_reason_decision_reason",
+                                    event
+                                        .reason
+                                        .map(|reason| decision_reason_label(self.locale, reason))
+                                        .unwrap_or("?"),
+                                ),
+                            ],
                         )
                     },
                 );
@@ -412,71 +419,76 @@ impl Session {
                     .map(|event| {
                         let actor = actor_name(self.locale, &self.world, event.actor);
                         match event.kind {
-                            AgencyEventKind::GoalChanged => format!(
-                                "#{} t{} {actor}: {} ({})",
-                                event.id,
-                                event.at,
-                                event
-                                    .goal
-                                    .map(|goal| goal_label(self.locale, goal))
-                                    .unwrap_or("?"),
-                                event
-                                    .reason
-                                    .map(|reason| decision_reason_label(self.locale, reason))
-                                    .unwrap_or("?")
+                            AgencyEventKind::GoalChanged => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_event_2",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                    (
+                                        "event_goal_map_goal_goal_label",
+                                        event
+                                            .goal
+                                            .map(|goal| goal_label(self.locale, goal))
+                                            .unwrap_or("?"),
+                                    ),
+                                    (
+                                        "event_reason_map_reason_decision_reason",
+                                        event
+                                            .reason
+                                            .map(|reason| {
+                                                decision_reason_label(self.locale, reason)
+                                            })
+                                            .unwrap_or("?"),
+                                    ),
+                                ],
                             ),
-                            AgencyEventKind::WorkGathered => format!(
-                                "#{} t{} {actor} {}",
-                                event.id,
-                                event.at,
-                                text(
-                                    self.locale,
-                                    "gathered work herbs",
-                                    "memetik herba untuk bekerja",
-                                )
+                            AgencyEventKind::WorkGathered => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_gathered",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                ],
                             ),
-                            AgencyEventKind::WorkSold => format!(
-                                "#{} t{} {actor} {} {} {}",
-                                event.id,
-                                event.at,
-                                text(
-                                    self.locale,
-                                    "sold work herbs for",
-                                    "menjual herba kerja senilai",
-                                ),
-                                event.amount,
-                                text(self.locale, "coin(s)", "koin")
+                            AgencyEventKind::WorkSold => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_sold",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                    ("event_amount", &format!("{}", event.amount)),
+                                ],
                             ),
-                            AgencyEventKind::CarePaid => format!(
-                                "#{} t{} {actor} {} {} {}",
-                                event.id,
-                                event.at,
-                                text(self.locale, "paid", "membayar",),
-                                event.amount,
-                                text(
-                                    self.locale,
-                                    "coin(s) for wound care",
-                                    "koin untuk perawatan luka",
-                                )
+                            AgencyEventKind::CarePaid => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_paid",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                    ("event_amount", &format!("{}", event.amount)),
+                                ],
                             ),
-                            AgencyEventKind::CareBartered => format!(
-                                "#{} t{} {actor} {}",
-                                event.id,
-                                event.at,
-                                text(
-                                    self.locale,
-                                    "bartered an herb for wound care",
-                                    "menukar satu herba untuk perawatan luka",
-                                )
+                            AgencyEventKind::CareBartered => living_format(
+                                self.locale,
+                                "living.ascii.input.template.event_id_event_at_actor_bartered",
+                                &[
+                                    ("event_id", &format!("{}", event.id)),
+                                    ("event_at", &format!("{}", event.at)),
+                                    ("actor", actor),
+                                ],
                             ),
                         }
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "You have witnessed no character decisions.",
-                        "Kamu belum menyaksikan keputusan tokoh.",
+                        "living.ascii.input.you_have_witnessed_no_character_decisions",
                     )
                     .into()
                 } else {
@@ -486,9 +498,14 @@ impl Session {
             }
             "meridians" if self.world.meridians().is_some() => {
                 let state = self.world.meridians().unwrap().people[&PLAYER];
-                self.notice = format!(
-                    "Qi: {}; open channels: {}; blockage: {}",
-                    state.qi, state.channels, state.blockage
+                self.notice = living_format(
+                    self.locale,
+                    "living.ascii.input.template.state_qi_state_channels_state_blockage",
+                    &[
+                        ("state_qi", &format!("{}", state.qi)),
+                        ("state_channels", &format!("{}", state.channels)),
+                        ("state_blockage", &format!("{}", state.blockage)),
+                    ],
                 );
                 return true;
             }
@@ -501,17 +518,20 @@ impl Session {
                     .iter()
                     .filter(|event| event.witnessed)
                     .map(|event| {
-                        format!(
-                            "#{} t{} {} {:?}",
-                            event.id,
-                            event.at,
-                            actor_name(self.locale, &self.world, event.actor),
-                            event.kind
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.event_id_event_at_actor_event_3",
+                            &[
+                                ("event_id", &format!("{}", event.id)),
+                                ("event_at", &format!("{}", event.at)),
+                                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                                ("event_kind", &format!("{:?}", event.kind)),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    "No witnessed meridian events.".into()
+                    living_text(self.locale, "living.ascii.meridianlog.empty").into()
                 } else {
                     lines.join("\n")
                 };
@@ -540,12 +560,12 @@ impl Session {
             "tell" => {
                 let Some(actor) = argument.and_then(|value| value.parse::<u32>().ok()) else {
                     self.notice =
-                        text(self.locale, "tell <npc> <event>", "tell <npc> <peristiwa>").into();
+                        living_text(self.locale, "living.ascii.input.tell_npc_event").into();
                     return true;
                 };
                 let Some(event) = second.and_then(|value| value.parse::<u32>().ok()) else {
                     self.notice =
-                        text(self.locale, "tell <npc> <event>", "tell <npc> <peristiwa>").into();
+                        living_text(self.locale, "living.ascii.input.tell_npc_event").into();
                     return true;
                 };
                 Intent::Testify {
@@ -555,16 +575,13 @@ impl Session {
             }
             "reportbody" => {
                 if !self.world.is_player_reporting() {
-                    self.notice = text(self.locale, "Only in C2.7.", "Hanya di C2.7.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_7").into();
                     return true;
                 }
                 let Some(body) = second.and_then(|value| value.parse::<u32>().ok()) else {
-                    self.notice = text(
-                        self.locale,
-                        "reportbody <npc> <body>",
-                        "reportbody <npc> <jenazah>",
-                    )
-                    .into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.reportbody_npc_body").into();
                     return true;
                 };
                 let to = match self.target(argument) {
@@ -581,11 +598,12 @@ impl Session {
             }
             "claim" => {
                 let Some(id) = argument.and_then(|value| value.parse::<u32>().ok()) else {
-                    self.notice = text(self.locale, "claim <lot>", "claim <barang>").into();
+                    self.notice = living_text(self.locale, "living.ascii.input.claim_lot").into();
                     return true;
                 };
                 if self.world.contested().is_none() {
-                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_9").into();
                     return true;
                 }
                 Intent::ClaimLot(id)
@@ -596,38 +614,52 @@ impl Session {
                     return true;
                 };
                 if !self.world.is_sect_cultivation() {
-                    self.notice = "Only in C3.0.".into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c3_0").into();
                     return true;
                 }
                 Intent::AttuneLot(id)
             }
             "cultivation" => {
                 if !self.world.is_sect_cultivation() {
-                    self.notice = "Only in C3.0.".into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c3_0").into();
                     return true;
                 }
                 let state = self.world.contested().unwrap();
-                self.notice = format!(
-                    "Wards: {}; Jade channels: {}",
-                    state.wards, state.script_charges
+                self.notice = living_format(
+                    self.locale,
+                    "living.ascii.input.template.state_wards_state_script_charges",
+                    &[
+                        ("state_wards", &format!("{}", state.wards)),
+                        ("state_script_charges", &format!("{}", state.script_charges)),
+                    ],
                 );
                 return true;
             }
             "martial" => {
                 let Some(martial) = self.world.martial() else {
-                    self.notice = "Only in C3.1.".into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c3_1").into();
                     return true;
                 };
                 let skill = martial.skills[&PLAYER];
-                self.notice = format!(
-                    "Form: {:?}; lessons: {}; strain: {}; parry: {}",
-                    skill.form, skill.lessons, skill.strain, skill.parry
+                self.notice = living_format(
+                    self.locale,
+                    "living.ascii.input.template.skill_form_skill_lessons_skill_strain",
+                    &[
+                        ("skill_form", &format!("{:?}", skill.form)),
+                        ("skill_lessons", &format!("{}", skill.lessons)),
+                        ("skill_strain", &format!("{}", skill.strain)),
+                        ("skill_parry", &format!("{}", skill.parry)),
+                    ],
                 );
                 return true;
             }
             "martiallog" => {
                 let Some(martial) = self.world.martial() else {
-                    self.notice = "Only in C3.1.".into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c3_1").into();
                     return true;
                 };
                 let lines: Vec<_> = martial
@@ -635,19 +667,35 @@ impl Session {
                     .iter()
                     .filter(|lesson| lesson.witnessed)
                     .map(|lesson| {
-                        format!(
-                            "#{} t{} {} trained with {} in {:?}{}",
-                            lesson.id,
-                            lesson.at,
-                            actor_name(self.locale, &self.world, lesson.student),
-                            actor_name(self.locale, &self.world, lesson.teacher),
-                            lesson.form,
-                            if lesson.learned { " (learned)" } else { "" }
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.lesson_id_lesson_at_actor_actor",
+                            &[
+                                ("lesson_id", &format!("{}", lesson.id)),
+                                ("lesson_at", &format!("{}", lesson.at)),
+                                (
+                                    "actor",
+                                    actor_name(self.locale, &self.world, lesson.student),
+                                ),
+                                (
+                                    "actor_2",
+                                    actor_name(self.locale, &self.world, lesson.teacher),
+                                ),
+                                ("lesson_form", &format!("{:?}", lesson.form)),
+                                (
+                                    "conditional",
+                                    if lesson.learned {
+                                        living_text(self.locale, "living.ascii.martiallog.learned")
+                                    } else {
+                                        ""
+                                    },
+                                ),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    "No witnessed lessons.".into()
+                    living_text(self.locale, "living.ascii.martiallog.empty").into()
                 } else {
                     lines.join("\n")
                 };
@@ -655,16 +703,13 @@ impl Session {
             }
             "offerlot" => {
                 let Some(id) = second.and_then(|value| value.parse::<u32>().ok()) else {
-                    self.notice = text(
-                        self.locale,
-                        "offerlot <npc> <lot>",
-                        "offerlot <npc> <barang>",
-                    )
-                    .into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.offerlot_npc_lot").into();
                     return true;
                 };
                 if self.world.contested().is_none() {
-                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_9").into();
                     return true;
                 }
                 let to = match self.target(argument) {
@@ -678,7 +723,8 @@ impl Session {
             }
             "lots" => {
                 let Some(state) = self.world.contested() else {
-                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_9").into();
                     return true;
                 };
                 let lines: Vec<_> = state
@@ -690,18 +736,25 @@ impl Session {
                                 format!("({},{})", position.x, position.y)
                             }
                             Holder::Carried(PLAYER) => {
-                                text(self.locale, "your pack", "tasmu").into()
+                                living_text(self.locale, "living.ascii.input.your_pack").into()
                             }
                             _ => return None,
                         };
-                        Some(format!("#{} {:?} {place}", lot.id, lot.good))
+                        Some(living_format(
+                            self.locale,
+                            "living.ascii.input.template.lot_id_lot_good_place",
+                            &[
+                                ("lot_id", &format!("{}", lot.id)),
+                                ("lot_good", &format!("{:?}", lot.good)),
+                                ("place", &place.to_string()),
+                            ],
+                        ))
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No visible lots or carried relics.",
-                        "Tidak ada barang terlihat atau relik yang dibawa.",
+                        "living.ascii.input.no_visible_lots_or_carried_relics",
                     )
                     .into()
                 } else {
@@ -711,7 +764,8 @@ impl Session {
             }
             "lotlog" => {
                 let Some(state) = self.world.contested() else {
-                    self.notice = text(self.locale, "Only in C2.9.", "Hanya di C2.9.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_9").into();
                     return true;
                 };
                 let lines: Vec<_> = state
@@ -720,31 +774,37 @@ impl Session {
                     .filter(|event| event.witnessed)
                     .map(|event| {
                         let verb = match event.kind {
-                            LotEventKind::Claimed => text(self.locale, "claimed", "mengambil"),
-                            LotEventKind::Sold => text(self.locale, "sold", "menjual"),
-                            LotEventKind::Deposited => {
-                                text(self.locale, "deposited", "menyerahkan")
+                            LotEventKind::Claimed => {
+                                living_text(self.locale, "living.ascii.input.claimed_2")
                             }
-                            LotEventKind::Dropped => text(self.locale, "dropped", "menjatuhkan"),
-                            LotEventKind::Attuned => text(self.locale, "attuned", "mengolah"),
+                            LotEventKind::Sold => {
+                                living_text(self.locale, "living.ascii.input.sold")
+                            }
+                            LotEventKind::Deposited => {
+                                living_text(self.locale, "living.ascii.input.deposited")
+                            }
+                            LotEventKind::Dropped => {
+                                living_text(self.locale, "living.ascii.input.dropped")
+                            }
+                            LotEventKind::Attuned => {
+                                living_text(self.locale, "living.ascii.input.attuned")
+                            }
                         };
-                        format!(
-                            "#{} t{} {} {} lot #{}",
-                            event.id,
-                            event.at,
-                            actor_name(self.locale, &self.world, event.actor),
-                            verb,
-                            event.lot
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.event_id_event_at_actor_verb",
+                            &[
+                                ("event_id", &format!("{}", event.id)),
+                                ("event_at", &format!("{}", event.at)),
+                                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                                ("verb", verb),
+                                ("event_lot", &format!("{}", event.lot)),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
-                        self.locale,
-                        "No witnessed lot transfers.",
-                        "Belum ada perpindahan barang yang disaksikan.",
-                    )
-                    .into()
+                    living_text(self.locale, "living.ascii.input.no_witnessed_lot_transfers").into()
                 } else {
                     lines.join("\n")
                 };
@@ -752,12 +812,9 @@ impl Session {
             }
             "know" => {
                 if !self.world.is_player_agency() {
-                    self.notice = text(
-                        self.locale,
-                        "know is part of the C2.3 campaign.",
-                        "know ada di kampanye C2.3.",
-                    )
-                    .into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.know_is_part_of_the_c2_3")
+                            .into();
                     return true;
                 }
                 let lines: Vec<String> = self
@@ -771,39 +828,54 @@ impl Session {
                                 let event = self.world.information()?.event(id)?;
                                 let how = match receipt.provenance {
                                     Provenance::Firsthand { .. } => {
-                                        text(self.locale, "witnessed", "disaksikan")
+                                        living_text(self.locale, "living.ascii.input.witnessed")
                                     }
                                     Provenance::Reported { sender, .. } if sender == PLAYER => {
-                                        text(self.locale, "examined", "diperiksa")
+                                        living_text(self.locale, "living.ascii.input.examined")
                                     }
-                                    Provenance::Reported { hops, .. } => text(
-                                        self.locale,
-                                        if hops <= 1 { "heard" } else { "rumor" },
-                                        if hops <= 1 { "didengar" } else { "desas-desus" },
-                                    ),
+                                    Provenance::Reported { hops, .. } => {
+                                        if hops <= 1 {
+                                            living_text(
+                                                self.locale,
+                                                "living.ascii.input.provenance.heard",
+                                            )
+                                        } else {
+                                            living_text(
+                                                self.locale,
+                                                "living.ascii.input.provenance.rumor",
+                                            )
+                                        }
+                                    }
                                 };
                                 let finding = match event.finding {
                                     AuditFinding::Delivered => {
-                                        text(self.locale, "delivered", "terkirim")
+                                        living_text(self.locale, "living.ascii.input.delivered")
                                     }
                                     AuditFinding::Unfulfilled => {
-                                        text(self.locale, "missed", "gagal")
+                                        living_text(self.locale, "living.ascii.input.missed")
                                     }
                                 };
-                                Some(format!(
-                                    "#{id} {finding} {} ({how})",
-                                    actor_name(self.locale, &self.world, event.provider),
-                                    id = id.0
+                                Some(living_format(
+                                    self.locale,
+                                    "living.ascii.input.template.id_finding_actor_how",
+                                    &[
+                                        ("id", &format!("{}", id.0)),
+                                        ("finding", finding),
+                                        (
+                                            "actor",
+                                            actor_name(self.locale, &self.world, event.provider),
+                                        ),
+                                        ("how", how),
+                                    ],
                                 ))
                             })
                             .collect()
                     })
                     .unwrap_or_default();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "You know no institutional finding.",
-                        "Kamu belum mengetahui temuan lembaga.",
+                        "living.ascii.input.you_know_no_institutional_finding",
                     )
                     .into()
                 } else {
@@ -813,7 +885,8 @@ impl Session {
             }
             "bodies" => {
                 if !self.world.is_violence_logistics() {
-                    self.notice = text(self.locale, "Only in C2.5.", "Hanya di C2.5.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_5").into();
                     return true;
                 }
                 let lines: Vec<_> = self
@@ -822,23 +895,23 @@ impl Session {
                     .discoveries()
                     .filter(|discovery| discovery.observer == PLAYER)
                     .map(|discovery| {
-                        format!(
-                            "t{} {} ({})",
-                            discovery.at,
-                            actor_name(self.locale, &self.world, discovery.body),
-                            text(
-                                self.locale,
-                                "cause unknown unless you witnessed it",
-                                "penyebab tidak diketahui kecuali kamu menyaksikannya"
-                            )
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.discovery_at_actor_cause_unknown_unless",
+                            &[
+                                ("discovery_at", &format!("{}", discovery.at)),
+                                (
+                                    "actor",
+                                    actor_name(self.locale, &self.world, discovery.body),
+                                ),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "You have discovered no bodies.",
-                        "Kamu belum menemukan jenazah.",
+                        "living.ascii.input.you_have_discovered_no_bodies",
                     )
                     .into()
                 } else {
@@ -848,7 +921,8 @@ impl Session {
             }
             "salvagelog" => {
                 if !self.world.is_physical_recovery() {
-                    self.notice = text(self.locale, "Only in C2.8.", "Hanya di C2.8.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_8").into();
                     return true;
                 }
                 let lines: Vec<_> = self
@@ -858,35 +932,37 @@ impl Session {
                     .iter()
                     .filter(|event| event.witnessed)
                     .map(|event| {
-                        format!(
-                            "#{} t{} {} {} {} {} {}",
-                            event.id,
-                            event.at,
-                            actor_name(self.locale, &self.world, event.actor),
-                            text(
-                                self.locale,
-                                if event.delivered {
-                                    "delivered"
-                                } else {
-                                    "recovered"
-                                },
-                                if event.delivered {
-                                    "mengantar"
-                                } else {
-                                    "mengambil"
-                                }
-                            ),
-                            event.herbs,
-                            text(self.locale, "herbs from", "herba dari"),
-                            actor_name(self.locale, &self.world, event.body)
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.event_id_event_at_actor_conditional",
+                            &[
+                                ("event_id", &format!("{}", event.id)),
+                                ("event_at", &format!("{}", event.at)),
+                                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                                (
+                                    "conditional",
+                                    if event.delivered {
+                                        living_text(
+                                            self.locale,
+                                            "living.ascii.input.recovery.delivered",
+                                        )
+                                    } else {
+                                        living_text(
+                                            self.locale,
+                                            "living.ascii.input.recovery.recovered",
+                                        )
+                                    },
+                                ),
+                                ("event_herbs", &format!("{}", event.herbs)),
+                                ("actor_2", actor_name(self.locale, &self.world, event.body)),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed cargo recovery.",
-                        "Belum menyaksikan pemulihan muatan.",
+                        "living.ascii.input.no_witnessed_cargo_recovery",
                     )
                     .into()
                 } else {
@@ -896,7 +972,8 @@ impl Session {
             }
             "crimelog" => {
                 if !self.world.is_violence_logistics() {
-                    self.notice = text(self.locale, "Only in C2.5.", "Hanya di C2.5.").into();
+                    self.notice =
+                        living_text(self.locale, "living.ascii.input.only_in_c2_5").into();
                     return true;
                 }
                 let lines: Vec<_> = self
@@ -907,42 +984,51 @@ impl Session {
                     .rev()
                     .filter_map(|incident| {
                         let relation = if incident.source == PLAYER {
-                            text(self.locale, "you did this", "kamu melakukannya")
+                            living_text(self.locale, "living.ascii.input.you_did_this")
                         } else if incident.target == PLAYER {
-                            text(self.locale, "you were struck", "kamu diserang")
+                            living_text(self.locale, "living.ascii.input.you_were_struck")
                         } else {
                             match self.world.social().knowledge(PLAYER, incident.id)?.source {
                                 KnowledgeSource::Observed => {
-                                    text(self.locale, "witnessed", "disaksikan")
+                                    living_text(self.locale, "living.ascii.input.witnessed")
                                 }
                                 KnowledgeSource::Reported { hops: 1, .. } => {
-                                    text(self.locale, "heard firsthand", "dengar langsung")
+                                    living_text(self.locale, "living.ascii.input.heard_firsthand")
                                 }
                                 KnowledgeSource::Reported { .. } => {
-                                    text(self.locale, "allegation", "dugaan")
+                                    living_text(self.locale, "living.ascii.input.allegation")
                                 }
                             }
                         };
                         let action = if incident.damage == 0 {
-                            text(self.locale, "took cargo from", "mengambil muatan dari")
+                            living_text(self.locale, "living.ascii.input.took_cargo_from")
                         } else {
-                            text(self.locale, "hit", "menyerang")
+                            living_text(self.locale, "living.ascii.input.hit")
                         };
-                        Some(format!(
-                            "t{} {} {} {} ({relation})",
-                            incident.tick,
-                            actor_name(self.locale, &self.world, incident.source),
-                            action,
-                            actor_name(self.locale, &self.world, incident.target)
+                        Some(living_format(
+                            self.locale,
+                            "living.ascii.input.template.incident_tick_actor_action_actor_2",
+                            &[
+                                ("incident_tick", &format!("{}", incident.tick)),
+                                (
+                                    "actor",
+                                    actor_name(self.locale, &self.world, incident.source),
+                                ),
+                                ("action", action),
+                                (
+                                    "actor_2",
+                                    actor_name(self.locale, &self.world, incident.target),
+                                ),
+                                ("relation", relation),
+                            ],
                         ))
                     })
                     .take(12)
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "You know no assaults or thefts.",
-                        "Kamu belum mengetahui serangan atau pencurian.",
+                        "living.ascii.input.you_know_no_assaults_or_thefts",
                     )
                     .into()
                 } else {
@@ -967,12 +1053,15 @@ impl Session {
                 self.notice = match seed {
                     Some(seed) if self.world.tick() == 0 => {
                         self.world = self.new_seeded_world(seed);
-                        format!("{} {seed}", text(self.locale, "World seed", "Seed dunia"))
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.world_seed_seed",
+                            &[("seed", &format!("{}", seed))],
+                        )
                     }
-                    _ => text(
+                    _ => living_text(
                         self.locale,
-                        "Use seed <number> before the first turn.",
-                        "Gunakan seed <angka> sebelum giliran pertama.",
+                        "living.ascii.input.use_seed_number_before_the_first_turn",
                     )
                     .into(),
                 };
@@ -982,113 +1071,125 @@ impl Session {
                 self.notice = if self.world.checkpoint_revision() == 26 {
                     living_text(self.locale, "living.help.c351")
                 } else if self.world.sect_hierarchy().is_some() {
-                    text(self.locale,
-                        "C3.5: Reed Hall tracks persisted rank and merit for both you and NPC members. Complete shrine duty to reach Disciple (free Reed Hall martial drills, Reed Strike study, and Hall Qi access), and repeat Hall duty from real Hall offerings to reach Senior Disciple and claim one physical herb with allocate. NPC members perform duties, advance, and assume Elder office on succession without you. sect and sectlog inspect known standing and witnessed events. --c34 keeps C3.4.",
-                        "C3.5: Balai Alang-alang mencatat pangkat dan jasa bagi dirimu maupun anggota NPC. Tuntaskan tugas kuil untuk menjadi Murid Dalam (latihan bela diri balai bebas biaya, belajar Jurus Alang-alang, dan akses Qi balai), lalu ulangi tugas dari persembahan nyata balai untuk menjadi Murid Senior dan mengambil satu herba fisik dengan allocate. Anggota NPC menjalankan tugas, naik pangkat, dan menjabat Tetua saat suksesi tanpa bantuanmu. sect dan sectlog memeriksa kedudukan dan peristiwa yang disaksikan. --c34 untuk C3.4.")
-                } else if self.world.character_agency().is_some() {
-                    text(self.locale,
-                        "C3.4: Injured NPCs without treatment money can gather and sell physical herbs, pay a present medic, recover, and resume interrupted ambitions. agency <visible npc> explains current circumstances; agencylog lists only decisions and transactions you witnessed. --c33 keeps free-care C3.3.",
-                        "C3.4: NPC terluka tanpa biaya perawatan dapat memetik dan menjual herba nyata, membayar tabib yang hadir, pulih, lalu melanjutkan ambisi yang terputus. agency <npc terlihat> menjelaskan keadaan saat ini; agencylog hanya mencatat keputusan dan transaksi yang kamu saksikan. --c33 mempertahankan C3.3 dengan perawatan gratis.")
-                } else if self.world.injuries().is_some() {
-                    text(self.locale,
-                        "C3.3: Real blows can leave lasting arm or leg wounds. Severe arm wounds weaken strikes; severe leg wounds slow movement on alternating ticks. Injured NPCs retreat and seek care. At a staffed clinic treatwounds spends one shrine herb and heals one wound; wounds and woundlog show your condition and witnessed events. --c32 keeps C3.2.",
-                        "C3.3: Pukulan nyata dapat meninggalkan luka lengan atau kaki. Luka lengan berat melemahkan serangan; luka kaki berat memperlambat gerak setiap dua giliran. NPC terluka mundur dan mencari perawatan. Di klinik yang dijaga treatwounds memakai satu herba kuil dan menyembuhkan satu luka; wounds dan woundlog menunjukkan kondisi serta peristiwa yang disaksikan. --c32 untuk C3.2.")
-                } else if self.world.meridians().is_some() {
-                    text(self.locale,
-                        "C3.2: Gather real herbs; at Qinghe shrine or Reed Hall drawqi spends one herb for one Qi. circulate spends Qi: a rested body opens a channel; strain or wounds obstruct it. Two open channels and Qi are required for technique. Blockage requires mend at a staffed clinic, using real shrine medicine. meridians and meridianlog show known condition. --c31 keeps C3.1.",
-                        "C3.2: Petik herba sungguhan; di kuil Qinghe atau Balai Alang-alang drawqi memakai satu herba untuk satu Qi. circulate memakai Qi: tubuh pulih membuka jalur, latihan berat atau luka menyumbatnya. Dua jalur terbuka dan Qi diperlukan untuk technique. Sumbatan dirawat dengan mend di klinik yang dijaga, memakai obat kuil. meridians dan meridianlog mencatat kondisi. --c31 untuk C3.1.")
-                } else if self.world.martial().is_some() {
-                    text(self.locale,
-                        "C3.1: Seek Ren Zhi (33) for Reed Palm or Stonebank's envoy (35) for Stone Fist. drill <teacher> twice face-to-face (one coin per lesson); martial and martiallog show personal and witnessed progress. technique <npc> uses your learned form; wait eases strain. Sect oaths restrict rival lessons. NPC disciples train without you. --c30 keeps C3.0.",
-                        "C3.1: Temui Ren Zhi (33) untuk Telapak Alang-alang atau utusan Batu Tepi (35) untuk Tinju Batu. drill <guru> dua kali langsung (satu koin per pelajaran); martial dan martiallog menampilkan latihan diri dan yang disaksikan. technique <npc> memakai jurus; wait meredakan kelelahan. Sumpah perguruan membatasi guru saingan. Murid NPC berlatih sendiri. --c30 untuk C3.0.")
-                } else if self.world.is_sect_cultivation() {
-                    text(self.locale,
-                        "C3.0: Keep a relic to cultivate instead of selling. attune <lot> consumes carried SpiritOre into two one-hit wards or JadeScript into two ranged channel <npc> strikes. Use cultivation to inspect charges. --c29 preserves C2.9.",
-                        "C3.0: Simpan relik untuk berkultivasi alih-alih menjual. attune <barang> menghabiskan SpiritOre menjadi dua perlindungan atau JadeScript menjadi dua serangan jarak jauh channel <npc>. Gunakan cultivation untuk melihat sisa. --c29 untuk C2.9.")
-                } else if self.world.contested().is_some() {
-                    text(self.locale,
-                        "C2.9: Rival sects compete for finite SpiritOre and JadeScript lots. Use lots, lotlog, claim <lot>, offerlot <npc> <lot> to sell a carried good face-to-face to Stonebank's envoy or Reed Hall's steward. Unseen goods stay private. --c28 preserves the previous campaign.",
-                        "C2.9: Perguruan bersaing memperebutkan SpiritOre dan JadeScript yang terbatas. Gunakan lots, lotlog, claim <barang>, offerlot <npc> <barang> untuk menjual barang langsung kepada utusan Stonebank atau pengurus Balai Alang-alang. Barang tak terlihat tetap tersembunyi. --c28 untuk kampanye sebelumnya.")
-                } else if self.world.is_physical_recovery() {
-                    text(self.locale,
-                        "C2.8: Watchmen who see a body can recover its real herbs and carry them back to the shrine when medicine is short. The body is not evidence of a killer. Use reportbody <npc> <body>, bodies and salvagelog. --c27 keeps C2.7; --c25 keeps C2.5.",
-                        "C2.8: Penjaga yang melihat jenazah dapat mengambil herba sungguhan dan membawanya ke kuil saat obat kurang. Jenazah bukan bukti pembunuh. Gunakan reportbody <npc> <jenazah>, bodies dan salvagelog. --c27 untuk C2.7; --c25 untuk C2.5.")
-                } else if self.world.is_player_reporting() {
-                    text(self.locale,
-                        "C2.7: Find a body, then reportbody <npc> <body> face-to-face. The listener hears a corpse report after two turns, not a murder accusation. A watchman may travel to confirm it. bodies and crimelog show what you personally know. --c25 keeps C2.5; --c24 keeps C2.4.",
-                        "C2.7: Temukan jenazah, lalu reportbody <npc> <jenazah> secara tatap muka. Penerima mendengar laporan jenazah dua giliran kemudian, bukan tuduhan pembunuhan. Penjaga dapat pergi memeriksanya. bodies dan crimelog mencatat yang kamu ketahui. --c25 untuk C2.5; --c24 untuk C2.4.")
-                } else if self.world.is_violence_logistics() {
-                    text(self.locale,
-                        "C2.5: attack <id> a living courier or contract provider; carried herbs remain on the body. take <id> recovers them. bodies shows only corpses you discovered, not the killer. crimelog lists only your own actions or learned incidents. Witnesses identify attackers; nearby strangers only have a lead. contractlog, accountlog, infolog, know track consequences. --c24 keeps C2.4.",
-                        "C2.5: attack <id> kurir atau pengantar kontrak; herba tetap di jenazah. take <id> mengambilnya. bodies hanya menunjukkan jenazah yang ditemukan, bukan pembunuhnya. crimelog hanya mencatat tindakanmu atau kejadian yang kamu ketahui. Saksi mengenali penyerang; orang dekat hanya punya petunjuk. contractlog, accountlog, infolog, know mencatat akibat. --c24 untuk C2.4.")
-                } else if self.world.is_consequences() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C2.4: A dead carrier's herbs can be taken from the body. People who see you do it remember who you are. People who do not only notice that the cargo is gone. examine, ask, tell, know, and take [id]. --c23 keeps C2.3; --c22 keeps C2.2.",
-                        "C2.4: Herba pada jenazah pengangkut dapat diambil. Orang yang melihatmu mengingat pelakunya. Orang yang tidak melihat hanya mendapati barangnya hilang. examine, ask, tell, know, dan take [id]. --c23 untuk C2.3; --c22 untuk C2.2.",
+                        "living.ascii.input.c3_5_reed_hall_tracks_persisted_rank",
+                    )
+                } else if self.world.character_agency().is_some() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c3_4_injured_npcs_without_treatment_money",
+                    )
+                } else if self.world.injuries().is_some() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c3_3_real_blows_can_leave_lasting",
+                    )
+                } else if self.world.meridians().is_some() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c3_2_gather_real_herbs_at_qinghe",
+                    )
+                } else if self.world.martial().is_some() {
+                    living_text(self.locale, "living.ascii.input.c3_1_seek_ren_zhi_33_for")
+                } else if self.world.is_sect_cultivation() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c3_0_keep_a_relic_to_cultivate",
+                    )
+                } else if self.world.contested().is_some() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c2_9_rival_sects_compete_for_finite",
+                    )
+                } else if self.world.is_physical_recovery() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c2_8_watchmen_who_see_a_body",
+                    )
+                } else if self.world.is_player_reporting() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c2_7_find_a_body_then_reportbody",
+                    )
+                } else if self.world.is_violence_logistics() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c2_5_attack_id_a_living_courier",
+                    )
+                } else if self.world.is_consequences() {
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.c2_4_a_dead_carrier_s_herbs",
                     )
                 } else if self.world.is_player_agency() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C2.3: You can witness, examine a site, ask someone what they know, or tell a specific finding to someone beside you. examine, ask [id], tell [id] [event], and know. Gossip you only heard does not carry the same weight as evidence you checked. --c22 keeps C2.2; --c21 keeps C2.1; --c20 keeps C2.0.",
-                        "C2.3: Kamu dapat menyaksikan, memeriksa lokasi, bertanya apa yang diketahui seseorang, atau menyampaikan temuan tertentu kepada orang di sampingmu. examine, ask [id], tell [id] [event], dan know. Gosip yang hanya kamu dengar tidak sekuat bukti yang kamu periksa. --c22 untuk C2.2; --c21 untuk C2.1; --c20 untuk C2.0.",
+                        "living.ascii.input.c2_3_you_can_witness_examine_a",
                     )
                 } else if self.world.information().is_some() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C2.2: Audit findings travel only by face-to-face testimony with provenance. Credible reports can open institutional disputes that change later contract awards, including suspension. Use contractlog, accountlog and infolog. --c21 keeps C2.1; --c20 keeps C2.0.",
-                        "C2.2: Temuan audit hanya menyebar lewat kesaksian tatap muka dengan asal-usul. Laporan kredibel dapat membuka sengketa lembaga yang mengubah kontrak berikutnya, termasuk penangguhan. Gunakan contractlog, accountlog dan infolog. --c21 untuk C2.1; --c20 untuk C2.0.",
+                        "living.ascii.input.c2_2_audit_findings_travel_only_by",
                     )
                 } else if self.world.contract_memory().is_some() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C2.1: Institutions inspect their own delivery sites before judging past providers. Confirmed deliveries earn local trust; missed deadlines reduce it. Those memories influence later in-person bids, never remote knowledge. Use contractlog and accountlog. --c20 keeps the original contract campaign.",
-                        "C2.1: Lembaga harus memeriksa lokasi pengiriman sendiri sebelum menilai penyedia. Pengiriman terkonfirmasi membangun kepercayaan; tenggat terlewat menguranginya. Ingatan ini memengaruhi tawaran tatap muka berikutnya, bukan pengetahuan jarak jauh. Gunakan contractlog dan accountlog. --c20 untuk kampanye kontrak lama.",
+                        "living.ascii.input.c2_1_institutions_inspect_their_own_delivery",
                     )
                 } else if self.world.contracts().is_some() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C2.0: Qinghe and Reed Hall may discover shortages locally. Requesters travel to prospective sponsors, collect offers, return to award the chosen institution, then wait for real market procurement and physical delivery. Contracts can expire or fail. Use contractlog for events you witnessed; --c19 retains the earlier autonomous faction campaign.",
-                        "C2.0: Qinghe dan Balai Alang-alang dapat mengenali kekurangan secara lokal. Pemohon mengunjungi calon penyokong, membawa tawaran, kembali menyampaikan keputusan, lalu menunggu pembelian pasar dan pengiriman fisik. Kontrak bisa gagal atau kedaluwarsa. Gunakan contractlog untuk kejadian yang kamu saksikan; --c19 untuk kampanye faksi sebelumnya.",
+                        "living.ascii.input.c2_0_qinghe_and_reed_hall_may",
                     )
                 } else if self.world.faction_agency_state().is_some() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C1.9: Stonebank's envoy periodically visits Qinghe to inspect the shrine. A shortage witnessed in person can provoke a competing physical aid shipment, paid with Stonebank funds. Both factions contend for finite market herbs. Use aidlog for events you witnessed; --c18 keeps the earlier campaign.",
-                        "C1.9: Utusan Batu Tepi mendatangi Qinghe untuk memeriksa kuil. Kekurangan yang disaksikan sendiri dapat memicu pengiriman bantuan fisik memakai uang perguruan. Kedua faksi bersaing atas stok pasar yang terbatas. Gunakan aidlog untuk kejadian yang kamu saksikan; --c18 untuk kampanye lama.",
+                        "living.ascii.input.c1_9_stonebank_s_envoy_periodically_visits",
                     )
                 } else if self.world.relief().is_some() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C1.8: An observed Qinghe medicine shortage may send the watchman to ask Reed Hall for relief. The steward must obtain real herbs at Willowford market and carry them to the shrine. The mission can fail or be withdrawn. Use relieflog for events you witnessed, or trafficlog for passage.",
-                        "C1.8: Kekurangan obat Qinghe yang terlihat dapat membuat penjaga meminta bantuan Balai Alang-alang. Pengurus harus membeli herba nyata di pasar Willowford dan membawanya ke kuil. Misi bisa gagal atau dibatalkan. Gunakan relieflog untuk peristiwa yang kamu saksikan, atau trafficlog untuk pertukaran jalan.",
+                        "living.ascii.input.c1_8_an_observed_qinghe_medicine_shortage",
                     )
                 } else if self.world.traffic().is_some() {
-                    text(
+                    living_text(
                         self.locale,
-                        "C1.7: Move into an adjacent friendly villager to exchange tiles. NPCs can negotiate bottlenecks after a short wait, but busy healers, teachers and hostile actors will not yield. Use trafficlog to inspect witnessed exchanges. Sect politics and Willowford continue as usual.",
-                        "C1.7: Bergerak ke petak warga ramah yang bersebelahan untuk bertukar tempat. NPC dapat melewati jalan sempit setelah menunggu sebentar, tetapi tabib atau guru yang sibuk dan musuh tidak akan mengalah. Gunakan trafficlog untuk melihat pertukaran yang disaksikan. Politik perguruan dan Willowford tetap berjalan.",
+                        "living.ascii.input.c1_7_move_into_an_adjacent_friendly",
                     )
                 } else if self.world.politics().is_some() {
-                    text(self.locale,
-                        "Reed Hall and Stonebank compete over Willowford herbs. Visit the market or Hall and use factions. Talk to envoy 35, then pledge with one herb; aidlodge supplies your allies. Renounce at Reed Hall before joining it again. Sponsoring the Hall earns its steward's trust. Use politicslog for witnessed events.",
-                        "Balai Alang-alang dan Batu Tepi berebut herba Willowford. Datangi pasar atau balai lalu gunakan factions. Bicara dengan utusan 35, lalu pledge dengan satu herba; aidlodge membekali sekutumu. Renounce di Balai Alang-alang sebelum kembali bergabung. Sponsor balai membangun kepercayaan pengurusnya. Gunakan politicslog untuk peristiwa yang disaksikan.")
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.reed_hall_and_stonebank_compete_over_willowford",
+                    )
                 } else if self.world.region().is_some() {
-                    text(self.locale,
-                        "Follow the eastern road to Willowford. Gather herbs and sell at the market, donate in Qinghe or train at the shrine. Reed Hall teaches remedy brewing after breath practice and a one-herb offering.",
-                        "Ikuti jalan ke timur menuju Willowford. Petik herba lalu jual di pasar, sumbangkan di Qinghe, atau pakai untuk latihan di kuil. Balai Alang-alang mengajar racikan obat setelah latihan napas dan persembahan satu herba.")
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.follow_the_eastern_road_to_willowford_gather",
+                    )
                 } else {
-                    text(self.locale,
-                        "Gather herbs at the patch and deliver them to the shrine. Use inspect on visible villagers and talk to the healer for care.",
-                        "Petik herba di ladang lalu antar ke kuil. Gunakan inspect untuk warga yang terlihat dan bicara dengan tabib untuk berobat.")
-                }.into();
+                    living_text(
+                        self.locale,
+                        "living.ascii.input.gather_herbs_at_the_patch_and_deliver",
+                    )
+                }
+                .into();
                 return true;
             }
             "lang" => {
-                match argument {
-                    Some("en") => self.locale = Locale::English,
-                    Some("id") => self.locale = Locale::Indonesian,
-                    _ => self.notice = "lang en | lang id".into(),
+                let next = match argument {
+                    Some("en") => Locale::English,
+                    Some("id") => Locale::Indonesian,
+                    _ => {
+                        self.notice = "lang en | lang id".into();
+                        return true;
+                    }
+                };
+                if next != self.locale {
+                    self.locale = next;
+                    // A cached notice was authored in the previous language.
+                    // Discard presentation-only text; never change world state.
+                    self.notice.clear();
                 }
                 return true;
             }
@@ -1103,21 +1204,24 @@ impl Session {
                     "form" => Intent::ReedStrike(id),
                     "channel" => {
                         if !self.world.is_sect_cultivation() {
-                            self.notice = "Only in C3.0.".into();
+                            self.notice =
+                                living_text(self.locale, "living.ascii.input.only_in_c3_0").into();
                             return true;
                         }
                         Intent::ChannelStrike(id)
                     }
                     "drill" => {
                         if self.world.martial().is_none() {
-                            self.notice = "Only in C3.1.".into();
+                            self.notice =
+                                living_text(self.locale, "living.ascii.input.only_in_c3_1").into();
                             return true;
                         }
                         Intent::Drill(id)
                     }
                     "technique" => {
                         if self.world.martial().is_none() {
-                            self.notice = "Only in C3.1.".into();
+                            self.notice =
+                                living_text(self.locale, "living.ascii.input.only_in_c3_1").into();
                             return true;
                         }
                         Intent::TechniqueStrike(id)
@@ -1174,10 +1278,9 @@ impl Session {
                     .map(|event| self.company_line(event))
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No recorded travel encounters.",
-                        "Belum ada catatan perjalanan.",
+                        "living.ascii.input.no_recorded_travel_encounters",
                     )
                     .into()
                 } else {
@@ -1196,10 +1299,9 @@ impl Session {
                     .map(|event| self.traffic_line(event))
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed passage exchanges.",
-                        "Belum ada pertukaran jalan yang disaksikan.",
+                        "living.ascii.input.no_witnessed_passage_exchanges",
                     )
                     .into()
                 } else {
@@ -1218,12 +1320,7 @@ impl Session {
                     .map(|event| self.relief_line(event))
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
-                        self.locale,
-                        "No witnessed relief events.",
-                        "Belum ada kejadian bantuan yang kamu saksikan.",
-                    )
-                    .into()
+                    living_text(self.locale, "living.ascii.input.no_witnessed_relief_events").into()
                 } else {
                     lines.join("\n")
                 };
@@ -1240,10 +1337,9 @@ impl Session {
                     .map(|event| self.faction_aid_line(event))
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed faction aid events.",
-                        "Belum ada bantuan antarfaksi yang kamu saksikan.",
+                        "living.ascii.input.no_witnessed_faction_aid_events",
                     )
                     .into()
                 } else {
@@ -1262,10 +1358,9 @@ impl Session {
                     .map(|event| self.contract_line(event))
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed institutional contracts.",
-                        "Belum ada kontrak lembaga yang kamu saksikan.",
+                        "living.ascii.input.no_witnessed_institutional_contracts",
                     )
                     .into()
                 } else {
@@ -1284,10 +1379,9 @@ impl Session {
                     .map(|event| self.account_line(event))
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed contract audits.",
-                        "Belum ada pemeriksaan kontrak yang kamu saksikan.",
+                        "living.ascii.input.no_witnessed_contract_audits",
                     )
                     .into()
                 } else {
@@ -1306,10 +1400,9 @@ impl Session {
                     .map(|event| self.info_line(event))
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed institutional information.",
-                        "Belum ada informasi lembaga yang kamu saksikan.",
+                        "living.ascii.input.no_witnessed_institutional_information",
                     )
                     .into()
                 } else {
@@ -1332,34 +1425,34 @@ impl Session {
                     .map(|event| {
                         let verb = match event.kind {
                             SectEventKind::Purchased => {
-                                text(self.locale, "bought an herb", "membeli herba")
+                                living_text(self.locale, "living.ascii.input.bought_an_herb")
                             }
-                            SectEventKind::Petitioned => text(
+                            SectEventKind::Petitioned => living_text(
                                 self.locale,
-                                "pressed a claim at Reed Hall",
-                                "menuntut pengaruh di Balai Alang-alang",
+                                "living.ascii.input.pressed_a_claim_at_reed_hall",
                             ),
                             SectEventKind::Accord => {
-                                text(self.locale, "negotiated a truce", "menegosiasikan gencatan")
+                                living_text(self.locale, "living.ascii.input.negotiated_a_truce")
                             }
-                            SectEventKind::Patronage => text(
-                                self.locale,
-                                "supported Reed Hall",
-                                "mendukung Balai Alang-alang",
-                            ),
+                            SectEventKind::Patronage => {
+                                living_text(self.locale, "living.ascii.input.supported_reed_hall")
+                            }
                         };
-                        format!(
-                            "t{} · {} {verb}.",
-                            event.at,
-                            actor_name(self.locale, &self.world, event.actor)
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.event_at_actor_verb",
+                            &[
+                                ("event_at", &format!("{}", event.at)),
+                                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                                ("verb", verb),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "You witnessed no sect events.",
-                        "Belum ada peristiwa perguruan yang kamu saksikan.",
+                        "living.ascii.input.you_witnessed_no_sect_events",
                     )
                     .into()
                 } else {
@@ -1377,49 +1470,42 @@ impl Session {
                     .take(8)
                     .map(|event| {
                         let action = match event.kind {
-                            PoliticalEventKind::HallPurchase => text(
+                            PoliticalEventKind::HallPurchase => living_text(
                                 self.locale,
-                                "bought herbs for Reed Hall",
-                                "membeli herba untuk Balai Alang-alang",
+                                "living.ascii.input.bought_herbs_for_reed_hall",
                             ),
-                            PoliticalEventKind::HallSupply => text(
+                            PoliticalEventKind::HallSupply => living_text(
                                 self.locale,
-                                "delivered Hall supplies",
-                                "menyerahkan perbekalan balai",
+                                "living.ascii.input.delivered_hall_supplies",
                             ),
-                            PoliticalEventKind::LodgeOath => text(
-                                self.locale,
-                                "pledged to Stonebank",
-                                "bersumpah kepada Batu Tepi",
-                            ),
-                            PoliticalEventKind::LodgeAid => text(
-                                self.locale,
-                                "supplied Stonebank",
-                                "membekali perguruan Batu Tepi",
-                            ),
-                            PoliticalEventKind::LodgeRenunciation => text(
-                                self.locale,
-                                "renounced Stonebank",
-                                "melepaskan sumpah Batu Tepi",
-                            ),
-                            PoliticalEventKind::HallPatronage => text(
-                                self.locale,
-                                "supported Reed Hall",
-                                "mendukung Balai Alang-alang",
-                            ),
+                            PoliticalEventKind::LodgeOath => {
+                                living_text(self.locale, "living.ascii.input.pledged_to_stonebank")
+                            }
+                            PoliticalEventKind::LodgeAid => {
+                                living_text(self.locale, "living.ascii.input.supplied_stonebank")
+                            }
+                            PoliticalEventKind::LodgeRenunciation => {
+                                living_text(self.locale, "living.ascii.input.renounced_stonebank")
+                            }
+                            PoliticalEventKind::HallPatronage => {
+                                living_text(self.locale, "living.ascii.input.supported_reed_hall")
+                            }
                         };
-                        format!(
-                            "t{} · {} {action}.",
-                            event.at,
-                            actor_name(self.locale, &self.world, event.actor)
+                        living_format(
+                            self.locale,
+                            "living.ascii.input.template.event_at_actor_action",
+                            &[
+                                ("event_at", &format!("{}", event.at)),
+                                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                                ("action", action),
+                            ],
                         )
                     })
                     .collect();
                 self.notice = if lines.is_empty() {
-                    text(
+                    living_text(
                         self.locale,
-                        "No witnessed political events.",
-                        "Belum ada peristiwa politik yang disaksikan.",
+                        "living.ascii.input.no_witnessed_political_events",
                     )
                     .into()
                 } else {
@@ -1429,9 +1515,10 @@ impl Session {
             }
             "look" => return true,
             _ => {
-                self.notice = format!(
-                    "{} — {command}",
-                    text(self.locale, "Unknown command", "Perintah tidak dikenal")
+                self.notice = living_format(
+                    self.locale,
+                    "living.ascii.input.template.unknown_command_command",
+                    &[("command", command)],
                 );
                 return true;
             }
@@ -1439,67 +1526,55 @@ impl Session {
 
         if let Err(error) = self.world.step(self.world.tick(), intent) {
             self.notice = match error {
-                StepError::UnavailableInOriginalRules => text(
+                StepError::UnavailableInOriginalRules => living_text(
                     self.locale,
-                    "Breath practice requires a new campaign.",
-                    "Latihan napas tersedia di kampanye baru.",
+                    "living.ascii.input.breath_practice_requires_a_new_campaign",
                 )
                 .into(),
-                StepError::RegionalCampaignRequired => text(
+                StepError::RegionalCampaignRequired => living_text(
                     self.locale,
-                    "This action requires a Qinghe–Willowford campaign.",
-                    "Aksi ini memerlukan kampanye Qinghe–Willowford.",
+                    "living.ascii.input.this_action_requires_a_qinghe_willowford_campaign",
                 )
                 .into(),
-                StepError::CompanyCampaignRequired => text(
+                StepError::CompanyCampaignRequired => living_text(
                     self.locale,
-                    "Travelling partnerships require a new campaign.",
-                    "Mulai kampanye baru untuk merekrut pendamping.",
+                    "living.ascii.input.travelling_partnerships_require_a_new_campaign",
                 )
                 .into(),
-                StepError::RivalryCampaignRequired => text(
+                StepError::RivalryCampaignRequired => living_text(
                     self.locale,
-                    "Sect diplomacy requires a C1.5 campaign.",
-                    "Diplomasi perguruan memerlukan kampanye C1.5.",
+                    "living.ascii.input.sect_diplomacy_requires_a_c1_5_campaign",
                 )
                 .into(),
-                StepError::PoliticsCampaignRequired => text(
+                StepError::PoliticsCampaignRequired => living_text(
                     self.locale,
-                    "Allegiance requires a C1.6 campaign.",
-                    "Kesetiaan perguruan memerlukan kampanye C1.6.",
+                    "living.ascii.input.allegiance_requires_a_c1_6_campaign",
                 )
                 .into(),
-                StepError::SchoolCampaignRequired => text(
+                StepError::SchoolCampaignRequired => living_text(
                     self.locale,
-                    "This action requires a new Reed Hall campaign.",
-                    "Aksi ini memerlukan kampanye baru Balai Alang-alang.",
+                    "living.ascii.input.this_action_requires_a_new_reed_hall",
                 )
                 .into(),
-                StepError::HorizonReached => text(
+                StepError::HorizonReached => living_text(
                     self.locale,
-                    "This campaign reached its turn limit.",
-                    "Kampanye ini mencapai batas giliran.",
+                    "living.ascii.input.this_campaign_reached_its_turn_limit",
                 )
                 .into(),
-                StepError::WrongBoundary { .. } => text(
+                StepError::WrongBoundary { .. } => {
+                    living_text(self.locale, "living.ascii.input.the_turn_is_out_of_date").into()
+                }
+                StepError::InvalidBodyReport => living_text(
                     self.locale,
-                    "The turn is out of date.",
-                    "Giliran sudah berubah.",
-                )
-                .into(),
-                StepError::InvalidBodyReport => text(
-                    self.locale,
-                    "Invalid body report or unavailable campaign.",
-                    "Laporan jenazah tidak sah atau kampanye tidak tersedia.",
+                    "living.ascii.input.invalid_body_report_or_unavailable_campaign",
                 )
                 .into(),
                 StepError::UnrecordableIntent => {
                     living_text(self.locale, "living.intent.unrecordable").into()
                 }
-                StepError::ContestedCampaignRequired => text(
+                StepError::ContestedCampaignRequired => living_text(
                     self.locale,
-                    "Contested resources are unavailable in this campaign.",
-                    "Barang sengketa tidak tersedia di kampanye ini.",
+                    "living.ascii.input.contested_resources_are_unavailable_in_this_campaign",
                 )
                 .into(),
             };
@@ -1550,10 +1625,9 @@ impl Session {
     }
 
     fn target_hint(&self) -> &'static str {
-        text(
+        living_text(
             self.locale,
-            "Choose a visible NPC by ID.",
-            "Pilih ID NPC yang terlihat.",
+            "living.ascii.target_hint.choose_a_visible_npc_by_id",
         )
     }
 
@@ -1563,23 +1637,23 @@ impl Session {
             Err(message) => return message.into(),
         };
         let npc = self.world.npc(id).expect("visible target");
-        let tr = |en, id| text(self.locale, en, id);
+        let tr = |key| living_text(self.locale, key);
         let occupation = match npc.definition.role {
-            Role::Medic => tr("healer", "tabib"),
-            Role::Watch => tr("watch", "penjaga"),
-            Role::Supplier => tr("herbalist", "pemetik herba"),
-            Role::Traveler => tr("traveler", "musafir"),
-            Role::Grower => tr("grower", "pekebun"),
-            Role::Courier => tr("courier", "kurir"),
-            Role::Mentor => tr("mentor", "guru balai"),
-            Role::HallDeputy => tr("deputy", "wakil guru"),
-            Role::RivalEnvoy => tr("Stonebank envoy", "utusan perguruan Batu Tepi"),
-            Role::HallSteward => tr("Hall steward", "pengurus Balai Alang-alang"),
+            Role::Medic => tr("living.ascii.inspect.healer"),
+            Role::Watch => tr("living.ascii.inspect.watch"),
+            Role::Supplier => tr("living.ascii.inspect.herbalist"),
+            Role::Traveler => tr("living.ascii.inspect.traveler"),
+            Role::Grower => tr("living.ascii.inspect.grower"),
+            Role::Courier => tr("living.ascii.inspect.courier"),
+            Role::Mentor => tr("living.ascii.inspect.mentor"),
+            Role::HallDeputy => tr("living.ascii.inspect.deputy"),
+            Role::RivalEnvoy => tr("living.ascii.inspect.stonebank_envoy"),
+            Role::HallSteward => tr("living.ascii.inspect.hall_steward"),
         };
         let condition = if npc.hp < npc.definition.hp {
-            tr("wounded", "terluka")
+            tr("living.ascii.inspect.wounded")
         } else {
-            tr("no visible wounds", "tidak tampak luka")
+            tr("living.ascii.inspect.no_visible_wounds")
         };
         if self
             .world
@@ -1590,31 +1664,36 @@ impl Session {
                 + npc.position.y.abs_diff(self.world.player().position.y)
                 <= 1
         {
-            return format!(
-                "{} ({occupation}) — {condition}. {} {}.",
-                npc.definition.name,
-                tr("Packed herbs", "Herba bekal"),
-                npc.packed_herbs
+            return living_format(
+                self.locale,
+                "living.ascii.inspect.template.npc_definition_name_occupation_condition_packed",
+                &[
+                    ("npc_definition_name", npc.definition.name),
+                    ("occupation", occupation),
+                    ("condition", condition),
+                    ("npc_packed_herbs", &format!("{}", npc.packed_herbs)),
+                ],
             );
         }
         let invitation = match self.world.invitation(id) {
-            Some(Invitation::OpenRoad) => tr(
-                " Talk, then invite to travel.",
-                " Ajak bicara, lalu gunakan invite.",
-            ),
-            Some(Invitation::SchoolMember) => tr(
-                " Talk first. Hall members can invite the deputy until they take office.",
-                " Berkenalanlah dulu. Anggota balai bisa mengajak wakil sebelum ia menjabat guru.",
-            ),
-            Some(Invitation::LodgeMember) => tr(
-                " Talk first. Stonebank members may invite this envoy.",
-                " Berkenalanlah dulu. Anggota Batu Tepi bisa mengajak utusan ini.",
-            ),
+            Some(Invitation::OpenRoad) => tr("living.ascii.inspect.talk_then_invite_to_travel"),
+            Some(Invitation::SchoolMember) => {
+                tr("living.ascii.inspect.talk_first_hall_members_can_invite_the")
+            }
+            Some(Invitation::LodgeMember) => {
+                tr("living.ascii.inspect.talk_first_stonebank_members_may_invite_this")
+            }
             None => "",
         };
-        format!(
-            "{} ({occupation}) — {condition}.{invitation}",
-            npc.definition.name
+        living_format(
+            self.locale,
+            "living.ascii.inspect.template.npc_definition_name_occupation_condition_invitation",
+            &[
+                ("npc_definition_name", npc.definition.name),
+                ("occupation", occupation),
+                ("condition", condition),
+                ("invitation", invitation),
+            ],
         )
     }
 
@@ -1674,54 +1753,69 @@ impl Session {
         let world = &self.world;
         let scenario = world.scenario();
         let player = world.player();
-        let tr = |en, id| text(self.locale, en, id);
+        let tr = |key| living_text(self.locale, key);
         let visible = |cell| self.debug_world || world.player_sees(cell);
         let (hour, minute) = clock::clock_hhmm(clock::minute_of_day(world.calendar_tick()));
-        let mut out = format!(
-            "Sealed Heaven - {}\n{} {}  {hour:02}:{minute:02}  {} {}  HP {}  {} {}{}\n",
-            scenario.name,
-            tr("Day", "Hari"),
-            clock::day_number(world.calendar_tick()),
-            tr("Turn", "Giliran"),
-            world.tick(),
-            player.hp,
-            tr("Herbs", "Herba"),
-            player.herbs,
-            if player.alive() {
-                ""
-            } else {
-                tr("  DEAD - n advances time", "  GUGUR - n memajukan waktu")
-            }
+        let mut out = living_format(
+            self.locale,
+            "living.ascii.frame.template.scenario_name_day_clock_day_number",
+            &[
+                ("scenario_name", scenario.name),
+                (
+                    "clock_day_number_world_calendar_tick",
+                    &format!("{}", clock::day_number(world.calendar_tick())),
+                ),
+                ("hour", &format!("{:02}", hour)),
+                ("minute", &format!("{:02}", minute)),
+                ("world_tick", &format!("{}", world.tick())),
+                ("player_hp", &format!("{}", player.hp)),
+                ("player_herbs", &format!("{}", player.herbs)),
+                (
+                    "conditional",
+                    if player.alive() {
+                        ""
+                    } else {
+                        tr("living.ascii.frame.dead_n_advances_time")
+                    },
+                ),
+            ],
         );
         if self.debug_world {
-            let _ = writeln!(out, "{}", tr("DEVELOPER VIEW", "TAMPILAN PENGEMBANG"));
+            let _ = writeln!(out, "{}", tr("living.ascii.frame.developer_view"));
         }
         if world.original_rules() {
-            let _ = writeln!(
-                out,
-                "{}",
-                tr("Original C1.0 campaign", "Kampanye C1.0 awal")
-            );
+            let _ = writeln!(out, "{}", tr("living.ascii.frame.original_c1_0_campaign"));
         } else {
             let _ = writeln!(
                 out,
-                "{} {}/{}",
-                tr("Breath", "Napas"),
-                world.breath_progress(),
-                BREATH_MASTERY
+                "{}",
+                living_format(
+                    self.locale,
+                    "living.ascii.frame.template.breath_world_breath_progress_breath_mastery",
+                    &[
+                        (
+                            "world_breath_progress",
+                            &format!("{}", world.breath_progress())
+                        ),
+                        ("breath_mastery", &format!("{}", BREATH_MASTERY))
+                    ]
+                )
             );
         }
         let sites = world.region().map(|_| Region::sites());
         if let Some(region) = world.region() {
             let _ = writeln!(
                 out,
-                "{} {}  |  {} {}  |  {} {}",
-                tr("Coins", "Koin"),
-                region.coins,
-                tr("Remedies", "Obat"),
-                region.remedies,
-                tr("Seed", "Seed"),
-                region.seed
+                "{}",
+                living_format(
+                    self.locale,
+                    "living.ascii.frame.template.coins_region_coins_remedies_region_remedies",
+                    &[
+                        ("region_coins", &format!("{}", region.coins)),
+                        ("region_remedies", &format!("{}", region.remedies)),
+                        ("region_seed", &format!("{}", region.seed))
+                    ]
+                )
             );
             if let Some(background) = region.background {
                 let _ = writeln!(out, "{}", background_label(self.locale, background));
@@ -1729,10 +1823,7 @@ impl Session {
                 let _ = writeln!(
                     out,
                     "{}",
-                    tr(
-                        "Before moving, choose background wanderer (3 coins), herbalist (1 coin, up to 2 herbs per gather), or peddler (6 coins).",
-                        "Sebelum bergerak, pilih background wanderer (3 koin), herbalist (1 koin, hingga 2 herba per petik), atau peddler (6 koin).",
-                    )
+                    tr("living.ascii.frame.before_moving_choose_background_wanderer_3_coins")
                 );
             }
             if let Some(rank) = world.hall_rank() {
@@ -1743,16 +1834,23 @@ impl Session {
                 .politics()
                 .is_some_and(|politics| politics.allegiance == Allegiance::Stonebank)
             {
-                let _ = writeln!(
-                    out,
-                    "{}",
-                    tr("Stonebank lodge member", "Anggota perguruan Batu Tepi")
-                );
+                let _ = writeln!(out, "{}", tr("living.ascii.frame.stonebank_lodge_member"));
             }
         }
         if let Some(school) = world.school() {
             if school.form_learned {
-                let _ = writeln!(out, "Qi {}/{}", school.qi, MAX_QI);
+                let _ = writeln!(
+                    out,
+                    "{}",
+                    living_format(
+                        self.locale,
+                        "living.ascii.frame.template.school_qi_max_qi",
+                        &[
+                            ("school_qi", &format!("{}", school.qi)),
+                            ("max_qi", &format!("{}", MAX_QI))
+                        ]
+                    )
+                );
             }
             if let Some(hint) = self.duty_hint() {
                 let _ = writeln!(out, "{hint}");
@@ -1778,14 +1876,11 @@ impl Session {
         let _ = writeln!(
             out,
             "{}",
-            tr(
-                "@ you  * herb patch  + shrine  = clinic  # wall  x fallen  ? unseen",
-                "@ kamu  * ladang herba  + kuil  = klinik  # tembok  x gugur  ? tak terlihat",
-            )
+            tr("living.ascii.frame.you_herb_patch_shrine_clinic_wall_x")
         );
         for npc in world.npcs().filter(|npc| visible(npc.position)) {
             let status = if !npc.alive() {
-                tr("fallen", "gugur")
+                tr("living.ascii.frame.fallen")
             } else if self.debug_world {
                 goal_label(self.locale, npc.activity.goal)
             } else if world
@@ -1794,25 +1889,31 @@ impl Session {
                 .is_some_and(|j| j.actor == npc.id())
             {
                 match npc.activity.goal {
-                    Goal::Rest => tr("companion resting", "pendamping beristirahat"),
-                    Goal::SeekCare => tr("companion seeking care", "pendamping mencari perawatan"),
-                    _ => tr("travelling companion", "pendamping perjalanan"),
+                    Goal::Rest => tr("living.ascii.frame.companion_resting"),
+                    Goal::SeekCare => tr("living.ascii.frame.companion_seeking_care"),
+                    _ => tr("living.ascii.frame.travelling_companion"),
                 }
             } else if npc.herbs > 0 {
-                tr("carrying herbs", "membawa herba")
+                tr("living.ascii.frame.carrying_herbs")
             } else if npc.definition.role == Role::Medic && npc.position == scenario.clinic {
-                tr("at the clinic", "di klinik")
+                tr("living.ascii.frame.at_the_clinic")
             } else {
                 ""
             };
             let _ = write!(
                 out,
-                "{} {:>2} {} ({},{})",
-                npc.definition.glyph,
-                npc.id().get(),
-                npc.definition.name,
-                npc.position.x,
-                npc.position.y
+                "{}",
+                living_format(
+                    self.locale,
+                    "living.ascii.frame.template.npc_definition_glyph_npc_id_get",
+                    &[
+                        ("npc_definition_glyph", &format!("{}", npc.definition.glyph)),
+                        ("npc_id_get", &format!("{:>2}", npc.id().get())),
+                        ("npc_definition_name", npc.definition.name),
+                        ("npc_position_x", &format!("{}", npc.position.x)),
+                        ("npc_position_y", &format!("{}", npc.position.y))
+                    ]
+                )
             );
             if !status.is_empty() {
                 let _ = write!(out, " - {status}");
@@ -1823,18 +1924,29 @@ impl Session {
         if visible(scenario.shrine) {
             let _ = writeln!(
                 out,
-                "{} {}/{}",
-                tr("Shrine stock", "Stok kuil"),
-                supply.shrine,
-                scenario.shrine_target
+                "{}",
+                living_format(
+                    self.locale,
+                    "living.ascii.frame.template.shrine_stock_supply_shrine_scenario_shrine",
+                    &[
+                        ("supply_shrine", &format!("{}", supply.shrine)),
+                        (
+                            "scenario_shrine_target",
+                            &format!("{}", scenario.shrine_target)
+                        )
+                    ]
+                )
             );
         }
         if visible(scenario.patch) {
             let _ = writeln!(
                 out,
-                "{} {}",
-                tr("Herbs in patch", "Herba di ladang"),
-                supply.source
+                "{}",
+                living_format(
+                    self.locale,
+                    "living.ascii.frame.template.herbs_in_patch_supply_source",
+                    &[("supply_source", &format!("{}", supply.source))]
+                )
             );
         }
         if let Some((region, sites)) = world.region().zip(sites) {
@@ -1844,62 +1956,86 @@ impl Session {
                     let _ = writeln!(
                         out,
                         "{}",
-                        tr(
-                            "Willowford market closed until dawn",
-                            "Pasar Willowford tutup hingga fajar"
-                        )
+                        tr("living.ascii.frame.willowford_market_closed_until_dawn")
                     );
                 } else {
                     let _ = writeln!(
                         out,
-                        "{} {}  |  {} {}  |  {} {}",
-                        tr("Market herbs", "Herba pasar"),
-                        region.market_herbs,
-                        tr("buy", "beli"),
-                        quote.buy,
-                        tr("sell", "jual"),
-                        quote.sell
+                        "{}",
+                        living_format(
+                            self.locale,
+                            "living.ascii.frame.template.market_herbs_region_market_herbs_buy",
+                            &[
+                                ("region_market_herbs", &format!("{}", region.market_herbs)),
+                                ("quote_buy", &format!("{}", quote.buy)),
+                                ("quote_sell", &format!("{}", quote.sell))
+                            ]
+                        )
                     );
                 }
             }
             if visible(sites.garden) {
                 let _ = writeln!(
                     out,
-                    "{} {}",
-                    tr("Willowford garden herbs", "Herba kebun Willowford"),
-                    region.garden_herbs
+                    "{}",
+                    living_format(
+                        self.locale,
+                        "living.ascii.frame.template.willowford_garden_herbs_region_garden_herbs",
+                        &[("region_garden_herbs", &format!("{}", region.garden_herbs))]
+                    )
                 );
             }
             if visible(sites.hall) {
                 let _ = writeln!(out, "{}", self.hall_hint());
                 if let Some(rivalry) = world.rivalry() {
                     let state = if rivalry.at_peace(world.tick()) {
-                        tr("truce", "gencatan")
+                        tr("living.ascii.frame.truce")
                     } else if rivalry.contested(world.tick()) {
-                        tr("contested", "diperebutkan")
+                        tr("living.ascii.frame.contested")
                     } else {
-                        tr("stable", "stabil")
+                        tr("living.ascii.frame.stable")
                     };
-                    let _ = writeln!(out, "{}: {state}", tr("Hall influence", "Pengaruh balai"));
+                    let _ = writeln!(
+                        out,
+                        "{}",
+                        living_format(
+                            self.locale,
+                            "living.ascii.frame.template.hall_influence_state",
+                            &[("state", state)]
+                        )
+                    );
                 }
             }
             if self.debug_world {
                 let _ = writeln!(
                     out,
-                    "{} {}",
-                    tr("Herbs shipped to Qinghe", "Herba dikirim ke Qinghe"),
-                    region.shipped_to_qinghe
+                    "{}",
+                    living_format(
+                        self.locale,
+                        "living.ascii.frame.template.herbs_shipped_to_qinghe_region_shipped",
+                        &[(
+                            "region_shipped_to_qinghe",
+                            &format!("{}", region.shipped_to_qinghe)
+                        )]
+                    )
                 );
             }
         }
         if self.debug_world {
             let _ = writeln!(
                 out,
-                "{} {}  |  {} {}",
-                tr("NPC deliveries", "Kiriman NPC"),
-                supply.npc_deliveries,
-                tr("Used for care", "Dipakai untuk perawatan"),
-                supply.consumed
+                "{}",
+                living_format(
+                    self.locale,
+                    "living.ascii.frame.template.npc_deliveries_supply_npc_deliveries_used",
+                    &[
+                        (
+                            "supply_npc_deliveries",
+                            &format!("{}", supply.npc_deliveries)
+                        ),
+                        ("supply_consumed", &format!("{}", supply.consumed))
+                    ]
+                )
             );
         }
         if let Some(outcome) = world.latest_outcome() {
@@ -1917,26 +2053,39 @@ impl Session {
             if incident.damage == 0 {
                 let _ = writeln!(
                     out,
-                    "t{} {} {} {}",
-                    incident.tick,
-                    actor_name(self.locale, world, incident.source),
-                    tr("took cargo from", "mengambil muatan dari"),
-                    actor_name(self.locale, world, incident.target),
+                    "{}",
+                    living_format(
+                        self.locale,
+                        "living.ascii.frame.template.incident_tick_actor_took_cargo_from",
+                        &[
+                            ("incident_tick", &format!("{}", incident.tick)),
+                            ("actor", actor_name(self.locale, world, incident.source)),
+                            ("actor_2", actor_name(self.locale, world, incident.target))
+                        ]
+                    )
                 );
             } else {
                 let _ = writeln!(
                     out,
-                    "t{} {} {} {} ({} HP){}",
-                    incident.tick,
-                    actor_name(self.locale, world, incident.source),
-                    tr("hit", "menyerang"),
-                    actor_name(self.locale, world, incident.target),
-                    incident.damage,
-                    if incident.fatal {
-                        tr(" fatal", " fatal")
-                    } else {
-                        ""
-                    }
+                    "{}",
+                    living_format(
+                        self.locale,
+                        "living.ascii.frame.template.incident_tick_actor_hit_actor_2",
+                        &[
+                            ("incident_tick", &format!("{}", incident.tick)),
+                            ("actor", actor_name(self.locale, world, incident.source)),
+                            ("actor_2", actor_name(self.locale, world, incident.target)),
+                            ("incident_damage", &format!("{}", incident.damage)),
+                            (
+                                "conditional",
+                                if incident.fatal {
+                                    tr("living.ascii.frame.fatal")
+                                } else {
+                                    ""
+                                }
+                            )
+                        ]
+                    )
                 );
             }
         }
@@ -2026,107 +2175,74 @@ impl Session {
         let _ = writeln!(
             out,
             "\n{}",
-            tr(
-                "wasd move | n wait | f [id] attack | b guard | e [id] talk or request care | i [id] inspect",
-                "wasd bergerak | n tunggu | f [id] serang | b bertahan | e [id] bicara atau berobat | i [id] amati",
-            )
+            tr("living.ascii.frame.wasd_move_n_wait_f_id_attack")
         );
         let _ = writeln!(
             out,
             "{}",
-            tr(
-                "g gather | h deliver | v save | o load | r reset | q quit | lang id",
-                "g petik | h sumbang | v simpan | o muat | r ulang | q keluar | lang en",
-            )
+            tr("living.ascii.frame.g_gather_h_deliver_v_save_o")
         );
         if !world.original_rules() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "m practice at the shrine (costs 1 herb, mastery improves guard)",
-                    "m latihan di kuil (1 herba, penguasaan memperkuat pertahanan)",
-                )
+                tr("living.ascii.frame.m_practice_at_the_shrine_costs_1")
             );
         }
         if sites.is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "$ market  & garden  ^ hall | buy | sell | join | brew | remedy | help",
-                    "$ pasar  & kebun  ^ balai | buy beli | sell jual | join | brew racik | remedy minum | help",
-                )
+                tr("living.ascii.frame.market_garden_hall_buy_sell_join_brew")
             );
         }
         if world.school().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "duty carry or report | study learn form | center gain Qi | form [id] strike",
-                    "duty antar atau lapor | study belajar jurus | center pulihkan Qi | form [id] serang",
-                )
+                tr("living.ascii.frame.duty_carry_or_report_study_learn_form")
             );
         }
         if world.company().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "invite [id] travel together | pack [id] give a medicinal herb | part [id] | journal",
-                    "invite [id] ajak ikut | pack [id] bekali satu herba | part [id] berpisah | journal catatan",
-                )
+                tr("living.ascii.frame.invite_id_travel_together_pack_id_give")
             );
         }
         if world.rivalry().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "V envoy | accord (offer 1 herb) | sponsor (Hall member, 1 herb) | factions | factionlog",
-                    "V utusan | accord (beri 1 herba) | sponsor (anggota balai, 1 herba) | factions | factionlog",
-                )
+                tr("living.ascii.frame.v_envoy_accord_offer_1_herb_sponsor")
             );
         }
         if world.politics().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "Q Hall steward | pledge (talk to envoy, 1 herb) | aidlodge (1 herb) | renounce (at Hall) | politicslog",
-                    "Q pengurus balai | pledge (bicara utusan, 1 herba) | aidlodge (1 herba) | renounce (di balai) | politicslog",
-                )
+                tr("living.ascii.frame.q_hall_steward_pledge_talk_to_envoy")
             );
         }
         if world.traffic().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "Move toward friendly NPC to pass | trafficlog records witnessed exchanges",
-                    "Bergerak ke NPC ramah untuk lewat | trafficlog mencatat pertukaran yang terlihat",
-                )
+                tr("living.ascii.frame.move_toward_friendly_npc_to_pass_trafficlog")
             );
         }
         if world.relief().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "relieflog: witnessed Qinghe crisis and Reed Hall assistance",
-                    "relieflog: krisis Qinghe dan bantuan balai yang kamu saksikan",
-                )
+                tr("living.ascii.frame.relieflog_witnessed_qinghe_crisis_and_reed_hall")
             );
         }
         if world.faction_agency_state().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "aidlog: witnessed Stonebank surveys, physical relief and local support",
-                    "aidlog: peninjauan Batu Tepi, bantuan fisik dan dukungan warga yang terlihat",
-                )
+                tr("living.ascii.frame.aidlog_witnessed_stonebank_surveys_physical_relief_and")
             );
         }
         if world.contracts().is_some() {
@@ -2134,8 +2250,7 @@ impl Session {
                 out,
                 "{}",
                 tr(
-                    "contractlog: witnessed institutional requests, bids, awards and physical deliveries",
-                    "contractlog: permintaan, tawaran, persetujuan dan pengiriman lembaga yang disaksikan",
+                    "living.ascii.frame.contractlog_witnessed_institutional_requests_bids_awards_and"
                 )
             );
         }
@@ -2143,117 +2258,102 @@ impl Session {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "accountlog: witnessed site audits and provider reliability learned in person",
-                    "accountlog: pemeriksaan lokasi dan keandalan penyedia yang terlihat langsung",
-                )
+                tr("living.ascii.frame.accountlog_witnessed_site_audits_and_provider_reliability")
             );
         }
         if world.information().is_some() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "infolog: witnessed testimony and institutional disputes you were present for",
-                    "infolog: kesaksian dan sengketa lembaga yang kamu saksikan langsung",
-                )
+                tr("living.ascii.frame.infolog_witnessed_testimony_and_institutional_disputes_you")
             );
         }
         if world.is_consequences() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "know | examine | ask [id] | tell [id] [event] | take [id] from a body you can see",
-                    "know | examine | ask [id] | tell [id] [peristiwa] | take [id] dari jenazah yang terlihat",
-                )
+                tr("living.ascii.frame.know_examine_ask_id_tell_id_event")
             );
         } else if world.is_player_agency() {
             let _ = writeln!(
                 out,
                 "{}",
-                tr(
-                    "know lists what you know | examine this tile | ask [id] | tell [id] [event]",
-                    "know daftar pengetahuan | examine petak ini | ask [id] | tell [id] [peristiwa]",
-                )
+                tr("living.ascii.frame.know_lists_what_you_know_examine_this")
             );
         }
         out
     }
 
     fn faction_status(&self) -> String {
-        let tr = |en, id| text(self.locale, en, id);
+        let tr = |key| living_text(self.locale, key);
         let Some(rivalry) = self.world.rivalry() else {
-            return tr(
-                "No active sect dispute in this campaign.",
-                "Tidak ada konflik perguruan di kampanye ini.",
-            )
-            .into();
+            return tr("living.ascii.faction_status.no_active_sect_dispute_in_this_campaign")
+                .into();
         };
         let sites = Region::sites();
         if !self.debug_world
             && !self.world.player_sees(sites.market)
             && !self.world.player_sees(sites.hall)
         {
-            return tr(
-                "Ask in Willowford to learn about the local dispute.",
-                "Cari kabar di Willowford untuk mengetahui konflik setempat.",
-            )
-            .into();
+            return tr("living.ascii.faction_status.ask_in_willowford_to_learn_about_the").into();
         }
         let condition = if rivalry.at_peace(self.world.tick()) {
-            tr("Truce", "Gencatan")
+            tr("living.ascii.faction_status.truce")
         } else if rivalry.contested(self.world.tick()) {
-            tr(
-                "Reed Hall contested: teaching suspended and herbs dearer",
-                "Balai diperebutkan: pengajaran tertunda dan herba lebih mahal",
-            )
+            tr("living.ascii.faction_status.reed_hall_contested_teaching_suspended_and_herbs")
         } else {
-            tr("Reed Hall still teaching", "Balai masih mengajar")
+            tr("living.ascii.faction_status.reed_hall_still_teaching")
         };
-        let mut public = format!(
-            "{condition}. {} {}/8.",
-            tr("Pressure", "Tekanan"),
-            rivalry.pressure
+        let mut public = living_format(
+            self.locale,
+            "living.ascii.faction_status.template.condition_pressure_rivalry_pressure",
+            &[
+                ("condition", condition),
+                ("rivalry_pressure", &format!("{}", rivalry.pressure)),
+            ],
         );
         if let Some(politics) = self.world.politics() {
             let oath = if politics.allegiance == Allegiance::Stonebank {
-                tr("Stonebank member", "Anggota Batu Tepi")
+                tr("living.ascii.faction_status.stonebank_member")
             } else {
-                tr("Unaffiliated", "Tidak berafiliasi")
+                tr("living.ascii.faction_status.unaffiliated")
             };
             public.push_str(&format!(" {oath}."));
-            public.push_str(&format!(
-                " {} {} / {} {}.",
-                tr("Hall favor", "Dukungan balai"),
-                politics.hall_favor,
-                tr("Lodge favor", "Dukungan Batu Tepi"),
-                politics.lodge_favor
+            public.push_str(&living_format(
+                self.locale,
+                "living.ascii.faction_status.template.hall_favor_politics_hall_favor_lodge",
+                &[
+                    ("politics_hall_favor", &format!("{}", politics.hall_favor)),
+                    ("politics_lodge_favor", &format!("{}", politics.lodge_favor)),
+                ],
             ));
         }
         if self.debug_world
             && let Some(agency) = self.world.faction_agency_state()
         {
-            public.push_str(&format!(
-                " {} {}.",
-                tr(
-                    "Village support (Hall + / Stonebank -)",
-                    "Dukungan warga (Balai + / Batu Tepi -)"
-                ),
-                agency.public_standing
+            public.push_str(&living_format(
+                self.locale,
+                "living.ascii.faction_status.template.village_support_hall_stonebank_agency_public",
+                &[(
+                    "agency_public_standing",
+                    &format!("{}", agency.public_standing),
+                )],
             ));
         }
         if self.debug_world {
-            let mut details = format!(
-                "{public} {} {}.",
-                tr("Lodge treasury", "Kas perguruan rival"),
-                rivalry.lodge_coins
+            let mut details = living_format(
+                self.locale,
+                "living.ascii.faction_status.template.public_lodge_treasury_rivalry_lodge_coins",
+                &[
+                    ("public", &public.to_string()),
+                    ("rivalry_lodge_coins", &format!("{}", rivalry.lodge_coins)),
+                ],
             );
             if let Some(politics) = self.world.politics() {
-                details.push_str(&format!(
-                    " {} {}.",
-                    tr("Hall treasury", "Kas balai"),
-                    politics.hall_coins
+                details.push_str(&living_format(
+                    self.locale,
+                    "living.ascii.faction_status.template.hall_treasury_politics_hall_coins",
+                    &[("politics_hall_coins", &format!("{}", politics.hall_coins))],
                 ));
             }
             details
@@ -2263,223 +2363,233 @@ impl Session {
     }
 
     pub(crate) fn company_line(&self, event: &CompanyEvent) -> String {
-        let tr = |en, id| text(self.locale, en, id);
+        let tr = |key| living_text(self.locale, key);
         let action = match event.kind {
-            JourneyEvent::Joined => tr("joined you", "mulai menemanimu"),
-            JourneyEvent::Dismissed => tr("parted ways with you", "berpisah denganmu"),
-            JourneyEvent::LostContact => tr("lost the trail", "kehilangan jejak"),
-            JourneyEvent::Distrust => tr(
-                "refused to continue with you",
-                "menolak melanjutkan perjalanan bersamamu",
-            ),
-            JourneyEvent::Office => tr(
-                "left to take up the teaching post",
-                "kembali untuk menjabat guru",
-            ),
-            JourneyEvent::Fallen => tr("fell", "gugur"),
-            JourneyEvent::PlayerFallen => tr("ended the journey", "mengakhiri perjalanan"),
-            JourneyEvent::FieldCare => tr(
-                "used a packed herb to treat you",
-                "memakai satu herba bekal untuk mengobatimu",
-            ),
+            JourneyEvent::Joined => tr("living.ascii.company_line.joined_you"),
+            JourneyEvent::Dismissed => tr("living.ascii.company_line.parted_ways_with_you"),
+            JourneyEvent::LostContact => tr("living.ascii.company_line.lost_the_trail"),
+            JourneyEvent::Distrust => tr("living.ascii.company_line.refused_to_continue_with_you"),
+            JourneyEvent::Office => {
+                tr("living.ascii.company_line.left_to_take_up_the_teaching_post")
+            }
+            JourneyEvent::Fallen => tr("living.ascii.company_line.fell"),
+            JourneyEvent::PlayerFallen => tr("living.ascii.company_line.ended_the_journey"),
+            JourneyEvent::FieldCare => {
+                tr("living.ascii.company_line.used_a_packed_herb_to_treat_you")
+            }
         };
-        format!(
-            "t{} · {} {action}.",
-            event.at,
-            actor_name(self.locale, &self.world, event.actor)
+        living_format(
+            self.locale,
+            "living.ascii.company_line.template.event_at_actor_action",
+            &[
+                ("event_at", &format!("{}", event.at)),
+                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                ("action", action),
+            ],
         )
     }
 
     fn traffic_line(&self, event: &sealed_sim::living::TrafficEvent) -> String {
         let action = match event.kind {
-            TrafficEventKind::PlayerPass => text(
+            TrafficEventKind::PlayerPass => living_text(
                 self.locale,
-                "exchanged places with",
-                "bertukar tempat dengan",
+                "living.ascii.traffic_line.exchanged_places_with",
             ),
-            TrafficEventKind::NpcPass => text(self.locale, "passed", "melewati"),
+            TrafficEventKind::NpcPass => {
+                living_text(self.locale, "living.ascii.traffic_line.passed")
+            }
         };
-        format!(
-            "t{} · {} {action} {} ({},{} -> {},{}).",
-            event.at,
-            actor_name(self.locale, &self.world, event.mover),
-            actor_name(self.locale, &self.world, event.other),
-            event.from.x,
-            event.from.y,
-            event.to.x,
-            event.to.y
+        living_format(
+            self.locale,
+            "living.ascii.traffic_line.template.event_at_actor_action_actor_2",
+            &[
+                ("event_at", &format!("{}", event.at)),
+                ("actor", actor_name(self.locale, &self.world, event.mover)),
+                ("action", action),
+                ("actor_2", actor_name(self.locale, &self.world, event.other)),
+                ("event_from_x", &format!("{}", event.from.x)),
+                ("event_from_y", &format!("{}", event.from.y)),
+                ("event_to_x", &format!("{}", event.to.x)),
+                ("event_to_y", &format!("{}", event.to.y)),
+            ],
         )
     }
 
     fn relief_line(&self, event: &sealed_sim::living::ReliefEvent) -> String {
         let action = match event.kind {
-            ReliefEventKind::Observed => text(
+            ReliefEventKind::Observed => living_text(
                 self.locale,
-                "noticed an urgent medicine shortage",
-                "melihat kekurangan obat yang mendesak",
+                "living.ascii.relief_line.noticed_an_urgent_medicine_shortage",
             ),
-            ReliefEventKind::Reported => text(
+            ReliefEventKind::Reported => living_text(
                 self.locale,
-                "asked Reed Hall for aid",
-                "meminta bantuan Balai Alang-alang",
+                "living.ascii.relief_line.asked_reed_hall_for_aid",
             ),
-            ReliefEventKind::Purchased => text(
+            ReliefEventKind::Purchased => living_text(
                 self.locale,
-                "bought an herb for Qinghe",
-                "membeli herba untuk Qinghe",
+                "living.ascii.relief_line.bought_an_herb_for_qinghe",
             ),
-            ReliefEventKind::Redirected => text(
+            ReliefEventKind::Redirected => living_text(
                 self.locale,
-                "redirected an herb to Qinghe",
-                "mengalihkan satu herba ke Qinghe",
+                "living.ascii.relief_line.redirected_an_herb_to_qinghe",
             ),
-            ReliefEventKind::Delivered => text(
+            ReliefEventKind::Delivered => living_text(
                 self.locale,
-                "delivered medical relief to Qinghe",
-                "mengantar bantuan obat ke Qinghe",
+                "living.ascii.relief_line.delivered_medical_relief_to_qinghe",
             ),
-            ReliefEventKind::Withdrawn => text(
+            ReliefEventKind::Withdrawn => living_text(
                 self.locale,
-                "stopped a no-longer-needed relief mission",
-                "menghentikan misi bantuan yang tak lagi diperlukan",
+                "living.ascii.relief_line.stopped_a_no_longer_needed_relief_mission",
             ),
-            ReliefEventKind::Failed => text(
+            ReliefEventKind::Failed => living_text(
                 self.locale,
-                "lost a relief mission",
-                "gagal menuntaskan misi bantuan",
+                "living.ascii.relief_line.lost_a_relief_mission",
             ),
         };
-        format!(
-            "t{} · {} {action}.",
-            event.at,
-            actor_name(self.locale, &self.world, event.actor)
+        living_format(
+            self.locale,
+            "living.ascii.relief_line.template.event_at_actor_action",
+            &[
+                ("event_at", &format!("{}", event.at)),
+                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                ("action", action),
+            ],
         )
     }
 
     fn faction_aid_line(&self, event: &sealed_sim::living::FactionEvent) -> String {
         let action = match event.kind {
-            FactionEventKind::SurveyClear => text(
+            FactionEventKind::SurveyClear => living_text(
                 self.locale,
-                "found Qinghe supplied",
-                "menemukan Qinghe berkecukupan",
+                "living.ascii.faction_aid_line.found_qinghe_supplied",
             ),
-            FactionEventKind::ShortageSeen => text(
+            FactionEventKind::ShortageSeen => living_text(
                 self.locale,
-                "personally witnessed Qinghe's medicine shortage",
-                "menyaksikan sendiri kekurangan obat Qinghe",
+                "living.ascii.faction_aid_line.personally_witnessed_qinghe_s_medicine_shortage",
             ),
-            FactionEventKind::Purchased => text(
+            FactionEventKind::Purchased => living_text(
                 self.locale,
-                "bought a real herb for Stonebank relief",
-                "membeli herba nyata untuk bantuan Batu Tepi",
+                "living.ascii.faction_aid_line.bought_a_real_herb_for_stonebank_relief",
             ),
-            FactionEventKind::Redirected => text(
+            FactionEventKind::Redirected => living_text(
                 self.locale,
-                "redirected personal cargo to Qinghe",
-                "mengalihkan muatan pribadi ke Qinghe",
+                "living.ascii.faction_aid_line.redirected_personal_cargo_to_qinghe",
             ),
-            FactionEventKind::Delivered => text(
+            FactionEventKind::Delivered => living_text(
                 self.locale,
-                "delivered Stonebank medicine to Qinghe",
-                "mengantar obat Batu Tepi ke Qinghe",
+                "living.ascii.faction_aid_line.delivered_stonebank_medicine_to_qinghe",
             ),
-            FactionEventKind::HallDelivered => text(
+            FactionEventKind::HallDelivered => living_text(
                 self.locale,
-                "delivered Reed Hall medicine to Qinghe",
-                "mengantar obat Balai Alang-alang ke Qinghe",
+                "living.ascii.faction_aid_line.delivered_reed_hall_medicine_to_qinghe",
             ),
-            FactionEventKind::Withdrawn => text(
+            FactionEventKind::Withdrawn => living_text(
                 self.locale,
-                "left the aid mission to honor a companion",
-                "meninggalkan misi bantuan demi pendamping",
+                "living.ascii.faction_aid_line.left_the_aid_mission_to_honor_a",
             ),
-            FactionEventKind::Failed => text(
+            FactionEventKind::Failed => living_text(
                 self.locale,
-                "failed to finish the Stonebank relief trip",
-                "gagal menuntaskan perjalanan bantuan Batu Tepi",
+                "living.ascii.faction_aid_line.failed_to_finish_the_stonebank_relief_trip",
             ),
         };
-        format!(
-            "t{} · {} {action}.",
-            event.at,
-            actor_name(self.locale, &self.world, event.actor)
+        living_format(
+            self.locale,
+            "living.ascii.faction_aid_line.template.event_at_actor_action",
+            &[
+                ("event_at", &format!("{}", event.at)),
+                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                ("action", action),
+            ],
         )
     }
 
     fn contract_line(&self, event: &sealed_sim::living::ContractEvent) -> String {
         let objective = match event.need {
-            Need::ShrineMedicine => text(self.locale, "Qinghe medicine", "obat Qinghe"),
-            Need::HallOfferings => text(
-                self.locale,
-                "Reed Hall supplies",
-                "persediaan Balai Alang-alang",
-            ),
+            Need::ShrineMedicine => {
+                living_text(self.locale, "living.ascii.contract_line.qinghe_medicine")
+            }
+            Need::HallOfferings => {
+                living_text(self.locale, "living.ascii.contract_line.reed_hall_supplies")
+            }
         };
         let verb = match event.kind {
             ContractEventKind::Observed => {
-                text(self.locale, "noticed a need for", "melihat kebutuhan")
+                living_text(self.locale, "living.ascii.contract_line.noticed_a_need_for")
             }
-            ContractEventKind::Offered => {
-                text(self.locale, "offered to help with", "menawarkan bantuan")
+            ContractEventKind::Offered => living_text(
+                self.locale,
+                "living.ascii.contract_line.offered_to_help_with",
+            ),
+            ContractEventKind::Declined => {
+                living_text(self.locale, "living.ascii.contract_line.declined")
             }
-            ContractEventKind::Declined => text(self.locale, "declined", "menolak"),
-            ContractEventKind::Awarded => text(
+            ContractEventKind::Awarded => living_text(
                 self.locale,
-                "awarded the contract for",
-                "menetapkan kontrak",
+                "living.ascii.contract_line.awarded_the_contract_for",
             ),
-            ContractEventKind::Purchased => text(
+            ContractEventKind::Purchased => living_text(
                 self.locale,
-                "bought real cargo for",
-                "membeli muatan nyata untuk",
+                "living.ascii.contract_line.bought_real_cargo_for",
             ),
-            ContractEventKind::Redirected => text(
+            ContractEventKind::Redirected => living_text(
                 self.locale,
-                "redirected existing cargo to",
-                "mengalihkan muatan yang ada ke",
+                "living.ascii.contract_line.redirected_existing_cargo_to",
             ),
-            ContractEventKind::Delivered => text(
+            ContractEventKind::Delivered => living_text(
                 self.locale,
-                "physically delivered",
-                "mengantar secara fisik",
+                "living.ascii.contract_line.physically_delivered",
             ),
             ContractEventKind::Failed => {
-                text(self.locale, "could not finish", "gagal menyelesaikan")
+                living_text(self.locale, "living.ascii.contract_line.could_not_finish")
             }
-            ContractEventKind::Withdrawn => text(self.locale, "withdrew from", "meninggalkan"),
-            ContractEventKind::ResolvedLocally => text(
+            ContractEventKind::Withdrawn => {
+                living_text(self.locale, "living.ascii.contract_line.withdrew_from")
+            }
+            ContractEventKind::ResolvedLocally => living_text(
                 self.locale,
-                "resolved locally before awarding",
-                "diselesaikan setempat sebelum penunjukan",
+                "living.ascii.contract_line.resolved_locally_before_awarding",
             ),
         };
-        format!(
-            "t{} #{} · {} {verb} {objective}.",
-            event.at,
-            event.case_id,
-            actor_name(self.locale, &self.world, event.actor)
+        living_format(
+            self.locale,
+            "living.ascii.contract_line.template.event_at_event_case_id_actor",
+            &[
+                ("event_at", &format!("{}", event.at)),
+                ("event_case_id", &format!("{}", event.case_id)),
+                ("actor", actor_name(self.locale, &self.world, event.actor)),
+                ("verb", verb),
+                ("objective", objective),
+            ],
         )
     }
 
     fn account_line(&self, event: &sealed_sim::living::AuditEvent) -> String {
         let verdict = match event.finding {
-            AuditFinding::Delivered => text(
+            AuditFinding::Delivered => living_text(
                 self.locale,
-                "verified a signed delivery by",
-                "memastikan pengiriman tercatat oleh",
+                "living.ascii.account_line.verified_a_signed_delivery_by",
             ),
-            AuditFinding::Unfulfilled => text(
+            AuditFinding::Unfulfilled => living_text(
                 self.locale,
-                "found no delivery by the deadline from",
-                "tidak menemukan kiriman hingga tenggat dari",
+                "living.ascii.account_line.found_no_delivery_by_the_deadline_from",
             ),
         };
-        format!(
-            "t{} #{} · {} {verdict} {}.",
-            event.at,
-            event.case_id,
-            actor_name(self.locale, &self.world, event.requester),
-            actor_name(self.locale, &self.world, event.provider),
+        living_format(
+            self.locale,
+            "living.ascii.account_line.template.event_at_event_case_id_actor",
+            &[
+                ("event_at", &format!("{}", event.at)),
+                ("event_case_id", &format!("{}", event.case_id)),
+                (
+                    "actor",
+                    actor_name(self.locale, &self.world, event.requester),
+                ),
+                ("verdict", verdict),
+                (
+                    "actor_2",
+                    actor_name(self.locale, &self.world, event.provider),
+                ),
+            ],
         )
     }
 
@@ -2488,54 +2598,52 @@ impl Session {
         let other = event
             .other
             .map(|id| actor_name(self.locale, &self.world, id))
-            .unwrap_or_else(|| text(self.locale, "someone", "seseorang"));
+            .unwrap_or_else(|| living_text(self.locale, "living.ascii.info_line.someone"));
         let phase = event.phase.map(|phase| match phase {
-            DisputePhase::Open => text(self.locale, "opened", "dibuka"),
-            DisputePhase::Investigating => text(self.locale, "investigating", "diselidiki"),
-            DisputePhase::Confirmed => text(self.locale, "confirmed", "dikonfirmasi"),
-            DisputePhase::Refuted => text(self.locale, "refuted", "dibantah"),
-            DisputePhase::Suspended => text(self.locale, "suspended", "ditangguhkan"),
-            DisputePhase::Restored => text(self.locale, "restored", "dipulihkan"),
+            DisputePhase::Open => living_text(self.locale, "living.ascii.info_line.opened"),
+            DisputePhase::Investigating => {
+                living_text(self.locale, "living.ascii.info_line.investigating")
+            }
+            DisputePhase::Confirmed => living_text(self.locale, "living.ascii.info_line.confirmed"),
+            DisputePhase::Refuted => living_text(self.locale, "living.ascii.info_line.refuted"),
+            DisputePhase::Suspended => living_text(self.locale, "living.ascii.info_line.suspended"),
+            DisputePhase::Restored => living_text(self.locale, "living.ascii.info_line.restored"),
         });
         let tick = event.at.to_string();
         let id = event.event.0.to_string();
         match event.kind {
-            InfoLogKind::Learned => text(
+            InfoLogKind::Learned => living_text(
                 self.locale,
-                "t{tick} · {actor} learned institutional finding #{id}.",
-                "t{tick} · {actor} mempelajari temuan lembaga #{id}.",
+                "living.ascii.info_line.t_tick_actor_learned_institutional_finding_id",
             )
             .replace("{tick}", &tick)
             .replace("{actor}", actor)
             .replace("{id}", &id),
-            InfoLogKind::DisputeOpened => text(
+            InfoLogKind::DisputeOpened => living_text(
                 self.locale,
-                "t{tick} · {actor} {verb} a dispute about {other}.",
-                "t{tick} · {actor} {verb} sengketa tentang {other}.",
+                "living.ascii.info_line.t_tick_actor_verb_a_dispute_about",
             )
             .replace("{tick}", &tick)
             .replace("{actor}", actor)
             .replace(
                 "{verb}",
-                phase.unwrap_or(text(self.locale, "opened", "dibuka")),
+                phase.unwrap_or(living_text(self.locale, "living.ascii.info_line.opened")),
             )
             .replace("{other}", other),
-            InfoLogKind::DisputeUpdated => text(
+            InfoLogKind::DisputeUpdated => living_text(
                 self.locale,
-                "t{tick} · {actor} marked the dispute about {other} as {status}.",
-                "t{tick} · {actor} menandai sengketa tentang {other} sebagai {status}.",
+                "living.ascii.info_line.t_tick_actor_marked_the_dispute_about",
             )
             .replace("{tick}", &tick)
             .replace("{actor}", actor)
             .replace("{other}", other)
             .replace(
                 "{status}",
-                phase.unwrap_or(text(self.locale, "updated", "diperbarui")),
+                phase.unwrap_or(living_text(self.locale, "living.ascii.info_line.updated")),
             ),
-            InfoLogKind::TestimonyQueued => text(
+            InfoLogKind::TestimonyQueued => living_text(
                 self.locale,
-                "t{tick} · {actor} began briefing {other} about finding #{id}.",
-                "t{tick} · {actor} mulai memberi tahu {other} tentang temuan #{id}.",
+                "living.ascii.info_line.t_tick_actor_began_briefing_other_about",
             )
             .replace("{tick}", &tick)
             .replace("{actor}", actor)
@@ -2545,92 +2653,84 @@ impl Session {
     }
 
     pub(crate) fn duty_hint(&self) -> Option<&'static str> {
-        let tr = |en, id| text(self.locale, en, id);
+        let tr = |key| living_text(self.locale, key);
         match self.world.school()?.duty {
             Duty::Carrying => Some(tr(
-                "Hall parcel: use duty at the Qinghe shrine to deliver it.",
-                "Titipan balai: gunakan duty di kuil Qinghe untuk menyerahkannya.",
+                "living.ascii.duty_hint.hall_parcel_use_duty_at_the_qinghe",
             )),
             Duty::Delivered => Some(tr(
-                "Hall parcel delivered. Return to the teacher and use duty to report.",
-                "Titipan sudah sampai. Kembali ke guru dan gunakan duty untuk melapor.",
+                "living.ascii.duty_hint.hall_parcel_delivered_return_to_the_teacher",
             )),
             _ => None,
         }
     }
 
     pub(crate) fn hall_hint(&self) -> String {
-        let tr = |en, id| text(self.locale, en, id);
+        let tr = |key| living_text(self.locale, key);
         if self
             .world
             .politics()
             .is_some_and(|politics| politics.allegiance == Allegiance::Stonebank)
         {
-            return tr("Stonebank oath blocks Reed Hall teaching. Renounce here to seek readmission.",
-                "Sumpah Batu Tepi menutup pengajaran Reed Hall. Lepaskan sumpah di sini untuk mendaftar lagi.").into();
+            return tr("living.ascii.hall_hint.stonebank_oath_blocks_reed_hall_teaching_renounce")
+                .into();
         }
         if self
             .world
             .rivalry()
             .is_some_and(|rivalry| rivalry.contested(self.world.tick()))
         {
-            return tr("Reed Hall teaching disrupted. Offer accord to the envoy or sponsor the hall.",
-                "Pengajaran balai terganggu. Tawarkan accord kepada utusan atau dukung balai dengan sponsor.").into();
+            return tr("living.ascii.hall_hint.reed_hall_teaching_disrupted_offer_accord_to")
+                .into();
         }
         let Some(school) = self.world.school() else {
-            return tr(
-                "Reed Hall · join or brew",
-                "Balai Alang-alang · join atau brew",
-            )
-            .into();
+            return tr("living.ascii.hall_hint.reed_hall_join_or_brew").into();
         };
         let Some(leader) = school.leader.and_then(|id| self.world.npc(id)) else {
-            return tr(
-                "The teaching post is empty.",
-                "Tempat mengajar di balai kosong.",
-            )
-            .into();
+            return tr("living.ascii.hall_hint.the_teaching_post_is_empty").into();
         };
         if self.world.is_night() || leader.position != Region::sites().hall {
-            return tr(
-                "The hall's teacher is away.",
-                "Guru balai sedang tidak bertugas.",
-            )
-            .into();
+            return tr("living.ascii.hall_hint.the_hall_s_teacher_is_away").into();
         }
         let prompt = match self.world.hall_rank() {
-            None => tr("join after practicing breath", "join setelah latihan napas"),
-            Some(HallRank::Apprentice) => tr(
-                "duty for shrine service, brew for a remedy",
-                "duty untuk tugas kuil, brew untuk meracik",
-            ),
-            Some(HallRank::Disciple) if !school.form_learned => tr(
-                "study with mastered breath and 2 herbs",
-                "study dengan latihan napas tuntas dan 2 herba",
-            ),
-            Some(HallRank::Disciple) if self.world.sect_hierarchy().is_some() => tr(
-                "duty for senior rank, brew for a remedy",
-                "duty untuk naik pangkat senior, brew untuk meracik",
-            ),
-            Some(HallRank::Disciple) => tr("brew a remedy", "brew untuk meracik obat"),
-            Some(HallRank::SeniorDisciple | HallRank::Elder) => tr(
-                "allocate for Hall herb, duty or brew",
-                "allocate untuk herba balai, duty atau brew",
-            ),
+            None => tr("living.ascii.hall_hint.join_after_practicing_breath"),
+            Some(HallRank::Apprentice) => {
+                tr("living.ascii.hall_hint.duty_for_shrine_service_brew_for_a")
+            }
+            Some(HallRank::Disciple) if !school.form_learned => {
+                tr("living.ascii.hall_hint.study_with_mastered_breath_and_2_herbs")
+            }
+            Some(HallRank::Disciple) if self.world.sect_hierarchy().is_some() => {
+                tr("living.ascii.hall_hint.duty_for_senior_rank_brew_for_a")
+            }
+            Some(HallRank::Disciple) => tr("living.ascii.hall_hint.brew_a_remedy"),
+            Some(HallRank::SeniorDisciple | HallRank::Elder) => {
+                tr("living.ascii.hall_hint.allocate_for_hall_herb_duty_or_brew")
+            }
         };
         if let Some(record) = school
             .history
             .last()
             .filter(|record| record.successor == Some(leader.id()))
         {
-            return format!(
-                "{} {} {} · {prompt}",
-                leader.definition.name,
-                tr("succeeded", "menggantikan"),
-                actor_name(self.locale, &self.world, record.former)
+            return living_format(
+                self.locale,
+                "living.ascii.hall_hint.template.leader_definition_name_succeeded_actor_prompt",
+                &[
+                    ("leader_definition_name", leader.definition.name),
+                    ("actor", actor_name(self.locale, &self.world, record.former)),
+                    ("prompt", prompt),
+                ],
             );
         }
-        format!("{} · {prompt}", leader.definition.name)
+        living_format(
+            self.locale,
+            "living.ascii.hall_hint.template.leader_definition_name_prompt",
+            &[
+                ("leader_definition_name", leader.definition.name),
+                ("prompt", prompt),
+            ],
+        )
     }
 }
 
@@ -2668,22 +2768,14 @@ fn load(path: &Path, locale: Locale) -> Result<World, String> {
     })
 }
 
-pub(crate) fn text<'a>(locale: Locale, en: &'a str, id: &'a str) -> &'a str {
-    match locale {
-        Locale::English => en,
-        Locale::Indonesian => id,
-    }
-}
-
 fn actor_name(locale: Locale, world: &World, id: ActorId) -> &'static str {
     if id == PLAYER {
-        text(locale, "You", "Kamu")
+        living_text(locale, "living.ascii.actor_name.you")
     } else {
-        world
-            .npc(id)
-            .map_or(text(locale, "Unknown", "Tak dikenal"), |npc| {
-                npc.definition.name
-            })
+        world.npc(id).map_or(
+            living_text(locale, "living.ascii.actor_name.unknown"),
+            |npc| npc.definition.name,
+        )
     }
 }
 
@@ -2696,501 +2788,426 @@ fn background_label(locale: Locale, background: Background) -> &'static str {
 }
 
 fn goal_label(locale: Locale, goal: Goal) -> &'static str {
-    let (en, id) = match goal {
-        Goal::Idle => ("idle", "diam"),
-        Goal::Rest => ("resting or heading home", "beristirahat atau pulang"),
-        Goal::Patrol => ("patrolling", "berpatroli"),
-        Goal::TendClinic => ("staffing the clinic", "menjaga klinik"),
-        Goal::CollectHerbs => ("collecting herbs", "mencari herba"),
-        Goal::DeliverHerbs => ("hauling herbs to the shrine", "mengantar herba ke kuil"),
-        Goal::SeekCare => ("seeking care", "mencari perawatan"),
-        Goal::Treat(_) => ("attending to a patient", "merawat pasien"),
-        Goal::Investigate(_) => ("investigating a disturbance", "menyelidiki gangguan"),
-        Goal::InvestigateBody(_) => ("checking a reported body", "memeriksa laporan jenazah"),
-        Goal::RecoverBody(_) => ("recovering abandoned cargo", "mengambil muatan terlantar"),
-        Goal::ReturnRecoveredCargo => ("returning recovered herbs", "mengantar herba temuan"),
-        Goal::ClaimLot(_) => ("seeking a relic lot", "mencari barang relik"),
-        Goal::DeliverLot(_) => (
-            "carrying a relic to the sect",
-            "mengantar relik ke perguruan",
-        ),
-        Goal::MartialPractice(_) => ("training with a mentor", "berlatih bersama guru"),
-        Goal::MartialRest => (
-            "recovering from training",
-            "memulihkan diri setelah latihan",
-        ),
-        Goal::MeridianDraw => (
-            "drawing Qi from an offering",
-            "menyerap Qi dari persembahan",
-        ),
-        Goal::MeridianCirculate => ("circulating Qi", "mengalirkan Qi"),
-        Goal::MeridianCare => ("seeking meridian care", "mencari perawatan meridian"),
-        Goal::SeekWoundCare => ("seeking wound care", "mencari perawatan luka"),
-        Goal::GatherForCare => (
-            "working to afford treatment",
-            "bekerja untuk biaya perawatan",
-        ),
-        Goal::SellForCare => (
-            "selling work herbs for treatment",
-            "menjual herba kerja untuk perawatan",
-        ),
-        Goal::SectDuty => (
-            "carrying out Reed Hall service",
-            "menjalankan tugas Balai Alang-alang",
-        ),
-        Goal::Report { .. } => ("seeking someone to report to", "mencari penerima laporan"),
-        Goal::Retreat => ("retreating", "mundur"),
-        Goal::Retaliate => ("retaliating", "membalas serangan"),
-        Goal::StockGarden => ("collecting garden herbs", "memetik herba kebun"),
-        Goal::StockMarket => ("stocking Willowford market", "mengisi pasar Willowford"),
-        Goal::CollectFreight => ("picking up Qinghe's order", "mengambil pesanan Qinghe"),
-        Goal::DeliverFreight => ("carrying Qinghe's order", "mengantar pesanan Qinghe"),
-        Goal::Follow(_) => ("following the trail", "mengikuti jejak"),
-        Goal::FieldCare => ("giving field care", "merawat di perjalanan"),
-        Goal::TeachAtHall => ("teaching at Reed Hall", "mengajar di Balai Alang-alang"),
-        Goal::BuyForLodge => (
-            "buying herbs for Stonebank lodge",
-            "membeli herba untuk perguruan Batu Tepi",
-        ),
-        Goal::PetitionHall => (
-            "pressing Stonebank's claim",
-            "mengajukan tuntutan perguruan Batu Tepi",
-        ),
-        Goal::BuyForHall => (
-            "buying herbs for Reed Hall",
-            "membeli herba untuk Balai Alang-alang",
-        ),
-        Goal::SupplyHall => (
-            "delivering herbs to Reed Hall",
-            "mengantar herba untuk Balai Alang-alang",
-        ),
-        Goal::RequestRelief => (
-            "carrying a plea for medical relief",
-            "membawa permohonan bantuan obat",
-        ),
-        Goal::BuyRelief => ("procuring crisis medicine", "membeli obat untuk krisis"),
-        Goal::DeliverRelief => ("carrying emergency medicine", "mengantar obat darurat"),
-        Goal::CampRest => ("resting on the road", "beristirahat di perjalanan"),
-        Goal::SurveyQinghe => (
-            "surveying Qinghe for Stonebank",
-            "meninjau Qinghe untuk Batu Tepi",
-        ),
-        Goal::BuyLodgeAid => (
-            "buying Stonebank relief medicine",
-            "membeli obat bantuan Batu Tepi",
-        ),
-        Goal::DeliverLodgeAid => (
-            "carrying Stonebank relief medicine",
-            "mengantar obat bantuan Batu Tepi",
-        ),
-        Goal::NegotiateContract(_) => (
-            "negotiating an institutional contract",
-            "merundingkan kontrak lembaga",
-        ),
-        Goal::ProcureContract(_) => ("procuring contract supplies", "membeli persediaan kontrak"),
-        Goal::FulfillContract(_) => (
-            "delivering contract supplies",
-            "mengantar persediaan kontrak",
-        ),
-        Goal::AuditContract(_) => (
-            "inspecting the delivery site",
-            "memeriksa lokasi pengiriman",
-        ),
-        Goal::DeliverTestimony { .. } => (
-            "carrying institutional testimony",
-            "membawa kesaksian lembaga",
-        ),
-        Goal::InvestigateDispute(_) => (
-            "investigating an institutional dispute",
-            "menyelidiki sengketa lembaga",
-        ),
+    let key = match goal {
+        Goal::Idle => "living.ascii.goal_label.idle",
+        Goal::Rest => "living.ascii.goal_label.resting_or_heading_home",
+        Goal::Patrol => "living.ascii.goal_label.patrolling",
+        Goal::TendClinic => "living.ascii.goal_label.staffing_the_clinic",
+        Goal::CollectHerbs => "living.ascii.goal_label.collecting_herbs",
+        Goal::DeliverHerbs => "living.ascii.goal_label.hauling_herbs_to_the_shrine",
+        Goal::SeekCare => "living.ascii.goal_label.seeking_care",
+        Goal::Treat(_) => "living.ascii.goal_label.attending_to_a_patient",
+        Goal::Investigate(_) => "living.ascii.goal_label.investigating_a_disturbance",
+        Goal::InvestigateBody(_) => "living.ascii.goal_label.checking_a_reported_body",
+        Goal::RecoverBody(_) => "living.ascii.goal_label.recovering_abandoned_cargo",
+        Goal::ReturnRecoveredCargo => "living.ascii.goal_label.returning_recovered_herbs",
+        Goal::ClaimLot(_) => "living.ascii.goal_label.seeking_a_relic_lot",
+        Goal::DeliverLot(_) => "living.ascii.goal_label.carrying_a_relic_to_the_sect",
+        Goal::MartialPractice(_) => "living.ascii.goal_label.training_with_a_mentor",
+        Goal::MartialRest => "living.ascii.goal_label.recovering_from_training",
+        Goal::MeridianDraw => "living.ascii.goal_label.drawing_qi_from_an_offering",
+        Goal::MeridianCirculate => "living.ascii.goal_label.circulating_qi",
+        Goal::MeridianCare => "living.ascii.goal_label.seeking_meridian_care",
+        Goal::SeekWoundCare => "living.ascii.goal_label.seeking_wound_care",
+        Goal::GatherForCare => "living.ascii.goal_label.working_to_afford_treatment",
+        Goal::SellForCare => "living.ascii.goal_label.selling_work_herbs_for_treatment",
+        Goal::SectDuty => "living.ascii.goal_label.carrying_out_reed_hall_service",
+        Goal::Report { .. } => "living.ascii.goal_label.seeking_someone_to_report_to",
+        Goal::Retreat => "living.ascii.goal_label.retreating",
+        Goal::Retaliate => "living.ascii.goal_label.retaliating",
+        Goal::StockGarden => "living.ascii.goal_label.collecting_garden_herbs",
+        Goal::StockMarket => "living.ascii.goal_label.stocking_willowford_market",
+        Goal::CollectFreight => "living.ascii.goal_label.picking_up_qinghe_s_order",
+        Goal::DeliverFreight => "living.ascii.goal_label.carrying_qinghe_s_order",
+        Goal::Follow(_) => "living.ascii.goal_label.following_the_trail",
+        Goal::FieldCare => "living.ascii.goal_label.giving_field_care",
+        Goal::TeachAtHall => "living.ascii.goal_label.teaching_at_reed_hall",
+        Goal::BuyForLodge => "living.ascii.goal_label.buying_herbs_for_stonebank_lodge",
+        Goal::PetitionHall => "living.ascii.goal_label.pressing_stonebank_s_claim",
+        Goal::BuyForHall => "living.ascii.goal_label.buying_herbs_for_reed_hall",
+        Goal::SupplyHall => "living.ascii.goal_label.delivering_herbs_to_reed_hall",
+        Goal::RequestRelief => "living.ascii.goal_label.carrying_a_plea_for_medical_relief",
+        Goal::BuyRelief => "living.ascii.goal_label.procuring_crisis_medicine",
+        Goal::DeliverRelief => "living.ascii.goal_label.carrying_emergency_medicine",
+        Goal::CampRest => "living.ascii.goal_label.resting_on_the_road",
+        Goal::SurveyQinghe => "living.ascii.goal_label.surveying_qinghe_for_stonebank",
+        Goal::BuyLodgeAid => "living.ascii.goal_label.buying_stonebank_relief_medicine",
+        Goal::DeliverLodgeAid => "living.ascii.goal_label.carrying_stonebank_relief_medicine",
+        Goal::NegotiateContract(_) => {
+            "living.ascii.goal_label.negotiating_an_institutional_contract"
+        }
+        Goal::ProcureContract(_) => "living.ascii.goal_label.procuring_contract_supplies",
+        Goal::FulfillContract(_) => "living.ascii.goal_label.delivering_contract_supplies",
+        Goal::AuditContract(_) => "living.ascii.goal_label.inspecting_the_delivery_site",
+        Goal::DeliverTestimony { .. } => "living.ascii.goal_label.carrying_institutional_testimony",
+        Goal::InvestigateDispute(_) => {
+            "living.ascii.goal_label.investigating_an_institutional_dispute"
+        }
     };
-    text(locale, en, id)
+    living_text(locale, key)
 }
 
 pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> String {
-    let tr = |en, id| text(locale, en, id);
-    let (en, id) = match outcome {
+    let tr = |key| living_text(locale, key);
+    let key = match outcome {
         Outcome::JoinedCompany(id) | Outcome::Parted(id) | Outcome::Provisioned(id) => {
             let action = match outcome {
-                Outcome::JoinedCompany(_) => tr("agreed to travel with you", "bersedia menemanimu"),
-                Outcome::Parted(_) => tr("parted ways with you", "berpisah denganmu"),
-                _ => tr(
-                    "accepted a medicinal herb",
-                    "menerima satu herba untuk pengobatan",
-                ),
+                Outcome::JoinedCompany(_) => {
+                    tr("living.ascii.outcome_label.agreed_to_travel_with_you")
+                }
+                Outcome::Parted(_) => tr("living.ascii.outcome_label.parted_ways_with_you"),
+                _ => tr("living.ascii.outcome_label.accepted_a_medicinal_herb"),
             };
-            return format!("{} {action}.", actor_name(locale, world, id));
-        }
-        Outcome::Waited => ("Time passed.", "Waktu berlalu."),
-        Outcome::Moved => ("You moved.", "Kamu berpindah."),
-        Outcome::Spoke(id) => {
-            return format!(
-                "{} {}.",
-                tr("You spoke with", "Kamu berbicara dengan"),
-                actor_name(locale, world, id)
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.actor_action",
+                &[("actor", actor_name(locale, world, id)), ("action", action)],
             );
         }
-        Outcome::Gathered => ("You gathered an herb.", "Kamu memetik satu herba."),
-        Outcome::GatheredPair => ("You gathered two herbs.", "Kamu memetik dua herba."),
-        Outcome::DutyAccepted => (
-            "You took one herb from the hall for Qinghe.",
-            "Kamu menerima satu herba titipan untuk Qinghe.",
-        ),
-        Outcome::DutyDelivered => (
-            "The hall's herb entered shrine stock.",
-            "Herba titipan balai masuk ke stok kuil.",
-        ),
+        Outcome::Waited => "living.ascii.outcome_label.time_passed",
+        Outcome::Moved => "living.ascii.outcome_label.you_moved",
+        Outcome::Spoke(id) => {
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_spoke_with_actor",
+                &[("actor", actor_name(locale, world, id))],
+            );
+        }
+        Outcome::Gathered => "living.ascii.outcome_label.you_gathered_an_herb",
+        Outcome::GatheredPair => "living.ascii.outcome_label.you_gathered_two_herbs",
+        Outcome::DutyAccepted => "living.ascii.outcome_label.you_took_one_herb_from_the_hall",
+        Outcome::DutyDelivered => "living.ascii.outcome_label.the_hall_s_herb_entered_shrine_stock",
         Outcome::DutyReported => {
             if world.hall_rank() == Some(HallRank::SeniorDisciple) {
-                (
-                    "The teacher recorded your merit; you stand as a senior disciple.",
-                    "Guru mencatat jasamu; pangkatmu kini murid senior.",
-                )
+                "living.ascii.outcome_label.the_teacher_recorded_your_merit_you_stand"
             } else {
-                (
-                    "The teacher recognized you as a disciple.",
-                    "Guru mengangkatmu menjadi murid dalam.",
-                )
+                "living.ascii.outcome_label.the_teacher_recognized_you_as_a_disciple"
             }
         }
-        Outcome::FormLearned => (
-            "You learned Reed Strike.",
-            "Kamu mempelajari Jurus Alang-alang.",
-        ),
+        Outcome::FormLearned => "living.ascii.outcome_label.you_learned_reed_strike",
         Outcome::LodgeAccord { until } => {
-            return format!(
-                "{} {until}.",
-                tr(
-                    "Stonebank agreed to cease petitions through turn",
-                    "Perguruan Batu Tepi menyetujui gencatan sampai giliran"
-                )
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.stonebank_agreed_to_cease_petitions_through",
+                &[("until", &format!("{}", until))],
             );
         }
-        Outcome::HallSupported => (
-            "Your herb strengthened Reed Hall's standing.",
-            "Herbamu memperkuat kedudukan Balai Alang-alang.",
-        ),
-        Outcome::LodgePledged => (
-            "You pledged to Stonebank and left Reed Hall.",
-            "Kamu bersumpah kepada Batu Tepi dan keluar dari Balai Alang-alang.",
-        ),
-        Outcome::LodgeAided => (
-            "You provisioned Stonebank and strengthened its claim.",
-            "Kamu membekali Batu Tepi dan memperkuat tuntutannya.",
-        ),
-        Outcome::LodgeRenounced => (
-            "You renounced Stonebank at Reed Hall.",
-            "Kamu melepas sumpah Batu Tepi di Balai Alang-alang.",
-        ),
+        Outcome::HallSupported => {
+            "living.ascii.outcome_label.your_herb_strengthened_reed_hall_s_standing"
+        }
+        Outcome::LodgePledged => {
+            "living.ascii.outcome_label.you_pledged_to_stonebank_and_left_reed"
+        }
+        Outcome::LodgeAided => {
+            "living.ascii.outcome_label.you_provisioned_stonebank_and_strengthened_its_claim"
+        }
+        Outcome::LodgeRenounced => {
+            "living.ascii.outcome_label.you_renounced_stonebank_at_reed_hall"
+        }
         Outcome::Learned(event) => {
-            return format!(
-                "{} #{}.",
-                tr("You examined evidence", "Kamu memeriksa bukti"),
-                event.0
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_examined_evidence_event_0",
+                &[("event_0", &format!("{}", event.0))],
             );
         }
         Outcome::Briefed { from, event } => {
-            return format!(
-                "{} {} #{}.",
-                actor_name(locale, world, from),
-                tr("will tell you about finding", "akan menyampaikan temuan"),
-                event.0
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.actor_will_tell_you_about_finding",
+                &[
+                    ("actor", actor_name(locale, world, from)),
+                    ("event_0", &format!("{}", event.0)),
+                ],
             );
         }
         Outcome::Testified { to, event } => {
-            return format!(
-                "{} {} #{}.",
-                tr("You offered finding", "Kamu menyampaikan temuan"),
-                event.0,
-                actor_name(locale, world, to)
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_offered_finding_event_0_actor",
+                &[
+                    ("event_0", &format!("{}", event.0)),
+                    ("actor", actor_name(locale, world, to)),
+                ],
             );
         }
         Outcome::Took { from, herbs } => {
-            return format!(
-                "{} {herbs} {} {}.",
-                tr("You took", "Kamu mengambil"),
-                tr("herbs from", "herba dari"),
-                actor_name(locale, world, from)
+            return living_plural(
+                locale,
+                "living.ascii.outcome_label.template.you_took_herbs_herbs_from_actor.one",
+                "living.ascii.outcome_label.template.you_took_herbs_herbs_from_actor",
+                u64::from(herbs),
+                &[
+                    ("herbs", &herbs.to_string()),
+                    ("actor", actor_name(locale, world, from)),
+                ],
             );
         }
         Outcome::BodyReported { to, body } => {
-            return format!(
-                "{} {} {} {}.",
-                tr("You reported", "Kamu melaporkan"),
-                actor_name(locale, world, body),
-                tr("to", "kepada"),
-                actor_name(locale, world, to)
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_reported_actor_to_actor_2",
+                &[
+                    ("actor", actor_name(locale, world, body)),
+                    ("actor_2", actor_name(locale, world, to)),
+                ],
             );
         }
         Outcome::LotClaimed(id) => {
-            return format!("{} #{id}.", tr("You claimed lot", "Kamu mengambil barang"));
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_claimed_lot_id",
+                &[("id", &format!("{}", id))],
+            );
         }
         Outcome::LotAttuned(id) => {
-            return format!("{} #{id}.", tr("You attuned lot", "Kamu mengolah barang"));
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_attuned_lot_id",
+                &[("id", &format!("{}", id))],
+            );
         }
         Outcome::ChannelStruck(id) => {
-            return format!(
-                "{} {}.",
-                tr(
-                    "You channeled a strike against",
-                    "Kamu menyalurkan serangan kepada"
-                ),
-                actor_name(locale, world, id)
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_channeled_a_strike_against_actor",
+                &[("actor", actor_name(locale, world, id))],
             );
         }
         Outcome::MartialDrilled { teacher, learned } => {
-            return format!(
-                "{} {}{}.",
-                tr("You drilled with", "Kamu berlatih bersama"),
-                actor_name(locale, world, teacher),
-                if learned {
-                    tr(" and learned a form", " dan menguasai jurus")
-                } else {
-                    ""
-                }
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_drilled_with_actor_conditional",
+                &[
+                    ("actor", actor_name(locale, world, teacher)),
+                    (
+                        "conditional",
+                        if learned {
+                            tr("living.ascii.outcome_label.and_learned_a_form")
+                        } else {
+                            ""
+                        },
+                    ),
+                ],
             );
         }
         Outcome::TechniqueStruck { target, form } => {
-            return format!(
-                "{form:?}: {} {}.",
-                tr("you struck", "kamu menyerang"),
-                actor_name(locale, world, target)
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.form_you_struck_actor",
+                &[
+                    ("form", &format!("{:?}", form)),
+                    ("actor", actor_name(locale, world, target)),
+                ],
             );
         }
-        Outcome::QiDrawn(qi) => return format!("Qi {qi} (one herb consumed)."),
+        Outcome::QiDrawn(qi) => {
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.qi",
+                &[("qi", &format!("{}", qi))],
+            );
+        }
         Outcome::QiCirculated { channels, blockage } => {
-            return format!("Channels {channels}; blockage {blockage}.");
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.channels_blockage",
+                &[
+                    ("channels", &format!("{}", channels)),
+                    ("blockage", &format!("{}", blockage)),
+                ],
+            );
         }
-        Outcome::MeridiansMended => ("Your meridians were treated.", "Jalur meridianmu dirawat."),
-        Outcome::WoundTreated => (
-            "One wound was treated using shrine medicine.",
-            "Satu luka dirawat memakai obat kuil.",
-        ),
-        Outcome::HallAllocationClaimed => (
-            "You claimed one physical herb from Reed Hall stock.",
-            "Kamu mengambil satu herba fisik dari stok Balai Alang-alang.",
-        ),
+        Outcome::MeridiansMended => "living.ascii.outcome_label.your_meridians_were_treated",
+        Outcome::WoundTreated => {
+            "living.ascii.outcome_label.one_wound_was_treated_using_shrine_medicine"
+        }
+        Outcome::HallAllocationClaimed => {
+            "living.ascii.outcome_label.you_claimed_one_physical_herb_from_reed"
+        }
         Outcome::LotSold { to, id, coins } => {
-            return format!(
-                "{} #{id} {} {} {coins} {}.",
-                tr("You sold lot", "Kamu menjual barang"),
-                tr("to", "kepada"),
-                actor_name(locale, world, to),
-                tr("coins", "koin")
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_sold_lot_id_to_actor",
+                &[
+                    ("id", &format!("{}", id)),
+                    ("actor", actor_name(locale, world, to)),
+                    ("coins", &format!("{}", coins)),
+                ],
             );
         }
-        Outcome::QiCentered { total } => return format!("Qi {total}/{MAX_QI}."),
+        Outcome::QiCentered { total } => {
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.total_max_qi",
+                &[
+                    ("total", &format!("{}", total)),
+                    ("max_qi", &format!("{}", MAX_QI)),
+                ],
+            );
+        }
         Outcome::FormStruck(id) => {
-            return format!(
-                "{} {}.",
-                tr(
-                    "You used Reed Strike on",
-                    "Kamu memakai Jurus Alang-alang pada"
-                ),
-                actor_name(locale, world, id)
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_used_reed_strike_on_actor",
+                &[("actor", actor_name(locale, world, id))],
             );
         }
-        Outcome::Delivered | Outcome::Contribution { witnesses: 0 } => (
-            "You supplied the shrine with an herb.",
-            "Kamu menyumbang satu herba ke kuil.",
-        ),
+        Outcome::Delivered | Outcome::Contribution { witnesses: 0 } => {
+            "living.ascii.outcome_label.you_supplied_the_shrine_with_an_herb"
+        }
         Outcome::Contribution { witnesses } => {
-            return format!(
-                "{} {witnesses}.",
-                tr(
-                    "You supplied a herb during a shortage. People who noticed",
-                    "Kamu menyumbang herba saat stok kurang. Jumlah yang melihat"
-                )
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_supplied_a_herb_during_a",
+                &[("witnesses", &format!("{}", witnesses))],
             );
         }
         Outcome::Practiced { progress } => {
-            return format!(
-                "{} {progress}/{BREATH_MASTERY}.",
-                tr(
-                    "You spent one herb on breath practice. Progress",
-                    "Kamu memakai satu herba untuk latihan napas. Kemajuan"
-                )
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_spent_one_herb_on_breath",
+                &[
+                    ("progress", &format!("{}", progress)),
+                    ("breath_mastery", &format!("{}", BREATH_MASTERY)),
+                ],
             );
         }
         Outcome::Struck(id) => {
-            return format!(
-                "{} {}.",
-                tr("You struck", "Kamu menyerang"),
-                actor_name(locale, world, id)
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_struck_2_actor",
+                &[("actor", actor_name(locale, world, id))],
             );
         }
-        Outcome::Guarded => ("You guarded this turn.", "Kamu bertahan pada giliran ini."),
+        Outcome::Guarded => "living.ascii.outcome_label.you_guarded_this_turn",
         Outcome::BackgroundChosen(background) => {
             return background_label(locale, background).into();
         }
         Outcome::Traded { bought, coins } => {
-            return format!(
-                "{} {coins}.",
-                if bought {
-                    tr("You bought one herb for", "Kamu membeli satu herba seharga")
-                } else {
-                    tr("You sold one herb for", "Kamu menjual satu herba seharga")
-                }
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.conditional_coins",
+                &[
+                    (
+                        "conditional",
+                        if bought {
+                            tr("living.ascii.outcome_label.you_bought_one_herb_for")
+                        } else {
+                            tr("living.ascii.outcome_label.you_sold_one_herb_for")
+                        },
+                    ),
+                    ("coins", &format!("{}", coins)),
+                ],
             );
         }
-        Outcome::Enrolled => (
-            "You became a Reed Hall apprentice.",
-            "Kamu resmi menjadi murid Balai Alang-alang.",
-        ),
-        Outcome::Brewed => (
-            "You brewed a remedy from two herbs.",
-            "Kamu meracik satu obat dari dua herba.",
-        ),
+        Outcome::Enrolled => "living.ascii.outcome_label.you_became_a_reed_hall_apprentice",
+        Outcome::Brewed => "living.ascii.outcome_label.you_brewed_a_remedy_from_two_herbs",
         Outcome::UsedRemedy { healed } => {
-            return format!(
-                "{} (+{healed} HP).",
-                tr("You took a remedy", "Kamu meminum obat")
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.you_took_a_remedy_healed",
+                &[("healed", &format!("{}", healed))],
             );
         }
         Outcome::Treated { by, healed } => {
-            return format!(
-                "{} {} (+{healed} HP).",
-                actor_name(locale, world, by),
-                tr("treated you", "merawatmu")
+            return living_format(
+                locale,
+                "living.ascii.outcome_label.template.actor_treated_you_healed",
+                &[
+                    ("actor", actor_name(locale, world, by)),
+                    ("healed", &format!("{}", healed)),
+                ],
             );
         }
         Outcome::Rejected(reason) => match reason {
-            Rejection::Dead => (
-                "You are dead. You can still wait.",
-                "Kamu gugur. Kamu masih bisa menunggu.",
-            ),
-            Rejection::Impassable => ("The way is blocked.", "Jalan tertutup."),
-            Rejection::Occupied => ("Someone is in the way.", "Seseorang menghalangi jalan."),
-            Rejection::UnknownActor => ("That NPC is unavailable.", "NPC itu tidak tersedia."),
-            Rejection::OutOfReach => (
-                "You need to be within one tile.",
-                "Kamu harus berada dalam jarak satu petak.",
-            ),
-            Rejection::Refused => (
-                "The NPC refuses to help you.",
-                "NPC itu menolak membantumu.",
-            ),
-            Rejection::HealerAway => ("Ask the healer at the clinic.", "Temui tabib di klinik."),
-            Rejection::Empty => ("The supply is empty.", "Stok habis."),
-            Rejection::NoEvidence => (
-                "Nothing here records an institutional finding.",
-                "Tidak ada temuan lembaga di petak ini.",
-            ),
-            Rejection::Overtrained => (
-                "Too strained; wait and recover.",
-                "Terlalu lelah; tunggu dan pulihkan diri.",
-            ),
-            Rejection::MeridiansBlocked => (
-                "Blocked meridians require a healer.",
-                "Meridian tersumbat perlu perawatan tabib.",
-            ),
-            Rejection::Hobbled => (
-                "Your leg wound slows you this turn.",
-                "Luka kaki memperlambat langkahmu giliran ini.",
-            ),
-            Rejection::NoCargo => ("You need more herbs.", "Herba yang kamu bawa belum cukup."),
-            Rejection::PracticeComplete => (
-                "You already mastered this practice.",
-                "Kamu sudah menguasai latihan ini.",
-            ),
-            Rejection::BackgroundLocked => (
-                "Choose a background before your first turn.",
-                "Pilih latar sebelum giliran pertama.",
-            ),
-            Rejection::MarketClosed => ("The market opens at dawn.", "Pasar buka saat fajar."),
-            Rejection::NotEnoughCoins => (
-                "There are insufficient coins for the trade.",
-                "Koin untuk transaksi ini kurang.",
-            ),
-            Rejection::HallClosed => (
-                "Come back when the mentor is at the hall.",
-                "Kembali saat guru berada di balai.",
-            ),
-            Rejection::AlreadyEnrolled => (
-                "You are already an apprentice.",
-                "Kamu sudah menjadi murid.",
-            ),
-            Rejection::PracticeRequired => (
-                "Practice breath at the Qinghe shrine first.",
-                "Berlatih napas di kuil Qinghe dulu.",
-            ),
-            Rejection::MembershipRequired => {
-                ("Join Reed Hall first.", "Gabung Balai Alang-alang dulu.")
+            Rejection::Dead => "living.ascii.outcome_label.you_are_dead_you_can_still_wait",
+            Rejection::Impassable => "living.ascii.outcome_label.the_way_is_blocked",
+            Rejection::Occupied => "living.ascii.outcome_label.someone_is_in_the_way",
+            Rejection::UnknownActor => "living.ascii.outcome_label.that_npc_is_unavailable",
+            Rejection::OutOfReach => "living.ascii.outcome_label.you_need_to_be_within_one_tile",
+            Rejection::Refused => "living.ascii.outcome_label.the_npc_refuses_to_help_you",
+            Rejection::HealerAway => "living.ascii.outcome_label.ask_the_healer_at_the_clinic",
+            Rejection::Empty => "living.ascii.outcome_label.the_supply_is_empty",
+            Rejection::NoEvidence => {
+                "living.ascii.outcome_label.nothing_here_records_an_institutional_finding"
             }
-            Rejection::NoRemedy => ("You have no remedies.", "Kamu tidak membawa obat."),
-            Rejection::Uninjured => (
-                "Save your remedy for a wound.",
-                "Simpan obat untuk saat terluka.",
-            ),
-            Rejection::DutyComplete => (
-                "You already reported the shrine duty.",
-                "Tugas kuil sudah kamu laporkan.",
-            ),
+            Rejection::Overtrained => "living.ascii.outcome_label.too_strained_wait_and_recover",
+            Rejection::MeridiansBlocked => {
+                "living.ascii.outcome_label.blocked_meridians_require_a_healer"
+            }
+            Rejection::Hobbled => "living.ascii.outcome_label.your_leg_wound_slows_you_this_turn",
+            Rejection::NoCargo => "living.ascii.outcome_label.you_need_more_herbs",
+            Rejection::PracticeComplete => {
+                "living.ascii.outcome_label.you_already_mastered_this_practice"
+            }
+            Rejection::BackgroundLocked => {
+                "living.ascii.outcome_label.choose_a_background_before_your_first_turn"
+            }
+            Rejection::MarketClosed => "living.ascii.outcome_label.the_market_opens_at_dawn",
+            Rejection::NotEnoughCoins => {
+                "living.ascii.outcome_label.there_are_insufficient_coins_for_the_trade"
+            }
+            Rejection::HallClosed => "living.ascii.outcome_label.come_back_when_the_mentor_is_at",
+            Rejection::AlreadyEnrolled => {
+                "living.ascii.outcome_label.you_are_already_an_apprentice"
+            }
+            Rejection::PracticeRequired => {
+                "living.ascii.outcome_label.practice_breath_at_the_qinghe_shrine_first"
+            }
+            Rejection::MembershipRequired => "living.ascii.outcome_label.join_reed_hall_first",
+            Rejection::NoRemedy => "living.ascii.outcome_label.you_have_no_remedies",
+            Rejection::Uninjured => "living.ascii.outcome_label.save_your_remedy_for_a_wound",
+            Rejection::DutyComplete => {
+                "living.ascii.outcome_label.you_already_reported_the_shrine_duty"
+            }
             Rejection::RankRequired => {
                 if world.sect_hierarchy().is_some() && world.hall_rank() == Some(HallRank::Disciple)
                 {
-                    (
-                        "Earn more merit to reach senior disciple rank first.",
-                        "Raih lebih banyak jasa untuk mencapai pangkat murid senior dulu.",
-                    )
+                    "living.ascii.outcome_label.earn_more_merit_to_reach_senior_disciple"
                 } else {
-                    (
-                        "Complete your shrine duty and become a disciple first.",
-                        "Tuntaskan tugas kuil dan jadilah murid dalam dulu.",
-                    )
+                    "living.ascii.outcome_label.complete_your_shrine_duty_and_become_a"
                 }
             }
-            Rejection::FormAlreadyKnown => (
-                "You already know Reed Strike.",
-                "Kamu sudah menguasai Jurus Alang-alang.",
-            ),
-            Rejection::FormRequired => (
-                "Learn Reed Strike at the hall first.",
-                "Pelajari Jurus Alang-alang di balai dulu.",
-            ),
-            Rejection::QiFull => ("Your Qi is full.", "Qi kamu sudah penuh."),
-            Rejection::IntroductionRequired => (
-                "Talk to each other first.",
-                "Berkenalanlah dulu lewat talk.",
-            ),
-            Rejection::BoundToDuty => (
-                "This person stays with their duties.",
-                "Orang ini memilih tetap bertugas.",
-            ),
-            Rejection::CompanyFull => (
-                "You already have a travelling companion.",
-                "Kamu sudah memiliki pendamping.",
-            ),
-            Rejection::NotCompanion => (
-                "You are not travelling together.",
-                "Kalian tidak sedang bepergian bersama.",
-            ),
-            Rejection::PackFull => (
-                "The medicine pouch holds two herbs and is full.",
-                "Kantung obat berisi dua herba dan sudah penuh.",
-            ),
-            Rejection::SchoolContested => (
-                "Stonebank's claim has suspended the teacher's service. Negotiate an accord or sponsor Reed Hall.",
-                "Tuntutan perguruan Batu Tepi menghentikan layanan guru. Negosiasikan accord atau sponsor Balai Alang-alang.",
-            ),
-            Rejection::OathConflict => (
-                "Your current allegiance prevents that action.",
-                "Kesetiaanmu saat ini menghalangi tindakan itu.",
-            ),
-            Rejection::FactionTrustRequired => (
-                "Earn the faction's trust through material support first.",
-                "Bangun kepercayaan perguruan melalui dukungan nyata terlebih dahulu.",
-            ),
+            Rejection::FormAlreadyKnown => {
+                "living.ascii.outcome_label.you_already_know_reed_strike"
+            }
+            Rejection::FormRequired => {
+                "living.ascii.outcome_label.learn_reed_strike_at_the_hall_first"
+            }
+            Rejection::QiFull => "living.ascii.outcome_label.your_qi_is_full",
+            Rejection::IntroductionRequired => {
+                "living.ascii.outcome_label.talk_to_each_other_first"
+            }
+            Rejection::BoundToDuty => {
+                "living.ascii.outcome_label.this_person_stays_with_their_duties"
+            }
+            Rejection::CompanyFull => {
+                "living.ascii.outcome_label.you_already_have_a_travelling_companion"
+            }
+            Rejection::NotCompanion => "living.ascii.outcome_label.you_are_not_travelling_together",
+            Rejection::PackFull => {
+                "living.ascii.outcome_label.the_medicine_pouch_holds_two_herbs_and"
+            }
+            Rejection::SchoolContested => {
+                "living.ascii.outcome_label.stonebank_s_claim_has_suspended_the_teacher"
+            }
+            Rejection::OathConflict => {
+                "living.ascii.outcome_label.your_current_allegiance_prevents_that_action"
+            }
+            Rejection::FactionTrustRequired => {
+                "living.ascii.outcome_label.earn_the_faction_s_trust_through_material"
+            }
             Rejection::InsufficientQi => {
-                return format!(
-                    "{} {FORM_QI_COST} Qi.",
-                    tr("Reed Strike needs", "Jurus Alang-alang membutuhkan")
+                return living_format(
+                    locale,
+                    "living.ascii.outcome_label.template.reed_strike_needs_form_qi_cost",
+                    &[("form_qi_cost", &format!("{}", FORM_QI_COST))],
                 );
             }
         },
     };
-    text(locale, en, id).into()
+    living_text(locale, key).into()
 }
 
 pub(crate) fn run(debug_world: bool) {
@@ -3198,39 +3215,37 @@ pub(crate) fn run(debug_world: bool) {
 }
 
 fn hall_rank_label(locale: Locale, rank: HallRank) -> &'static str {
-    let (en, id) = match rank {
-        HallRank::Apprentice => ("Reed Hall apprentice", "Murid pemula Balai Alang-alang"),
-        HallRank::Disciple => ("Reed Hall disciple", "Murid dalam Balai Alang-alang"),
-        HallRank::SeniorDisciple => (
-            "Reed Hall senior disciple",
-            "Murid senior Balai Alang-alang",
-        ),
-        HallRank::Elder => ("Reed Hall elder", "Tetua Balai Alang-alang"),
+    let key = match rank {
+        HallRank::Apprentice => "living.ascii.hall_rank_label.reed_hall_apprentice",
+        HallRank::Disciple => "living.ascii.hall_rank_label.reed_hall_disciple",
+        HallRank::SeniorDisciple => "living.ascii.hall_rank_label.reed_hall_senior_disciple",
+        HallRank::Elder => "living.ascii.hall_rank_label.reed_hall_elder",
     };
-    text(locale, en, id)
+    living_text(locale, key)
 }
 
 fn decision_reason_label(locale: Locale, reason: DecisionReason) -> &'static str {
-    let (en, id) = match reason {
-        DecisionReason::ImmediateDanger => ("immediate danger", "bahaya langsung"),
-        DecisionReason::PhysicalRecovery => ("physical recovery", "pemulihan tubuh"),
-        DecisionReason::TreatmentFunds => ("treatment costs", "biaya perawatan"),
-        DecisionReason::MedicalDuty => ("medical duty", "tugas pengobatan"),
-        DecisionReason::Cultivation => ("cultivation", "kultivasi"),
-        DecisionReason::MartialAmbition => ("martial ambition", "ambisi bela diri"),
+    let key = match reason {
+        DecisionReason::ImmediateDanger => "living.ascii.decision_reason_label.immediate_danger",
+        DecisionReason::PhysicalRecovery => "living.ascii.decision_reason_label.physical_recovery",
+        DecisionReason::TreatmentFunds => "living.ascii.decision_reason_label.treatment_costs",
+        DecisionReason::MedicalDuty => "living.ascii.decision_reason_label.medical_duty",
+        DecisionReason::Cultivation => "living.ascii.decision_reason_label.cultivation",
+        DecisionReason::MartialAmbition => "living.ascii.decision_reason_label.martial_ambition",
         DecisionReason::InstitutionalObligation => {
-            ("institutional obligation", "kewajiban kelembagaan")
+            "living.ascii.decision_reason_label.institutional_obligation"
         }
-        DecisionReason::KnownOpportunity => ("a known opportunity", "peluang yang diketahui"),
-        DecisionReason::Fatigue => ("fatigue", "kelelahan"),
-        DecisionReason::Livelihood => ("livelihood", "mata pencaharian"),
-        DecisionReason::Routine => ("routine", "rutinitas"),
-        DecisionReason::ResumingAmbition => (
-            "resuming an interrupted pursuit",
-            "melanjutkan tujuan yang terputus",
-        ),
+        DecisionReason::KnownOpportunity => {
+            "living.ascii.decision_reason_label.a_known_opportunity"
+        }
+        DecisionReason::Fatigue => "living.ascii.decision_reason_label.fatigue",
+        DecisionReason::Livelihood => "living.ascii.decision_reason_label.livelihood",
+        DecisionReason::Routine => "living.ascii.decision_reason_label.routine",
+        DecisionReason::ResumingAmbition => {
+            "living.ascii.decision_reason_label.resuming_an_interrupted_pursuit"
+        }
     };
-    text(locale, en, id)
+    living_text(locale, key)
 }
 
 pub(crate) fn run_c35() {
@@ -3455,6 +3470,20 @@ mod tests {
         let session = campaign_session(false, 25);
         assert_eq!(session.world.checkpoint_revision(), 25);
         assert_eq!(session.save_path.file_name().unwrap(), "checkpoint.c35");
+    }
+
+    #[test]
+    fn changing_language_drops_stale_notice_without_mutating_checkpoint() {
+        let mut session = campaign_session(false, 26);
+        session.input("help");
+        assert!(!session.notice.is_empty());
+        let before = session.world.checkpoint();
+        session.input("lang id");
+        assert_eq!(session.locale, Locale::Indonesian);
+        assert!(session.notice.is_empty());
+        assert_eq!(session.world.checkpoint(), before);
+        session.input("help");
+        assert!(session.notice.contains("Balai Alang-alang"));
     }
 
     #[test]

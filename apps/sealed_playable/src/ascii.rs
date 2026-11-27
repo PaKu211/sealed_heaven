@@ -126,7 +126,7 @@ pub fn run_c08() {
 }
 
 fn run_session(mut session: Session) {
-    let catalog = Catalog::agency().expect("validated localization");
+    let catalog = Catalog::runtime().expect("validated localization");
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
         println!("{}", frame(&session, &catalog));
         for token in script.split(|c: char| c.is_whitespace() || c == ',') {
@@ -232,7 +232,10 @@ pub fn apply(session: &mut Session, token: &str) -> Command {
             Command::Continue
         }
         other => {
-            eprintln!("unknown command: {other}");
+            let label = Catalog::runtime_ref()
+                .map(|c| c.text(session.locale, "legacy.ascii.unknown_command"))
+                .unwrap_or_else(|_| "unknown command".into());
+            eprintln!("{label}: {other}");
             Command::Continue
         }
     }
@@ -240,14 +243,24 @@ pub fn apply(session: &mut Session, token: &str) -> Command {
 
 pub fn frame(session: &Session, catalog: &Catalog) -> String {
     let world = session.world();
-    let mut out = String::from("Sealed Heaven — Qinghe\n");
+    let mut out = catalog.text(session.locale, "legacy.ascii.title");
+    out.push('\n');
     let _ = writeln!(
         out,
-        "tick {}  player ({},{})  {}",
+        "{} {}  {} ({},{})  {}",
+        catalog.text(session.locale, "legacy.ascii.tick"),
         world.tick(),
+        catalog.text(session.locale, "legacy.ascii.player"),
         world.player_position().x,
         world.player_position().y,
-        if session.paused { "paused" } else { "running" }
+        catalog.text(
+            session.locale,
+            if session.paused {
+                "legacy.ascii.paused"
+            } else {
+                "legacy.ascii.running"
+            }
+        )
     );
     let _ = write!(out, "   ");
     for x in 0..WIDTH {
@@ -261,13 +274,12 @@ pub fn frame(session: &Session, catalog: &Catalog) -> String {
         }
         out.push('\n');
     }
-    out.push_str(
-        "@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected\n",
-    );
+    out.push_str(&catalog.text(session.locale, "legacy.ascii.legend"));
+    out.push('\n');
     out.push_str(&panel(session, catalog));
-    out.push_str(
-        "\nwasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit\n",
-    );
+    out.push('\n');
+    out.push_str(&catalog.text(session.locale, "legacy.ascii.controls"));
+    out.push('\n');
     out
 }
 

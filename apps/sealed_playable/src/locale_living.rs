@@ -1,4 +1,4 @@
-//! Runtime language resources for living-world presentation (C3.6 phase A).
+//! Runtime language resources for living-world presentation (C3.6).
 //! The simulation crate never sees a catalog, locale, or translated value.
 use crate::locale::{Locale, parse_dictionary};
 use std::{
@@ -14,6 +14,7 @@ const EN: &str = include_str!("../locales/living_en.json");
 const ID: &str = include_str!("../locales/living_id.json");
 const MAX_PACK_BYTES: u64 = 256 * 1024;
 const MAX_MESSAGE_BYTES: usize = 8192;
+const MAX_RENDER_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug)]
 enum Part {
@@ -97,25 +98,33 @@ impl Message {
     }
 
     fn render(&self, args: &[(&str, &str)]) -> Result<String, String> {
-        let mut values = BTreeMap::new();
-        for &(name, value) in args {
-            if values.insert(name, value).is_some() {
+        // Most templates use fewer than ten arguments. Check without a per-call
+        // tree allocation, and bound expansion even for a repeated placeholder.
+        if args.len() != self.parameters.len() {
+            return Err("missing or unknown parameters".into());
+        }
+        for (index, &(name, _)) in args.iter().enumerate() {
+            if !self.parameters.contains(name) {
+                return Err(format!("unknown parameter {name}"));
+            }
+            if args[..index].iter().any(|(prior, _)| *prior == name) {
                 return Err(format!("duplicate parameter {name}"));
             }
         }
-        if !values
-            .keys()
-            .copied()
-            .eq(self.parameters.iter().map(String::as_str))
-        {
-            return Err("missing or unknown parameters".into());
-        }
         let mut result = String::new();
         for part in &self.parts {
-            result.push_str(match part {
-                Part::Literal(value) => value,
-                Part::Parameter(name) => values[name.as_str()],
-            });
+            let value = match part {
+                Part::Literal(value) => value.as_str(),
+                Part::Parameter(name) => args
+                    .iter()
+                    .find(|(key, _)| *key == name)
+                    .map(|(_, value)| *value)
+                    .ok_or_else(|| format!("missing parameter {name}"))?,
+            };
+            if result.len().saturating_add(value.len()) > MAX_RENDER_BYTES {
+                return Err("rendered message exceeds byte limit".into());
+            }
+            result.push_str(value);
         }
         Ok(result)
     }
@@ -156,7 +165,7 @@ fn validate_overlay(
     Ok(())
 }
 
-fn read_optional(path: &Path) -> Result<Option<String>, String> {
+pub(crate) fn read_optional(path: &Path) -> Result<Option<String>, String> {
     let file = match File::open(path) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -237,6 +246,40 @@ impl LivingCatalog {
             .unwrap_or(key)
     }
 
+    /// English uses singular for exactly one. Indonesian nouns use the
+    /// invariant other form. If the selected Indonesian template is absent,
+    /// choose the correct English number form, not a mixed-language plural.
+    pub fn plural(
+        &self,
+        locale: Locale,
+        one: &str,
+        other: &str,
+        count: u64,
+        args: &[(&str, &str)],
+    ) -> Result<String, String> {
+        let singular = self
+            .english
+            .get(one)
+            .ok_or_else(|| format!("unknown message ID {one}"))?;
+        let multiple = self
+            .english
+            .get(other)
+            .ok_or_else(|| format!("unknown message ID {other}"))?;
+        if singular.parameters != multiple.parameters {
+            return Err("plural parameter contract mismatch".into());
+        }
+        if locale == Locale::Indonesian
+            && let Some(message) = self.indonesian.get(other)
+        {
+            return message.render(args);
+        }
+        if count == 1 {
+            singular.render(args)
+        } else {
+            multiple.render(args)
+        }
+    }
+
     pub fn format(
         &self,
         locale: Locale,
@@ -249,11 +292,28 @@ impl LivingCatalog {
     }
 }
 
+/// Prefer an explicit absolute directory; otherwise use a pack next to the
+/// executable. Never auto-discover catalogs from the current working directory.
+pub(crate) fn runtime_directory() -> Option<PathBuf> {
+    if let Some(path) = env::var_os("SEALED_LOCALE_DIR") {
+        return Some(PathBuf::from(path));
+    }
+    env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join("locales")))
+        .filter(|dir| dir.is_dir())
+}
+
 static RUNTIME: OnceLock<LivingCatalog> = OnceLock::new();
 
 fn runtime() -> &'static LivingCatalog {
     RUNTIME.get_or_init(|| {
-        if let Some(path) = env::var_os("SEALED_LOCALE_DIR").map(PathBuf::from) {
+        if let Some(path) = runtime_directory()
+            && (!path.is_absolute()
+                || !path.is_dir()
+                || path.join("living_en.json").exists()
+                || path.join("living_id.json").exists())
+        {
             match LivingCatalog::from_directory(&path) {
                 Ok(catalog) => return catalog,
                 Err(error) => {
@@ -276,9 +336,109 @@ pub(crate) fn living_format(locale: Locale, key: &str, args: &[(&str, &str)]) ->
     })
 }
 
+pub(crate) fn living_plural(
+    locale: Locale,
+    one: &str,
+    other: &str,
+    count: u64,
+    args: &[(&str, &str)],
+) -> String {
+    runtime()
+        .plural(locale, one, other, count, args)
+        .unwrap_or_else(|error| {
+            eprintln!("Localization plural formatting error: {other}: {error}");
+            other.to_owned()
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn all_presentation_ids_and_context_entries_are_valid() {
+        let catalog = LivingCatalog::embedded().unwrap();
+        let raw = include_str!("../locales/living_context.json");
+        let context: serde_json::Value = serde_json::from_str(raw).unwrap();
+        let entries = context.as_object().unwrap();
+        assert_eq!(entries.len(), catalog.english.len());
+        for key in catalog.english.keys() {
+            assert!(entries.contains_key(key), "{key}");
+        }
+        let mut active = BTreeSet::new();
+        for source in [
+            include_str!("living_ascii.rs"),
+            include_str!("living_pixel.rs"),
+        ] {
+            for token in source.split("#[cfg(test)]").next().unwrap().split('"') {
+                if token.starts_with("living.")
+                    && token.chars().all(|c| {
+                        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_'
+                    })
+                {
+                    assert!(catalog.english.contains_key(token), "unregistered {token}");
+                    active.insert(token);
+                }
+            }
+        }
+        for (key, entry) in entries {
+            assert_eq!(
+                entry["active"].as_bool(),
+                Some(active.contains(key.as_str())),
+                "{key}"
+            );
+            if let Some(params) = entry["parameters"].as_object() {
+                let declared: BTreeSet<_> = params.keys().cloned().collect();
+                assert_eq!(declared, catalog.english[key].parameters, "{key}");
+            }
+        }
+    }
+
+    #[test]
+    fn plural_uses_actual_fallback_language_and_rendering_is_bounded() {
+        let other = "living.ascii.outcome_label.template.you_took_herbs_herbs_from_actor";
+        let one = "living.ascii.outcome_label.template.you_took_herbs_herbs_from_actor.one";
+        let catalog = LivingCatalog::embedded().unwrap();
+        let args = [("herbs", "1"), ("actor", "Luo Xiu")];
+        assert_eq!(
+            catalog
+                .plural(Locale::English, one, other, 1, &args)
+                .unwrap(),
+            "You took 1 herb from Luo Xiu."
+        );
+        assert_eq!(
+            catalog
+                .plural(
+                    Locale::English,
+                    one,
+                    other,
+                    2,
+                    &[("herbs", "2"), ("actor", "Luo Xiu")]
+                )
+                .unwrap(),
+            "You took 2 herbs from Luo Xiu."
+        );
+        assert!(
+            catalog
+                .plural(Locale::Indonesian, one, other, 1, &args)
+                .unwrap()
+                .contains("herba")
+        );
+        let fallback = LivingCatalog::with_overrides(None, Some("{}")).unwrap();
+        assert_eq!(
+            fallback
+                .plural(Locale::Indonesian, one, other, 1, &args)
+                .unwrap(),
+            "You took 1 herb from Luo Xiu."
+        );
+        let huge = "x".repeat(MAX_RENDER_BYTES);
+        assert!(
+            Message::parse("{x}{x}")
+                .unwrap()
+                .render(&[("x", &huge)])
+                .is_err()
+        );
+    }
+
     #[test]
     fn embedded_keys_are_paired_and_default_strings_unchanged() {
         let catalog = LivingCatalog::embedded().unwrap();

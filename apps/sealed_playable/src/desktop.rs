@@ -79,7 +79,7 @@ enum Label {
 }
 
 pub fn run() {
-    let catalog = match Catalog::load() {
+    let catalog = match Catalog::runtime() {
         Ok(catalog) => catalog,
         Err(error) => {
             eprintln!("{error}");

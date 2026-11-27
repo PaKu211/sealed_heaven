@@ -217,8 +217,88 @@ impl Catalog {
                 return Err(format!("c09 shadowed key {key}"));
             }
         }
+        let en = parse_dictionary("c36/ui/en", include_str!("../locales/c36_ui_en.json"))?;
+        let id = parse_dictionary("c36/ui/id", include_str!("../locales/c36_ui_id.json"))?;
+        if !en.keys().eq(id.keys()) {
+            return Err("c36 UI dictionary key parity mismatch".into());
+        }
+        for (key, value) in en {
+            if catalog.english.insert(key.clone(), value).is_some() {
+                return Err(format!("c36 UI shadowed key {key}"));
+            }
+        }
+        for (key, value) in id {
+            if catalog.indonesian.insert(key.clone(), value).is_some() {
+                return Err(format!("c36 UI shadowed key {key}"));
+            }
+        }
         Ok(catalog)
     }
+    pub fn runtime() -> Result<Self, String> {
+        Self::runtime_ref().cloned()
+    }
+
+    pub(crate) fn runtime_ref() -> Result<&'static Self, String> {
+        static RUNTIME: std::sync::OnceLock<Result<Catalog, String>> = std::sync::OnceLock::new();
+        RUNTIME
+            .get_or_init(|| {
+                let mut catalog = Self::agency()?;
+                if let Some(path) = crate::locale_living::runtime_directory() {
+                    match catalog.with_external(&path) {
+                        Ok(next) => catalog = next,
+                        Err(error) => eprintln!(
+                            "Invalid legacy UI locale pack; using embedded catalogs: {error}"
+                        ),
+                    }
+                }
+                Ok(catalog)
+            })
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    fn with_external(&self, path: &std::path::Path) -> Result<Self, String> {
+        if !path.is_absolute() || !path.is_dir() {
+            return Err("locale directory must be an existing absolute path".into());
+        }
+        let read = crate::locale_living::read_optional;
+        let english = read(&path.join("ui_en.json"))?
+            .map(|source| parse_dictionary("ui/en", &source))
+            .transpose()?;
+        let indonesian = read(&path.join("ui_id.json"))?
+            .map(|source| parse_dictionary("ui/id", &source))
+            .transpose()?;
+        let validate = |dictionary: &BTreeMap<String, String>| -> Result<(), String> {
+            for (key, value) in dictionary {
+                if !self.english.contains_key(key) {
+                    return Err(format!("unknown UI message ID {key}"));
+                }
+                if value.len() > 8192
+                    || value
+                        .chars()
+                        .any(|c| c.is_control() && !matches!(c, '\n' | '\t'))
+                {
+                    return Err(format!("invalid UI value {key}"));
+                }
+            }
+            Ok(())
+        };
+        if let Some(ref en) = english {
+            validate(en)?;
+        }
+        if let Some(ref id) = indonesian {
+            validate(id)?;
+        }
+        let mut next = self.clone();
+        if let Some(en) = english {
+            next.english.extend(en);
+        }
+        if let Some(id) = indonesian {
+            next.indonesian = id;
+        }
+        Ok(next)
+    }
+
     pub fn load() -> Result<Self, String> {
         Self::from_json(
             include_str!("../locales/en.json"),

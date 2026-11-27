@@ -1,0 +1,11 @@
+{
+  "legacy.ascii.controls": "wasd bergerak | f serang | b bertahan | e gunakan | t target berikut | n tunggu | p jeda | l bahasa | r mulai ulang | v simpan | o muat | q keluar",
+  "legacy.ascii.legend": "@ kamu   Y tabib   2-9 a-k NPC lain   * herba   + kuil   # dinding   [] dipilih",
+  "legacy.ascii.paused": "jeda",
+  "legacy.ascii.player": "pemain",
+  "legacy.ascii.running": "berjalan",
+  "legacy.ascii.tick": "giliran",
+  "legacy.ascii.title": "Sealed Heaven — Qinghe",
+  "legacy.ascii.unknown_command": "perintah tidak dikenal",
+  "legacy.window.title": "Sealed Heaven — C0.7 Qinghe"
+}

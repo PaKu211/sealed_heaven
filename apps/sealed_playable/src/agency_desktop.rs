@@ -75,14 +75,15 @@ enum Label {
 }
 
 pub fn run() {
-    let strings = Catalog::agency().expect("validated C05 localization");
+    let strings = Catalog::runtime().expect("validated C05 localization");
+    let title = strings.text(Locale::English, "legacy.window.title");
     App::new()
         .insert_resource(Strings(strings))
         .init_resource::<Performance>()
         .insert_resource(ClearColor(Color::srgb(0.035, 0.055, 0.065)))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Sealed Heaven — C0.7 Qinghe".into(),
+                title,
                 resolution: (1440, 960).into(),
                 resize_constraints: bevy::window::WindowResizeConstraints {
                     min_width: 1280.0,

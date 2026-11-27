@@ -1,0 +1,11 @@
+{
+  "legacy.ascii.controls": "wasd move | f attack | b guard | e use | t next target | n wait | p pause | l language | r reset | v save | o load | q quit",
+  "legacy.ascii.legend": "@ you   Y healer   2-9 a-k other NPCs   * herbs   + shrine   # wall   [] selected",
+  "legacy.ascii.paused": "paused",
+  "legacy.ascii.player": "player",
+  "legacy.ascii.running": "running",
+  "legacy.ascii.tick": "tick",
+  "legacy.ascii.title": "Sealed Heaven — Qinghe",
+  "legacy.ascii.unknown_command": "unknown command",
+  "legacy.window.title": "Sealed Heaven — C0.7 Qinghe"
+}
