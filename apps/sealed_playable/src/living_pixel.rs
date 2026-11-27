@@ -6,9 +6,8 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 
 use crate::{
     clock,
-    living_ascii::{Session, outcome_label, text},
+    living_ascii::{Session, campaign_session, outcome_label, text},
     locale::Locale,
-    persistence,
 };
 
 const SIDE: f32 = 32.0;
@@ -28,10 +27,9 @@ struct Game {
 struct Projection;
 
 pub(crate) fn run() {
-    let path = persistence::default_path().with_file_name("checkpoint.c20");
     App::new()
         .insert_resource(Game {
-            session: Session::new(path),
+            session: campaign_session(false, 25),
             target: None,
         })
         .insert_resource(ClearColor(Color::srgb(0.048, 0.062, 0.065)))

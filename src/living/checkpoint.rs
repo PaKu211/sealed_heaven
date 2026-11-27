@@ -34,9 +34,8 @@ pub enum LoadError {
     StateMismatch,
 }
 
-pub(super) fn encode(world: &World) -> Vec<u8> {
-    let mut out = Wire(MAGIC.to_vec());
-    out.u16(match world.rules {
+pub(super) fn revision(rules: Rules) -> u16 {
+    match rules {
         Rules::Original => 1,
         Rules::Qinghe => 2,
         Rules::Riverlands => 3,
@@ -62,7 +61,12 @@ pub(super) fn encode(world: &World) -> Vec<u8> {
         Rules::PersistentInjury => 23,
         Rules::AutonomousAgency => 24,
         Rules::SectHierarchy => 25,
-    });
+    }
+}
+
+pub(super) fn encode(world: &World) -> Vec<u8> {
+    let mut out = Wire(MAGIC.to_vec());
+    out.u16(revision(world.rules));
     out.0.extend(scenario_digest(world.scenario, world.rules));
     out.count(world.journal.len());
     if let Some(region) = world.region() {
@@ -151,6 +155,10 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         return Err(LoadError::StateMismatch);
     }
     Ok(world)
+}
+
+pub(super) fn intent_is_recordable(intent: Intent, rules: Rules) -> bool {
+    read_intent(&Wire::intent_record(intent), rules).is_ok_and(|decoded| decoded == intent)
 }
 
 fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
@@ -1727,8 +1735,9 @@ impl Wire {
         self.u8(u8::from(member.allocation_claimed));
     }
 
-    fn intent(&mut self, intent: Intent) {
-        let (tag, payload) = match intent {
+    // Both admission and checkpoint serialization share the same fixed record.
+    fn intent_record(intent: Intent) -> [u8; INTENT_SIZE] {
+        let (tag, payload): (u8, u32) = match intent {
             Intent::Wait => (0, 0),
             Intent::Move(Direction::North) => (1, 0),
             Intent::Move(Direction::East) => (1, 1),
@@ -1775,8 +1784,12 @@ impl Wire {
             Intent::TreatWounds => (40, 0),
             Intent::ClaimHallAllocation => (41, 0),
         };
-        self.u8(tag);
-        self.u32(payload);
+        let [a, b, c, d] = payload.to_le_bytes();
+        [tag, a, b, c, d]
+    }
+
+    fn intent(&mut self, intent: Intent) {
+        self.0.extend(Self::intent_record(intent));
     }
 
     fn goal(&mut self, goal: Goal) {

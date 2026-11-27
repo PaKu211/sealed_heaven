@@ -101,11 +101,30 @@ fn a_living_carrier_cannot_be_looted_and_keeps_the_cargo() {
 fn revision_fourteen_refuses_theft_and_still_calls_an_empty_tile_empty() {
     let mut older = World::player_agency(0);
     corpse_with_herbs(&mut older, 3);
+    // Tag 29 is not defined by revision 14's decoder. Reject at admission
+    // rather than consuming a turn and producing an unrestorable journal.
+    let before = older.checkpoint();
+    let tick = older.tick();
     assert_eq!(
-        older.step(older.tick(), Intent::Take(CARRIER)).unwrap(),
-        Outcome::Rejected(Rejection::Refused)
+        older.step(tick, Intent::Take(CARRIER)),
+        Err(StepError::UnrecordableIntent)
     );
+    assert_eq!(older.tick(), tick);
+    assert_eq!(older.checkpoint(), before);
     assert_eq!(older.npcs[&CARRIER].herbs, 3);
+    // An ordinary valid command must still replay on an authentic seeded world.
+    let mut clean = World::player_agency(0);
+    let before = clean.checkpoint();
+    assert_eq!(
+        clean.step(clean.tick(), Intent::Take(CARRIER)),
+        Err(StepError::UnrecordableIntent)
+    );
+    assert_eq!(clean.checkpoint(), before);
+    wait(&mut clean);
+    assert_eq!(
+        World::restore(&clean.checkpoint()).unwrap().checkpoint(),
+        clean.checkpoint()
+    );
     assert_eq!(
         u16::from_le_bytes(older.checkpoint()[12..14].try_into().unwrap()),
         14

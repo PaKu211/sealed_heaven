@@ -325,6 +325,7 @@ pub enum StepError {
     PoliticsCampaignRequired,
     InvalidBodyReport,
     ContestedCampaignRequired,
+    UnrecordableIntent,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1025,6 +1026,11 @@ impl World {
             return Err(StepError::SchoolCampaignRequired);
         }
 
+        // Reject intents that the current revision cannot replay exactly.
+        if !checkpoint::intent_is_recordable(intent, self.rules) {
+            return Err(StepError::UnrecordableIntent);
+        }
+
         self.tick += 1;
         if let Some(traffic) = self.traffic.as_mut() {
             traffic.begin_tick();
@@ -1400,6 +1406,10 @@ impl World {
         self.supply.shrine -= 1;
         self.supply.consumed += 1;
         healed
+    }
+
+    pub fn checkpoint_revision(&self) -> u16 {
+        checkpoint::revision(self.rules)
     }
 
     pub fn checkpoint(&self) -> Vec<u8> {

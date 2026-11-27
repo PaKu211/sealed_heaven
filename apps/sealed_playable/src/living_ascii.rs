@@ -166,25 +166,25 @@ impl Session {
                 if let Some(player) = hierarchy.player {
                     let duty = match player.duty {
                         SectDuty::Unassigned => text(self.locale, "none", "tidak ada"),
-                        SectDuty::Carrying => text(self.locale, "carrying offering", "membawa titipan"),
+                        SectDuty::Carrying => {
+                            text(self.locale, "carrying offering", "membawa titipan")
+                        }
                         SectDuty::Delivered => {
                             text(self.locale, "awaiting report", "menunggu laporan")
                         }
                     };
-                    let allocation = if !matches!(
-                        player.rank,
-                        HallRank::SeniorDisciple | HallRank::Elder
-                    ) {
-                        text(
-                            self.locale,
-                            "requires senior disciple",
-                            "butuh murid senior",
-                        )
-                    } else if player.allocation_claimed {
-                        text(self.locale, "claimed", "sudah diambil")
-                    } else {
-                        text(self.locale, "available", "tersedia")
-                    };
+                    let allocation =
+                        if !matches!(player.rank, HallRank::SeniorDisciple | HallRank::Elder) {
+                            text(
+                                self.locale,
+                                "requires senior disciple",
+                                "butuh murid senior",
+                            )
+                        } else if player.allocation_claimed {
+                            text(self.locale, "claimed", "sudah diambil")
+                        } else {
+                            text(self.locale, "available", "tersedia")
+                        };
                     parts.push(format!(
                         "{}: {} ({} {}); {}: {duty}; {}: {allocation}",
                         text(self.locale, "Reed Hall", "Balai Alang-alang"),
@@ -337,9 +337,11 @@ impl Session {
                     return true;
                 };
                 let id = ActorId::new(id);
-                let Some(npc) = self.world.npc(id).filter(|npc| {
-                    npc.alive() && self.world.player_sees(npc.position)
-                }) else {
+                let Some(npc) = self
+                    .world
+                    .npc(id)
+                    .filter(|npc| npc.alive() && self.world.player_sees(npc.position))
+                else {
                     self.notice = text(
                         self.locale,
                         "That character is not visible.",
@@ -407,7 +409,10 @@ impl Session {
                                 "#{} t{} {actor}: {} ({})",
                                 event.id,
                                 event.at,
-                                event.goal.map(|goal| goal_label(self.locale, goal)).unwrap_or("?"),
+                                event
+                                    .goal
+                                    .map(|goal| goal_label(self.locale, goal))
+                                    .unwrap_or("?"),
                                 event
                                     .reason
                                     .map(|reason| decision_reason_label(self.locale, reason))
@@ -439,11 +444,7 @@ impl Session {
                                 "#{} t{} {actor} {} {} {}",
                                 event.id,
                                 event.at,
-                                text(
-                                    self.locale,
-                                    "paid",
-                                    "membayar",
-                                ),
+                                text(self.locale, "paid", "membayar",),
                                 event.amount,
                                 text(
                                     self.locale,
@@ -1123,20 +1124,21 @@ impl Session {
                 }
             },
             "v" | "save" => {
-                self.notice =
-                    match persistence::write_atomic(&self.save_path, &self.world.checkpoint()) {
-                        Ok(()) => {
-                            text(self.locale, "Saved the settlement.", "Desa tersimpan.").into()
-                        }
-                        Err(error) => format!(
-                            "{} — {error}",
-                            text(self.locale, "Save failed", "Gagal menyimpan")
-                        ),
-                    };
+                self.notice = match save_living(&self.save_path, &self.world, self.locale) {
+                    Ok(()) => text(self.locale, "Saved the settlement.", "Desa tersimpan.").into(),
+                    Err(error) => format!(
+                        "{} — {error}",
+                        text(self.locale, "Save failed", "Gagal menyimpan")
+                    ),
+                };
                 return true;
             }
             "o" | "load" => {
-                self.notice = match load(&self.save_path, self.locale) {
+                self.notice = match load_campaign(
+                    &self.save_path,
+                    self.locale,
+                    self.world.checkpoint_revision(),
+                ) {
                     Ok(world) => {
                         self.world = world;
                         text(
@@ -1492,6 +1494,12 @@ impl Session {
                     self.locale,
                     "Invalid body report or unavailable campaign.",
                     "Laporan jenazah tidak sah atau kampanye tidak tersedia.",
+                )
+                .into(),
+                StepError::UnrecordableIntent => text(
+                    self.locale,
+                    "This command cannot be recorded exactly in this campaign.",
+                    "Perintah ini tidak dapat direkam secara utuh dalam kampanye ini.",
                 )
                 .into(),
                 StepError::ContestedCampaignRequired => text(
@@ -2632,6 +2640,41 @@ impl Session {
     }
 }
 
+fn save_living(path: &Path, world: &World, locale: Locale) -> Result<(), String> {
+    let bytes = world.checkpoint();
+    World::restore(&bytes).map_err(|error| format!("{error:?}"))?;
+    match File::open(path) {
+        Ok(file) => {
+            let old = persistence::read_limited(file, MAX_SAVE_BYTES)?;
+            let previous = World::restore(&old).map_err(|error| format!("{error:?}"))?;
+            if previous.checkpoint_revision() != world.checkpoint_revision() {
+                return Err(text(
+                    locale,
+                    "Existing save belongs to another campaign.",
+                    "Simpanan yang ada milik kampanye lain.",
+                )
+                .into());
+            }
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.to_string()),
+    }
+    persistence::write_atomic(path, &bytes)
+}
+
+fn load_campaign(path: &Path, locale: Locale, expected_revision: u16) -> Result<World, String> {
+    let world = load(path, locale)?;
+    if world.checkpoint_revision() != expected_revision {
+        return Err(text(
+            locale,
+            "Save belongs to another campaign.",
+            "Simpanan milik kampanye lain.",
+        )
+        .into());
+    }
+    Ok(world)
+}
+
 fn load(path: &Path, locale: Locale) -> Result<World, String> {
     let file = File::open(path).map_err(|error| error.to_string())?;
     let bytes = persistence::read_limited(file, MAX_SAVE_BYTES)?;
@@ -3106,8 +3149,7 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
                 "Tugas kuil sudah kamu laporkan.",
             ),
             Rejection::RankRequired => {
-                if world.sect_hierarchy().is_some()
-                    && world.hall_rank() == Some(HallRank::Disciple)
+                if world.sect_hierarchy().is_some() && world.hall_rank() == Some(HallRank::Disciple)
                 {
                     (
                         "Earn more merit to reach senior disciple rank first.",
@@ -3197,10 +3239,9 @@ fn decision_reason_label(locale: Locale, reason: DecisionReason) -> &'static str
         DecisionReason::MedicalDuty => ("medical duty", "tugas pengobatan"),
         DecisionReason::Cultivation => ("cultivation", "kultivasi"),
         DecisionReason::MartialAmbition => ("martial ambition", "ambisi bela diri"),
-        DecisionReason::InstitutionalObligation => (
-            "institutional obligation",
-            "kewajiban kelembagaan",
-        ),
+        DecisionReason::InstitutionalObligation => {
+            ("institutional obligation", "kewajiban kelembagaan")
+        }
         DecisionReason::KnownOpportunity => ("a known opportunity", "peluang yang diketahui"),
         DecisionReason::Fatigue => ("fatigue", "kelelahan"),
         DecisionReason::Livelihood => ("livelihood", "mata pencaharian"),
@@ -3293,7 +3334,7 @@ pub(crate) fn run_c20() {
     run_campaign(false, 11);
 }
 
-fn run_campaign(debug_world: bool, revision: u16) {
+pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
     let path = persistence::default_path().with_file_name(match revision {
         5 => "checkpoint.c10",
         6 => "checkpoint.c15",
@@ -3344,6 +3385,11 @@ fn run_campaign(debug_world: bool, revision: u16) {
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
+    session
+}
+
+fn run_campaign(debug_world: bool, revision: u16) {
+    let mut session = campaign_session(debug_world, revision);
     if let Ok(script) = std::env::var("SEALED_ASCII_COMMANDS") {
         println!("{}", session.frame());
         // Semicolons support explicit IDs. A comma or whitespace sequence of
@@ -3387,6 +3433,62 @@ fn run_campaign(debug_world: bool, revision: u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recovery_keeps_existing_foreign_and_corrupt_saves_intact() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("checkpoint.c35");
+        let mut session = Session::new(path.clone());
+        session.world = World::sect_hierarchy_campaign(0);
+        session.input("wait");
+        let before = session.world.checkpoint();
+        let foreign = World::institutional_agency(0).checkpoint();
+        for existing in [foreign, b"corrupt".to_vec()] {
+            std::fs::write(&path, &existing).unwrap();
+            session.input("load");
+            assert!(session.notice.contains("Load failed"));
+            assert_eq!(session.world.checkpoint(), before);
+            session.input("save");
+            assert!(session.notice.contains("Save failed"));
+            assert_eq!(std::fs::read(&path).unwrap(), existing);
+        }
+        std::fs::remove_file(&path).unwrap();
+        session.input("save");
+        assert!(session.notice.contains("Saved the settlement"));
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        session.input("wait");
+        session.input("save");
+        let current = session.world.checkpoint();
+        session.input("wait");
+        session.input("load");
+        assert!(session.notice.contains("Restored the settlement"));
+        assert_eq!(session.world.checkpoint(), current);
+    }
+
+    #[test]
+    fn recovery_current_campaign_has_the_current_save_slot() {
+        let session = campaign_session(false, 25);
+        assert_eq!(session.world.checkpoint_revision(), 25);
+        assert_eq!(session.save_path.file_name().unwrap(), "checkpoint.c35");
+    }
+
+    #[test]
+    fn recovery_rejects_lossy_terminal_commands_without_mutation() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("checkpoint.c35");
+        let mut session = Session::new(path.clone());
+        session.world = World::sect_hierarchy_campaign(0);
+        let before = session.world.checkpoint();
+        for command in ["tell 257 0", "tell 1 16777216"] {
+            session.input(command);
+            assert_eq!(session.world.checkpoint(), before);
+        }
+        session.input("save");
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        session.input("load");
+        assert!(session.notice.contains("Restored the settlement"));
+        assert_eq!(session.world.checkpoint(), before);
+    }
 
     #[test]
     fn the_terminal_renders_canonical_ticks_activity_and_restored_stock() {
@@ -4530,7 +4632,10 @@ mod tests {
         }));
         assert!(history.iter().any(|event| {
             event.actor == ActorId::new(1)
-                && matches!(event.kind, AgencyEventKind::CarePaid | AgencyEventKind::CareBartered)
+                && matches!(
+                    event.kind,
+                    AgencyEventKind::CarePaid | AgencyEventKind::CareBartered
+                )
         }));
 
         let inspected = session.world.checkpoint();
@@ -4558,7 +4663,11 @@ mod tests {
         let c33 = World::persistent_injury(0).checkpoint();
         assert_eq!(u16::from_le_bytes(c33[12..14].try_into().unwrap()), 23);
         assert_eq!(
-            u16::from_le_bytes(session.new_seeded_world(7).checkpoint()[12..14].try_into().unwrap()),
+            u16::from_le_bytes(
+                session.new_seeded_world(7).checkpoint()[12..14]
+                    .try_into()
+                    .unwrap()
+            ),
             24
         );
     }
@@ -4801,7 +4910,11 @@ mod tests {
         assert!(session.notice.contains("claimed"));
         session.input("sectlog");
         assert!(session.notice.contains("promoted to"));
-        assert!(session.notice.contains("claimed a physical Hall herb allocation"));
+        assert!(
+            session
+                .notice
+                .contains("claimed a physical Hall herb allocation")
+        );
         session.input("lang id");
         session.input("sect");
         assert!(session.notice.contains("Murid senior Balai Alang-alang"));
@@ -4823,9 +4936,7 @@ mod tests {
 
         assert_eq!(
             u16::from_le_bytes(
-                session
-                    .new_seeded_world(7)
-                    .checkpoint()[12..14]
+                session.new_seeded_world(7).checkpoint()[12..14]
                     .try_into()
                     .unwrap()
             ),

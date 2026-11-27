@@ -5,15 +5,25 @@ mod agency_desktop;
 fn main() {
     let options: Vec<_> = std::env::args().skip(1).collect();
     if options.iter().any(|arg| arg == "--pixel") {
+        if options.len() != 1 {
+            eprintln!("--pixel currently supports only the default C3.5 campaign.");
+            std::process::exit(2);
+        }
         #[cfg(feature = "desktop")]
         sealed_playable::ascii::run_regional_window();
         #[cfg(not(feature = "desktop"))]
-        eprintln!("The window requires the desktop feature.");
+        {
+            eprintln!("The window requires the desktop feature.");
+            std::process::exit(2);
+        }
     } else if options.iter().any(|arg| arg == "--window") {
         #[cfg(feature = "desktop")]
         agency_desktop::run();
         #[cfg(not(feature = "desktop"))]
-        eprintln!("The window requires the desktop feature.");
+        {
+            eprintln!("The window requires the desktop feature.");
+            std::process::exit(2);
+        }
     } else if options.iter().any(|arg| arg == "--c08") {
         sealed_playable::ascii::run_c08();
     } else if options.iter().any(|arg| arg == "--c09") {

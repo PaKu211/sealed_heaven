@@ -566,11 +566,29 @@ fn revision_thirteen_rejects_player_agency_actions() {
     let mut world = World::information_disputes(0);
     far_from_shrine(&mut world);
     at_shrine(&mut world);
+    // Revision 13 has no Examine tag. The old tick-consuming rejection
+    // created an invalid journal; the structural refusal is now atomic.
+    let before = world.checkpoint();
+    let tick = world.tick();
     assert_eq!(
-        world.step(world.tick(), Intent::Examine).unwrap(),
-        Outcome::Rejected(Rejection::Refused)
+        world.step(tick, Intent::Examine),
+        Err(StepError::UnrecordableIntent)
     );
+    assert_eq!(world.tick(), tick);
+    assert_eq!(world.checkpoint(), before);
     assert!(!world.information().unwrap().known.contains_key(&PLAYER));
+    let mut clean = World::information_disputes(0);
+    let before = clean.checkpoint();
+    assert_eq!(
+        clean.step(clean.tick(), Intent::Examine),
+        Err(StepError::UnrecordableIntent)
+    );
+    assert_eq!(clean.checkpoint(), before);
+    wait(&mut clean);
+    assert_eq!(
+        World::restore(&clean.checkpoint()).unwrap().checkpoint(),
+        clean.checkpoint()
+    );
     assert_eq!(
         u16::from_le_bytes(world.checkpoint()[12..14].try_into().unwrap()),
         13
