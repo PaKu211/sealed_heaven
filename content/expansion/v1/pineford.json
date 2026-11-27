@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "pack_id": "sealed_heaven:pineford",
+  "content_version": 1,
+  "base_sha256": "5d33f089bf1086ed4e9465f4ef3be8254b8090c6a35fcbdf9a2e9f9bb0451b80",
+  "name": "Pineford",
+  "width": 54,
+  "height": 15,
+  "grove": [
+    50,
+    3
+  ],
+  "depot": [
+    46,
+    7
+  ],
+  "grove_capacity": 12,
+  "depot_target": 8,
+  "depot_reserve": 2,
+  "depot_initial": 6,
+  "coin_budget": 20,
+  "caravan_load": 2,
+  "willowford_buffer": 2,
+  "regrow_fastest": 10,
+  "regrow_step": 4,
+  "normal_buy": 2,
+  "normal_sell": 1,
+  "scarce_buy": 4,
+  "scarce_sell": 3,
+  "actors": [
+    {
+      "id": "sealed_heaven:li_wen",
+      "wire_id": 37,
+      "name": "Li Wen",
+      "glyph": "L",
+      "role": "FrontierCarrier",
+      "spawn": [
+        46,
+        7
+      ],
+      "home": [
+        47,
+        7
+      ],
+      "hp": 6,
+      "rest_threshold": 36
+    },
+    {
+      "id": "sealed_heaven:han_yu",
+      "wire_id": 38,
+      "name": "Han Yu",
+      "glyph": "B",
+      "role": "FrontierGrower",
+      "spawn": [
+        50,
+        3
+      ],
+      "home": [
+        50,
+        4
+      ],
+      "hp": 6,
+      "rest_threshold": 18
+    }
+  ]
+}

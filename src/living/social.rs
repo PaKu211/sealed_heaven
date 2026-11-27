@@ -499,6 +499,7 @@ impl World {
                     | super::Rules::SectHierarchy
                     | super::Rules::DutyCoherence
                     | super::Rules::GeneratedRiverlands
+                    | super::Rules::ExpandedRiverlands
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

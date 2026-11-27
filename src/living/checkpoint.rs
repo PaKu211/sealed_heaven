@@ -63,6 +63,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::SectHierarchy => 25,
         Rules::DutyCoherence => 26,
         Rules::GeneratedRiverlands => super::worldgen::GENERATED_REVISION,
+        Rules::ExpandedRiverlands => super::expansion::REVISION,
     }
 }
 
@@ -120,6 +121,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         25 => Rules::SectHierarchy,
         26 => Rules::DutyCoherence,
         super::worldgen::GENERATED_REVISION => Rules::GeneratedRiverlands,
+        super::expansion::REVISION => Rules::ExpandedRiverlands,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -219,6 +221,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::Invite(actor)
@@ -249,6 +252,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::Provision(actor)
@@ -279,6 +283,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::Part(actor)
@@ -308,6 +313,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::OfferAccord
@@ -337,6 +343,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::SupportHall
@@ -365,6 +372,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::PledgeLodge
@@ -393,6 +401,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::AidLodge
@@ -421,6 +430,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::RenounceLodge
@@ -442,6 +452,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::Ask(actor)
@@ -463,6 +474,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::Examine
@@ -484,6 +496,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -505,6 +518,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::Take(actor)
@@ -523,6 +537,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -543,6 +558,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::ClaimLot(value)
@@ -559,6 +575,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -575,6 +592,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::AttuneLot(value)
@@ -590,6 +608,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -604,6 +623,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::Drill(actor)
@@ -618,6 +638,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -636,7 +657,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (37, 0)
             if matches!(
                 rules,
-                Rules::SectHierarchy | Rules::DutyCoherence | Rules::GeneratedRiverlands
+                Rules::SectHierarchy
+                    | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::DrawQi
@@ -644,7 +668,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (38, 0)
             if matches!(
                 rules,
-                Rules::SectHierarchy | Rules::DutyCoherence | Rules::GeneratedRiverlands
+                Rules::SectHierarchy
+                    | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::CirculateQi
@@ -652,7 +679,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (39, 0)
             if matches!(
                 rules,
-                Rules::SectHierarchy | Rules::DutyCoherence | Rules::GeneratedRiverlands
+                Rules::SectHierarchy
+                    | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::MendMeridians
@@ -660,7 +690,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (40, 0)
             if matches!(
                 rules,
-                Rules::SectHierarchy | Rules::DutyCoherence | Rules::GeneratedRiverlands
+                Rules::SectHierarchy
+                    | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::TreatWounds
@@ -668,7 +701,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (41, 0)
             if matches!(
                 rules,
-                Rules::SectHierarchy | Rules::DutyCoherence | Rules::GeneratedRiverlands
+                Rules::SectHierarchy
+                    | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -679,6 +715,15 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
+    if let Some(map) = world.expanded_region() {
+        let mut bytes = b"SH:C41:SCENARIO:v1\0".to_vec();
+        bytes.extend_from_slice(&authored);
+        bytes.extend_from_slice(&super::expansion::GENERATOR_VERSION.to_le_bytes());
+        bytes.extend_from_slice(super::content::CONTENT_SHA256.as_bytes());
+        bytes.extend_from_slice(super::expansion::CONTENT_SHA256.as_bytes());
+        bytes.extend_from_slice(&map.digest());
+        return sha256(&bytes);
+    }
     let Some(map) = world.generated_region() else {
         return authored;
     };
@@ -721,6 +766,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::SectHierarchy => b"SH:C10:RULES:v25".to_vec(),
         Rules::DutyCoherence => b"SH:C10:RULES:v26".to_vec(),
         Rules::GeneratedRiverlands => b"SH:C10:RULES:v27".to_vec(),
+        Rules::ExpandedRiverlands => b"SH:C10:RULES:v28".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -761,6 +807,8 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             Role::HallDeputy => 7,
             Role::RivalEnvoy => 8,
             Role::HallSteward => 9,
+            Role::FrontierCarrier => 10,
+            Role::FrontierGrower => 11,
         });
         out.position(npc.spawn);
         out.position(npc.home);
@@ -807,6 +855,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::SectHierarchy
             | Rules::DutyCoherence
             | Rules::GeneratedRiverlands
+            | Rules::ExpandedRiverlands
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -850,6 +899,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::SectHierarchy => b"SH:C10:STATE:v25".to_vec(),
         Rules::DutyCoherence => b"SH:C10:STATE:v26".to_vec(),
         Rules::GeneratedRiverlands => b"SH:C10:STATE:v27".to_vec(),
+        Rules::ExpandedRiverlands => b"SH:C10:STATE:v28".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -861,6 +911,20 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(region) = world.region() {
         out.region(region);
+    }
+    if let Some(f) = world.frontier() {
+        for n in [
+            f.grove_herbs,
+            f.depot_herbs,
+            f.depot_coins,
+            f.regrown,
+            f.stocked,
+            f.shipped_to_willowford,
+            f.player_bought,
+            f.player_sold,
+        ] {
+            out.u32(n);
+        }
     }
     if let Some(school) = world.school() {
         out.school(school);
@@ -944,6 +1008,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1021,6 +1086,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SectHierarchy
             | Rules::DutyCoherence
             | Rules::GeneratedRiverlands
+            | Rules::ExpandedRiverlands
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1054,6 +1120,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1094,6 +1161,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::SectHierarchy
             | Rules::DutyCoherence
             | Rules::GeneratedRiverlands
+            | Rules::ExpandedRiverlands
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1175,6 +1243,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1951,6 +2020,10 @@ impl Wire {
             Goal::GatherForCare => 47,
             Goal::SellForCare => 48,
             Goal::SectDuty => 49,
+            Goal::GatherFrontier => 50,
+            Goal::StockFrontierDepot => 51,
+            Goal::CollectFrontierFreight => 52,
+            Goal::DeliverFrontierFreight => 53,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),

@@ -18,7 +18,10 @@ pub struct ContentIdentity {
     pub schema_version: u32,
     pub core_version: u32,
     pub world_version: u32,
+    /// Fingerprint of the immutable base registry.
     pub sha256: &'static str,
+    /// Additional authored overlay required for this rules revision.
+    pub overlay_sha256: Option<&'static str>,
 }
 
 pub(super) struct MartialProfile {
@@ -39,19 +42,34 @@ pub fn definition(id: &str) -> Option<&'static Definition> {
         .map(|index| &DEFINITIONS[index])
 }
 
+/// Resolve a definition only within a known revision. The old manifest and
+/// definition() API intentionally describe the base registry alone.
+pub fn definition_for_revision(revision: u16, id: &str) -> Option<&'static Definition> {
+    let identity = identity_for_revision(revision)?;
+    definition(id).or_else(|| {
+        identity.overlay_sha256?;
+        super::expansion::DEFINITIONS
+            .binary_search_by_key(&id, |d| d.id)
+            .ok()
+            .map(|index| &super::expansion::DEFINITIONS[index])
+    })
+}
+
 /// Legacy checkpoints encode their rules revision and scenario digest.
 /// All historical revisions are permanently bound to the exact v1 pack.
 /// Never guess content identity for an unknown future revision.
 pub fn identity_for_revision(revision: u16) -> Option<ContentIdentity> {
     // Revision 27 derives its geography from this exact authored v1 pack.
     // The separate generator version and world digest bind the generated map.
-    (1..=super::worldgen::GENERATED_REVISION)
+    (1..=super::expansion::REVISION)
         .contains(&revision)
         .then_some(ContentIdentity {
             schema_version: SCHEMA_VERSION,
             core_version: CORE_VERSION,
             world_version: CONTENT_VERSION,
             sha256: CONTENT_SHA256,
+            overlay_sha256: (revision == super::expansion::REVISION)
+                .then_some(super::expansion::CONTENT_SHA256),
         })
 }
 

@@ -23,6 +23,8 @@ pub enum Role {
     HallDeputy,
     RivalEnvoy,
     HallSteward,
+    FrontierCarrier,
+    FrontierGrower,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -100,6 +102,10 @@ pub enum Goal {
     },
     InvestigateDispute(u32),
     SectDuty,
+    GatherFrontier,
+    StockFrontierDepot,
+    CollectFrontierFreight,
+    DeliverFrontierFreight,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -327,6 +333,7 @@ impl World {
             || npc.fatigue >= npc.definition.rest_threshold
             || (npc.activity.goal == Goal::Rest && npc.fatigue > 0);
         let duty = match npc.definition.role {
+            Role::FrontierCarrier | Role::FrontierGrower => self.frontier_duty(npc),
             Role::Medic => Goal::TendClinic,
             Role::Supplier if npc.herbs > 0 => Goal::DeliverHerbs,
             Role::Supplier
@@ -388,6 +395,12 @@ impl World {
                 DecisionReason::PhysicalRecovery,
             ),
             (98, recovery, DecisionReason::InstitutionalObligation),
+            (
+                87,
+                (npc.definition.role == Role::FrontierCarrier && npc.fatigue >= 24)
+                    .then_some(Goal::CampRest),
+                DecisionReason::Fatigue,
+            ),
             (97, lot_goal, DecisionReason::KnownOpportunity),
             (
                 96,
@@ -597,6 +610,10 @@ impl World {
             Goal::SeekWoundCare => self.work_wound_care(id),
             Goal::GatherForCare | Goal::SellForCare => self.work_for_care(id, goal),
             Goal::SectDuty => self.work_sect_duty(id),
+            Goal::GatherFrontier
+            | Goal::StockFrontierDepot
+            | Goal::CollectFrontierFreight
+            | Goal::DeliverFrontierFreight => self.work_frontier(id, goal),
             Goal::Retreat => self.retreat(id),
             Goal::TendClinic => self.travel(id, scenario.clinic, 0),
             Goal::SeekCare => self.travel(id, scenario.clinic, 1),

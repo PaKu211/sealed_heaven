@@ -3,6 +3,9 @@ use super::{Rules, Scenario, checkpoint, content};
 pub(super) use content::SCENARIO_QINGHE as QINGHE;
 
 pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
+    if rules == Rules::ExpandedRiverlands {
+        return super::expansion::scenario(seed);
+    }
     let revision = if rules == Rules::GeneratedRiverlands {
         super::worldgen::BASE_REVISION
     } else {

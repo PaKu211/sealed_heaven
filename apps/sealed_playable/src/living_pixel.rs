@@ -6,7 +6,7 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 
 use crate::{
     clock,
-    living_ascii::{Session, campaign_session, generated_session, outcome_label},
+    living_ascii::{Session, campaign_session, expanded_session, generated_session, outcome_label},
     locale::Locale,
     locale_living::{living_format, living_text},
 };
@@ -33,6 +33,10 @@ pub(crate) fn run() {
 
 pub(crate) fn run_generated(seed: u32) {
     run_session(generated_session(seed, false));
+}
+
+pub(crate) fn run_expanded(seed: u32) {
+    run_session(expanded_session(seed, false));
 }
 
 fn run_session(session: Session) {
@@ -251,13 +255,19 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
         .x
         .saturating_sub(width / 2)
         .min(scenario.width - width);
-    for y in 0..scenario.height {
+    let height = scenario.height.min(9);
+    let top = player
+        .position
+        .y
+        .saturating_sub(height / 2)
+        .min(scenario.height - height);
+    for y in top..top + height {
         for x in left..left + width {
             let cell = Position { x, y };
             let symbol = session.tile_symbol(cell);
             let at = Vec2::new(
                 ((x - left) as f32 - (width - 1) as f32 / 2.0) * SIDE,
-                ((scenario.height - 1) as f32 / 2.0 - y as f32) * SIDE + 37.0,
+                ((height - 1) as f32 / 2.0 - (y - top) as f32) * SIDE + 37.0,
             );
             let tile_color = match symbol {
                 '?' => FOG,
@@ -283,6 +293,8 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
         session.company_line(event)
     } else if let Some(hint) = session.duty_hint() {
         hint.into()
+    } else if let Some(hint) = session.frontier_hint() {
+        hint
     } else if world.player_sees(scenario.shrine) {
         living_format(
             session.locale,
@@ -594,5 +606,96 @@ mod tests {
                 assert_eq!(session.tile_symbol(p), map.tile(p).unwrap().terrain.glyph());
             }
         }
+    }
+
+    #[test]
+    fn expanded_pixel_camera_and_frontier_inspection_follow_the_canonical_world() {
+        use sealed_sim::living::{Direction, Intent, expansion::DEPOT};
+        use std::collections::{BTreeSet, VecDeque};
+        let mut session = expanded_session(7, false);
+        assert_eq!(session.tile_symbol(DEPOT), '?');
+        assert!(session.frontier_hint().is_none());
+        let target = Position { x: 46, y: 8 };
+        // Independent BFS over the actual public collision map.
+        for _ in 0..400 {
+            let start = session.world.player().position;
+            if start == target {
+                break;
+            }
+            let mut queue = VecDeque::from([(start, None)]);
+            let mut seen = BTreeSet::from([start]);
+            let mut choice = None;
+            while let Some((at, first)) = queue.pop_front() {
+                if at == target {
+                    choice = first;
+                    break;
+                }
+                for (direction, x, y) in [
+                    (Direction::North, Some(at.x), at.y.checked_sub(1)),
+                    (Direction::East, at.x.checked_add(1), Some(at.y)),
+                    (Direction::South, Some(at.x), at.y.checked_add(1)),
+                    (Direction::West, at.x.checked_sub(1), Some(at.y)),
+                ] {
+                    let (Some(x), Some(y)) = (x, y) else {
+                        continue;
+                    };
+                    let p = Position { x, y };
+                    if !session.world.walkable(p)
+                        || session.world.npcs().any(|n| n.alive() && n.position == p)
+                        || !seen.insert(p)
+                    {
+                        continue;
+                    }
+                    queue.push_back((p, first.or(Some(direction))));
+                }
+            }
+            let intent = choice.map_or(Intent::Wait, Intent::Move);
+            session.world.step(session.world.tick(), intent).unwrap();
+        }
+        assert_eq!(session.world.player().position, target);
+        assert!(session.frontier_hint().unwrap().contains("Pineford depot:"));
+        let before = session.world.checkpoint();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("Pineford depot:"));
+        // Exactly 17 x 9 ground tiles; the extra vertical rows scroll rather
+        // than overflowing the fixed-size scene and controls.
+        let mut sprites = app.world_mut().query::<(&Sprite, &Transform)>();
+        let ground = sprites
+            .iter(app.world())
+            .filter(|(_, t)| t.translation.z == 0.0)
+            .count();
+        assert_eq!(ground, 17 * 9);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F2);
+        app.update();
+        assert!(text(&mut app).contains("elevation"));
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .clear();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Tab);
+        app.update();
+        assert!(text(&mut app).contains("Depot Pineford:"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
     }
 }

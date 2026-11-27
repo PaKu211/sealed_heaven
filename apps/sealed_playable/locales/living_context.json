@@ -3594,6 +3594,80 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.expansion.depot": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {
+      "buy": "visible Pineford market or grove",
+      "sell": "visible Pineford market or grove",
+      "stock": "visible Pineford market or grove"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.depot_closed": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {
+      "stock": "visible Pineford market or grove"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.goal.collect": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.goal.deliver": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.goal.gather": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.goal.stock": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.grove": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {
+      "stock": "visible Pineford market or grove"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.help": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.legend": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.role.carrier": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.expansion.role.grower": {
+    "active": true,
+    "context": "C4.1 local regional expansion",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.help.c351": {
     "active": true,
     "context": "help / c351",

@@ -1,3 +1,5 @@
+#[path = "build_support/expansion.rs"]
+mod expansion;
 #[path = "build_support/registry.rs"]
 mod registry;
 
@@ -12,6 +14,8 @@ fn main() {
     println!("cargo:rerun-if-changed=build_support/registry.rs");
     println!("cargo:rerun-if-changed=content/v1/core.json");
     println!("cargo:rerun-if-changed=content/v1/sealed_heaven.json");
+    println!("cargo:rerun-if-changed=build_support/expansion.rs");
+    println!("cargo:rerun-if-changed=content/expansion/v1/pineford.json");
     let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest directory"));
     let read = |name| {
         registry::read_bounded(&root.join("content/v1").join(name)).expect("read authored content")
@@ -25,4 +29,15 @@ fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("build output directory"));
     fs::write(out.join("living_registry.rs"), generated.rust).expect("write static registry");
     fs::write(out.join("living_registry.json"), generated.manifest).expect("write manifest");
+    let overlay = registry::read_bounded(&root.join("content/expansion/v1/pineford.json"))
+        .expect("read expansion pack");
+    let expanded = expansion::compile(&overlay, &read("sealed_heaven.json"), LEGACY_V1_SHA256)
+        .unwrap_or_else(|e| panic!("expansion rejected: {e}"));
+    assert_eq!(
+        expanded.sha256, "b768996f73e24a6a41c227fb7c27f9377e60df724994c71b817dc202bcc8af5a",
+        "historical expansion v1 is immutable"
+    );
+    fs::write(out.join("living_expansion.rs"), expanded.rust).expect("write expansion");
+    fs::write(out.join("living_expansion.json"), expanded.manifest)
+        .expect("write expansion manifest");
 }

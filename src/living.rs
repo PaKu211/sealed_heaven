@@ -14,6 +14,7 @@ mod contract_memory_tests;
 mod contracts;
 #[cfg(test)]
 mod contracts_tests;
+pub mod expansion;
 mod faction_agency;
 #[cfg(test)]
 mod faction_agency_tests;
@@ -375,6 +376,8 @@ pub struct Scenario {
 pub struct World {
     scenario: &'static Scenario,
     generated: Option<std::sync::Arc<worldgen::GeneratedRegion>>,
+    expanded: Option<std::sync::Arc<expansion::ExpandedRegion>>,
+    frontier: Option<expansion::Frontier>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -432,11 +435,15 @@ enum Rules {
     SectHierarchy,
     DutyCoherence,
     GeneratedRiverlands,
+    ExpandedRiverlands,
 }
 
 impl Rules {
     fn has_duty_coherence(self) -> bool {
-        matches!(self, Self::DutyCoherence | Self::GeneratedRiverlands)
+        matches!(
+            self,
+            Self::DutyCoherence | Self::GeneratedRiverlands | Self::ExpandedRiverlands
+        )
     }
 
     fn has_region(self) -> bool {
@@ -470,6 +477,7 @@ impl Rules {
                 | Self::SectHierarchy
                 | Self::DutyCoherence
                 | Self::GeneratedRiverlands
+                | Self::ExpandedRiverlands
         )
     }
 }
@@ -581,12 +589,25 @@ impl World {
         Self::seeded(seed, Rules::GeneratedRiverlands)
     }
 
+    /// C4.1: continuous eastern expansion with a third settlement.
+    pub fn expanded_riverlands(seed: u32) -> Self {
+        Self::seeded(seed, Rules::ExpandedRiverlands)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
-        if rules == Rules::GeneratedRiverlands {
-            world.generated = Some(std::sync::Arc::new(
-                worldgen::GeneratedRegion::from_scenario(seed, world.scenario),
-            ));
+        if matches!(
+            rules,
+            Rules::GeneratedRiverlands | Rules::ExpandedRiverlands
+        ) {
+            let base = worldgen::GeneratedRegion::generate(seed);
+            if rules == Rules::ExpandedRiverlands {
+                world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
+                    seed, &base,
+                )));
+                world.frontier = Some(expansion::Frontier::new());
+            }
+            world.generated = Some(std::sync::Arc::new(base));
         }
         assert!(
             Region::sites()
@@ -611,6 +632,8 @@ impl World {
         Self {
             scenario,
             generated: None,
+            expanded: None,
+            frontier: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -649,6 +672,7 @@ impl World {
                         | Rules::SectHierarchy
                         | Rules::DutyCoherence
                         | Rules::GeneratedRiverlands
+                        | Rules::ExpandedRiverlands
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -687,6 +711,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(Company::default),
             rivalry: matches!(
@@ -713,6 +738,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -738,6 +764,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(Politics::new),
             traffic: matches!(
@@ -762,6 +789,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -785,6 +813,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -805,6 +834,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -824,6 +854,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(Information::default),
             contested: matches!(
@@ -837,6 +868,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(|| {
                 Contested::new(matches!(
@@ -849,6 +881,7 @@ impl World {
                         | Rules::SectHierarchy
                         | Rules::DutyCoherence
                         | Rules::GeneratedRiverlands
+                        | Rules::ExpandedRiverlands
                 ))
             }),
             martial: matches!(
@@ -860,6 +893,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -870,6 +904,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -879,6 +914,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -887,11 +923,15 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
                 rules,
-                Rules::SectHierarchy | Rules::DutyCoherence | Rules::GeneratedRiverlands
+                Rules::SectHierarchy
+                    | Rules::DutyCoherence
+                    | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -986,14 +1026,20 @@ impl World {
     }
 
     pub fn walkable(&self, position: Position) -> bool {
-        self.generated_region().map_or_else(
-            || self.scenario.walkable(position),
-            |map| map.walkable(position),
-        )
+        if let Some(map) = self.expanded_region() {
+            map.walkable(position)
+        } else {
+            self.generated_region().map_or_else(
+                || self.scenario.walkable(position),
+                |map| map.walkable(position),
+            )
+        }
     }
 
     pub fn can_see(&self, from: Position, to: Position) -> bool {
-        if let Some(map) = self.generated_region() {
+        if let Some(map) = self.expanded_region() {
+            navigation::can_see_with(from, to, |p| map.walkable(p))
+        } else if let Some(map) = self.generated_region() {
             navigation::can_see_with(from, to, |p| map.walkable(p))
         } else {
             navigation::can_see(self.scenario, from, to)
@@ -1062,6 +1108,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1084,6 +1131,7 @@ impl World {
                     | Rules::SectHierarchy
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
+                    | Rules::ExpandedRiverlands
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -1122,6 +1170,7 @@ impl World {
         self.advance_information_recovery();
         self.regrow();
         self.advance_region();
+        self.advance_frontier();
         // 2. Apply the player's action and capture observation at the point of contact.
         if self.tick == 1 && !matches!(intent, Intent::ChooseBackground(_)) {
             self.select_default_background();
@@ -1286,6 +1335,7 @@ impl World {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         )
     }
 
@@ -1305,6 +1355,7 @@ impl World {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         )
     }
 
@@ -1323,6 +1374,7 @@ impl World {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         )
     }
 
@@ -1340,6 +1392,7 @@ impl World {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         )
     }
 
@@ -1356,6 +1409,7 @@ impl World {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         )
     }
 
@@ -1370,6 +1424,7 @@ impl World {
                 | Rules::SectHierarchy
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
+                | Rules::ExpandedRiverlands
         )
     }
 

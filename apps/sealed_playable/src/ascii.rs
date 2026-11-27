@@ -111,6 +111,13 @@ pub fn run_c34() {
     crate::living_ascii::run_c34();
 }
 
+pub fn run_expanded_campaign(seed: u32, debug: bool) {
+    crate::living_ascii::run_expanded_campaign(seed, debug);
+}
+#[cfg(feature = "desktop")]
+pub fn run_expanded_window(seed: u32) {
+    crate::living_pixel::run_expanded(seed);
+}
 pub fn run_generated_campaign(seed: u32, debug: bool) {
     crate::living_ascii::run_generated_campaign(seed, debug);
 }

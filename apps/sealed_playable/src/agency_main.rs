@@ -13,12 +13,16 @@ fn main() {
         println!("{}", sealed_sim::living::content::manifest_json());
         return;
     }
-    if options
-        .iter()
-        .any(|arg| arg == "--worldgen-info" || arg == "--c40")
-    {
+    if options.iter().any(|arg| {
+        matches!(
+            arg.as_str(),
+            "--worldgen-info" | "--expansion-info" | "--c40" | "--c41"
+        )
+    }) {
         let result = if options.iter().any(|arg| arg == "--worldgen-info") {
             worldgen_cli::inspect(&options)
+        } else if options.iter().any(|arg| arg == "--expansion-info") {
+            worldgen_cli::inspect_expanded(&options)
         } else {
             worldgen_cli::launch(&options)
         };

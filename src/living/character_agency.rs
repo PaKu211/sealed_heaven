@@ -94,9 +94,12 @@ impl CharacterAgency {
             .map(|npc| {
                 let ambition = match npc.role {
                     Role::Medic | Role::Watch => Ambition::CommunityService,
-                    Role::Supplier | Role::Grower | Role::Courier | Role::Traveler => {
-                        Ambition::Prosperity
-                    }
+                    Role::Supplier
+                    | Role::Grower
+                    | Role::Courier
+                    | Role::Traveler
+                    | Role::FrontierCarrier
+                    | Role::FrontierGrower => Ambition::Prosperity,
                     Role::Mentor | Role::HallDeputy => Ambition::MartialMastery,
                     Role::RivalEnvoy => Ambition::Cultivation,
                     Role::HallSteward => Ambition::InstitutionalDuty,
@@ -372,6 +375,10 @@ fn resumable(goal: Goal) -> bool {
             | Goal::TeachAtHall
             | Goal::Patrol
             | Goal::SectDuty
+            | Goal::GatherFrontier
+            | Goal::StockFrontierDepot
+            | Goal::CollectFrontierFreight
+            | Goal::DeliverFrontierFreight
     )
 }
 
@@ -389,6 +396,10 @@ pub(super) fn decision_for(goal: Goal, reason: DecisionReason, score: u16) -> De
 
 pub(super) fn ambition_reason(npc: &Npc, goal: Goal) -> DecisionReason {
     match goal {
+        Goal::GatherFrontier
+        | Goal::StockFrontierDepot
+        | Goal::CollectFrontierFreight
+        | Goal::DeliverFrontierFreight => DecisionReason::Livelihood,
         Goal::MartialPractice(_) | Goal::MartialRest => DecisionReason::MartialAmbition,
         Goal::MeridianDraw | Goal::MeridianCirculate | Goal::MeridianCare => {
             DecisionReason::Cultivation

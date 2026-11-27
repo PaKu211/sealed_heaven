@@ -42,7 +42,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 27 {
+        if self.world.checkpoint_revision() == 28 {
+            World::expanded_riverlands(seed)
+        } else if self.world.checkpoint_revision() == 27 {
             World::generated_riverlands(seed)
         } else if self.world.checkpoint_revision() == 26 {
             World::duty_coherence_campaign(seed)
@@ -1185,6 +1187,11 @@ impl Session {
                     self.notice
                         .push_str(living_text(self.locale, "living.worldgen.help"));
                 }
+                if self.world.frontier().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.expansion.help"));
+                }
                 return true;
             }
             "lang" => {
@@ -1660,6 +1667,8 @@ impl Session {
             Role::HallDeputy => tr("living.ascii.inspect.deputy"),
             Role::RivalEnvoy => tr("living.ascii.inspect.stonebank_envoy"),
             Role::HallSteward => tr("living.ascii.inspect.hall_steward"),
+            Role::FrontierCarrier => tr("living.expansion.role.carrier"),
+            Role::FrontierGrower => tr("living.expansion.role.grower"),
         };
         let condition = if npc.hp < npc.definition.hp {
             tr("living.ascii.inspect.wounded")
@@ -1715,7 +1724,7 @@ impl Session {
         let Some(map) = self.world.generated_region().filter(|_| player.alive()) else {
             return living_text(self.locale, "living.worldgen.no_survey").into();
         };
-        let Some(tile) = map.tile(player.position) else {
+        let Some(tile) = self.world.terrain_tile(player.position) else {
             return living_text(self.locale, "living.worldgen.no_survey").into();
         };
         let key = match tile.terrain {
@@ -1742,7 +1751,13 @@ impl Session {
             player.position.x.abs_diff(site.x) + player.position.y.abs_diff(site.y) <= 1
                 && self.world.player_sees(site)
         };
-        let cadence = if near(self.world.scenario().patch) {
+        let cadence = if near(sealed_sim::living::expansion::GROVE)
+            && self.world.expanded_region().is_some()
+        {
+            self.world
+                .expanded_region()
+                .map(|map| map.grove_regrow_every())
+        } else if near(self.world.scenario().patch) {
             Some(map.west_regrow_every())
         } else if near(Region::sites().garden) {
             Some(map.garden_regrow_every())
@@ -1761,7 +1776,7 @@ impl Session {
     }
 
     fn ground_symbol(&self, cell: Position) -> char {
-        if let Some(tile) = self.world.generated_region().and_then(|map| map.tile(cell)) {
+        if let Some(tile) = self.world.terrain_tile(cell) {
             tile.terrain.glyph()
         } else if self.world.walkable(cell) {
             '.'
@@ -1822,7 +1837,50 @@ impl Session {
                 return '^';
             }
         }
+        if world.frontier().is_some() {
+            use sealed_sim::living::expansion::{DEPOT, GROVE};
+            if cell == DEPOT {
+                return '$';
+            }
+            if cell == GROVE {
+                return '&';
+            }
+        }
         self.ground_symbol(cell)
+    }
+
+    pub(crate) fn frontier_hint(&self) -> Option<String> {
+        use sealed_sim::living::expansion::{DEPOT, GROVE};
+        let f = self.world.frontier()?;
+        let visible = |p| self.debug_world || self.world.player_sees(p);
+        if visible(DEPOT) {
+            if self.world.is_night() {
+                Some(living_format(
+                    self.locale,
+                    "living.expansion.depot_closed",
+                    &[("stock", &f.depot_herbs.to_string())],
+                ))
+            } else {
+                let q = f.quote();
+                Some(living_format(
+                    self.locale,
+                    "living.expansion.depot",
+                    &[
+                        ("stock", &f.depot_herbs.to_string()),
+                        ("buy", &q.buy.to_string()),
+                        ("sell", &q.sell.to_string()),
+                    ],
+                ))
+            }
+        } else if visible(GROVE) {
+            Some(living_format(
+                self.locale,
+                "living.expansion.grove",
+                &[("stock", &f.grove_herbs.to_string())],
+            ))
+        } else {
+            None
+        }
     }
 
     fn frame(&self) -> String {
@@ -1942,7 +2000,17 @@ impl Session {
             .x
             .saturating_sub(width / 2)
             .min(scenario.width - width);
-        for y in 0..scenario.height {
+        let height = if self.debug_world {
+            scenario.height
+        } else {
+            scenario.height.min(9)
+        };
+        let top = player
+            .position
+            .y
+            .saturating_sub(height / 2)
+            .min(scenario.height - height);
+        for y in top..top + height {
             for x in left..left + width {
                 let glyph = self.tile_symbol(Position { x, y });
                 let _ = write!(out, "{glyph} ");
@@ -1964,6 +2032,16 @@ impl Session {
                     &[("seed", &map.seed().to_string())]
                 )
             );
+        }
+        if world.frontier().is_some() {
+            let _ = writeln!(
+                out,
+                "{}",
+                living_text(self.locale, "living.expansion.legend")
+            );
+            if let Some(hint) = self.frontier_hint() {
+                let _ = writeln!(out, "{hint}");
+            }
         }
         for npc in world.npcs().filter(|npc| visible(npc.position)) {
             let status = if !npc.alive() {
@@ -2899,6 +2977,10 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::GatherForCare => "living.ascii.goal_label.working_to_afford_treatment",
         Goal::SellForCare => "living.ascii.goal_label.selling_work_herbs_for_treatment",
         Goal::SectDuty => "living.ascii.goal_label.carrying_out_reed_hall_service",
+        Goal::GatherFrontier => "living.expansion.goal.gather",
+        Goal::StockFrontierDepot => "living.expansion.goal.stock",
+        Goal::CollectFrontierFreight => "living.expansion.goal.collect",
+        Goal::DeliverFrontierFreight => "living.expansion.goal.deliver",
         Goal::Report { .. } => "living.ascii.goal_label.seeking_someone_to_report_to",
         Goal::Retreat => "living.ascii.goal_label.retreating",
         Goal::Retaliate => "living.ascii.goal_label.retaliating",
@@ -3444,6 +3526,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         25 => "checkpoint.c35",
         26 => "checkpoint.c351",
         27 => "checkpoint.c40",
+        28 => "checkpoint.c41",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3471,12 +3554,23 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         25 => World::sect_hierarchy_campaign(0),
         26 => World::duty_coherence_campaign(0),
         27 => World::generated_riverlands(0),
+        28 => World::expanded_riverlands(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
 }
 
+pub(crate) fn expanded_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 28);
+    if seed != 0 {
+        session.world = World::expanded_riverlands(seed);
+    }
+    session
+}
+pub(crate) fn run_expanded_campaign(seed: u32, debug_world: bool) {
+    run_session(expanded_session(seed, debug_world));
+}
 pub(crate) fn generated_session(seed: u32, debug_world: bool) -> Session {
     let mut session = campaign_session(debug_world, 27);
     if seed != 0 {

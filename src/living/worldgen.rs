@@ -117,14 +117,14 @@ fn mix(mut value: u64) -> u64 {
     value ^ (value >> 31)
 }
 
-fn sample(seed: u32, domain: u64, x: u32, y: u32) -> u64 {
+pub(super) fn sample(seed: u32, domain: u64, x: u32, y: u32) -> u64 {
     mix(domain
         ^ u64::from(seed).wrapping_mul(0x9e37_79b9_7f4a_7c15)
         ^ (u64::from(x) << 32)
         ^ u64::from(y))
 }
 
-fn field(seed: u32, domain: u64, x: u32, y: u32) -> u8 {
+pub(super) fn field(seed: u32, domain: u64, x: u32, y: u32) -> u8 {
     // Bilinear interpolation of coarse integer lattice samples.
     const SX: u32 = 4;
     const SY: u32 = 3;

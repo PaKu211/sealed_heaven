@@ -135,6 +135,9 @@ impl World {
     }
 
     pub(super) fn gather(&mut self) -> Result<Outcome, Rejection> {
+        if self.frontier().is_some() && in_reach(self.player.position, super::expansion::GROVE) {
+            return self.gather_frontier();
+        }
         let (source, limit) = if let Some(region) = &mut self.region {
             let source = if in_reach(self.player.position, Region::sites().garden) {
                 &mut region.garden_herbs
@@ -196,6 +199,9 @@ impl World {
     }
 
     pub(super) fn trade_herb(&mut self, buying: bool) -> Result<Outcome, Rejection> {
+        if self.frontier().is_some() && in_reach(self.player.position, super::expansion::DEPOT) {
+            return self.trade_frontier(buying);
+        }
         self.require_reach(Region::sites().market)?;
         if self.is_night() {
             return Err(Rejection::MarketClosed);
