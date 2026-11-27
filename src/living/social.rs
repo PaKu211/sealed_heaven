@@ -504,6 +504,7 @@ impl World {
                     | super::Rules::ExactLod
                     | super::Rules::SettlementProduction
                     | super::Rules::RoadHistory
+                    | super::Rules::EmergentRequests
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

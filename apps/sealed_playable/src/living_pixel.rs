@@ -8,7 +8,7 @@ use crate::{
     clock,
     living_ascii::{
         Session, campaign_session, expanded_session, generated_session, history_session,
-        knowledge_session, lod_session, outcome_label, production_session,
+        knowledge_session, lod_session, outcome_label, production_session, requests_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -56,6 +56,10 @@ pub(crate) fn run_production(seed: u32) {
 
 pub(crate) fn run_history(seed: u32) {
     run_session(history_session(seed, false));
+}
+
+pub(crate) fn run_requests(seed: u32) {
+    run_session(requests_session(seed, false));
 }
 
 fn run_session(session: Session) {
@@ -150,6 +154,18 @@ fn keyboard(
         game.session.input("recovercache");
     } else if keys.just_pressed(KeyCode::F8) && game.session.world.road_history().is_some() {
         game.session.input("entrustcache");
+    } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::F11) {
+        game.session.input("quests");
+    } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::F12) {
+        game.session.input("acceptquest");
+    } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::Digit7) {
+        game.session.input("declinequest");
+    } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::Digit8) {
+        game.session.input("abandonquest shrine");
+    } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::Digit9) {
+        game.session.input("abandonquest market");
+    } else if game.session.world.requests().is_some() && keys.just_pressed(KeyCode::Digit0) {
+        game.session.input("questlog 2");
     } else if keys.just_pressed(KeyCode::KeyT) {
         let nearby = nearby(&game.session);
         let next = nearby
@@ -271,7 +287,9 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
             &mut commands,
             living_format(
                 session.locale,
-                if world.road_history().is_some() {
+                if world.requests().is_some() {
+                    "living.quest.pixel.hint"
+                } else if world.road_history().is_some() {
                     "living.history.pixel.hint"
                 } else if world.production().is_some() {
                     "living.production.pixel.hint"
@@ -330,6 +348,8 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
         .filter(|event| event.witnessed && event.at == world.tick());
     let local = if let Some(event) = event {
         session.company_line(event)
+    } else if let Some(hint) = session.local_quest_hint() {
+        hint
     } else if let Some(hint) = session.duty_hint() {
         hint.into()
     } else if let Some(hint) = session.frontier_hint() {
@@ -378,6 +398,13 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     } else {
         session.notice.clone()
     };
+    let mut message = message;
+    if session.notice.is_empty()
+        && let Some(line) = session.latest_quest_notice()
+    {
+        message.push('\n');
+        message.push_str(&line);
+    }
     let message_size = if world.regional_news().is_some() && message.contains('\n') {
         14.0
     } else {
@@ -1079,6 +1106,125 @@ mod tests {
             assert_eq!(
                 app.world().resource::<Game>().session.world.checkpoint(),
                 expected.checkpoint()
+            );
+        }
+    }
+
+    #[test]
+    fn request_pixel_controls_replay_all_six_actual_choices_without_read_side_effects() {
+        use sealed_sim::living::{World, requests::Status};
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/living/c46_branch_trace_v1.json"
+        ))
+        .unwrap();
+        for row in fixture["rows"].as_array().unwrap() {
+            let seed = row["seed"].as_u64().unwrap().try_into().unwrap();
+            let site = row["site"].as_str().unwrap();
+            let choice = row["choice"].as_str().unwrap();
+            let mut session = requests_session(seed, false);
+            let commands = row["commands"].as_array().unwrap();
+            let first = commands
+                .iter()
+                .position(|c| {
+                    c.as_str()
+                        .unwrap()
+                        .ends_with(&format!("quest {}", row["id"]))
+                })
+                .unwrap();
+            for c in &commands[..first] {
+                assert!(session.input(c.as_str().unwrap()));
+            }
+            let before = session.world.checkpoint();
+            let mut reference = World::restore(&before).unwrap();
+            let mut app = App::new();
+            app.insert_resource(Game {
+                session,
+                target: None,
+            })
+            .init_resource::<ButtonInput<KeyCode>>()
+            .add_systems(Update, (keyboard, draw).chain());
+            app.world_mut().spawn((Window::default(), PrimaryWindow));
+            app.update();
+            let press = |app: &mut App, key| {
+                {
+                    let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                    keys.clear();
+                    keys.release(key);
+                    keys.press(key);
+                }
+                app.update();
+            };
+            let text = |app: &mut App| {
+                let mut q = app.world_mut().query::<&Text2d>();
+                q.iter(app.world())
+                    .map(|t| t.0.clone())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            assert!(text(&mut app).contains("F11 quests"));
+            press(&mut app, KeyCode::F11);
+            assert!(text(&mut app).contains("Offered"));
+            press(&mut app, KeyCode::Tab);
+            press(&mut app, KeyCode::F11);
+            assert!(text(&mut app).contains("Ditawarkan"));
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                before
+            );
+            for c in &commands[first..] {
+                let command = c.as_str().unwrap();
+                let id = row["id"].as_u64().unwrap().try_into().unwrap();
+                use sealed_sim::living::{Direction, Intent};
+                let (key, intent) = match command {
+                    "deliver" => (KeyCode::KeyH, Intent::Deliver),
+                    "sell" => (KeyCode::KeyI, Intent::SellHerb),
+                    "north" => (KeyCode::KeyW, Intent::Move(Direction::North)),
+                    "south" => (KeyCode::KeyS, Intent::Move(Direction::South)),
+                    "east" => (KeyCode::KeyD, Intent::Move(Direction::East)),
+                    "west" => (KeyCode::KeyA, Intent::Move(Direction::West)),
+                    "wait" => (KeyCode::Space, Intent::Wait),
+                    s if s.starts_with("acceptquest") => (KeyCode::F12, Intent::AcceptRequest(id)),
+                    s if s.starts_with("declinequest") => {
+                        (KeyCode::Digit7, Intent::DeclineRequest(id))
+                    }
+                    s if s.starts_with("abandonquest") => (
+                        if site == "shrine" {
+                            KeyCode::Digit8
+                        } else {
+                            KeyCode::Digit9
+                        },
+                        Intent::AbandonRequest(id),
+                    ),
+                    s => panic!("unexpected command {s}"),
+                };
+                reference.step(reference.tick(), intent).unwrap();
+                press(&mut app, key);
+                assert_eq!(
+                    app.world().resource::<Game>().session.world.checkpoint(),
+                    reference.checkpoint()
+                );
+            }
+            press(&mut app, KeyCode::Digit0);
+            let memory = text(&mut app);
+            assert!(memory.contains(match choice {
+                "complete" => "Selesai",
+                "decline" => "Ditolak",
+                _ => "Dibatalkan",
+            }));
+            if choice == "complete" && site == "market" {
+                assert!(memory.contains("bonus 1 dibayar"));
+            }
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                reference.checkpoint()
+            );
+            assert_eq!(
+                reference.request_receipts().last().unwrap().request.status,
+                match choice {
+                    "complete" => Status::Completed,
+                    "decline" => Status::Declined,
+                    _ => Status::Abandoned,
+                }
             );
         }
     }

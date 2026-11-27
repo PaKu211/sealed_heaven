@@ -111,6 +111,13 @@ pub fn run_c34() {
     crate::living_ascii::run_c34();
 }
 
+pub fn run_requests_campaign(seed: u32, debug: bool) {
+    crate::living_ascii::run_requests_campaign(seed, debug);
+}
+#[cfg(feature = "desktop")]
+pub fn run_requests_window(seed: u32) {
+    crate::living_pixel::run_requests(seed);
+}
 pub fn run_history_campaign(seed: u32, debug: bool) {
     crate::living_ascii::run_history_campaign(seed, debug);
 }

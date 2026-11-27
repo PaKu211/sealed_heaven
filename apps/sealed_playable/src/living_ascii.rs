@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 32 {
+        if self.world.checkpoint_revision() == 33 {
+            World::emergent_requests_campaign(seed)
+        } else if self.world.checkpoint_revision() == 32 {
             World::road_history_campaign(seed)
         } else if self.world.checkpoint_revision() == 31 {
             World::settlement_production_campaign(seed)
@@ -140,6 +142,10 @@ impl Session {
                         | "agency"
                         | "recovercache"
                         | "entrustcache"
+                        | "acceptquest"
+                        | "declinequest"
+                        | "abandonquest"
+                        | "questlog"
                 ))
         {
             self.notice =
@@ -1083,6 +1089,64 @@ impl Session {
                 };
                 return true;
             }
+            "quests" if self.world.requests().is_some() => {
+                self.notice = self.quest_lines(false, 2).join("\n");
+                return true;
+            }
+            "questlog" if self.world.requests().is_some() => {
+                let count = argument
+                    .and_then(|n| n.parse::<usize>().ok())
+                    .unwrap_or(8)
+                    .clamp(1, 32);
+                self.notice = self.quest_lines(true, count).join("\n");
+                return true;
+            }
+            "questdebug" if self.debug_world && self.world.requests().is_some() => {
+                self.notice = format!("{:?}", self.world.requests().unwrap());
+                return true;
+            }
+            "acceptquest" | "declinequest" | "abandonquest" if self.world.requests().is_some() => {
+                use sealed_sim::living::requests::{Site, Status};
+                let abandon = command == "abandonquest";
+                let candidates = self.world.known_requests();
+                let valid = |s: &sealed_sim::living::requests::Seen| {
+                    if abandon {
+                        s.request.status == Status::Accepted
+                    } else {
+                        s.request.status == Status::Offered
+                            && self.world.at_request_site(s.request.site)
+                    }
+                };
+                let id = match argument {
+                    Some("shrine") if abandon => candidates
+                        .iter()
+                        .find(|s| s.request.site == Site::Shrine && valid(s))
+                        .map(|s| s.request.id),
+                    Some("market") if abandon => candidates
+                        .iter()
+                        .find(|s| s.request.site == Site::Market && valid(s))
+                        .map(|s| s.request.id),
+                    Some(arg) => arg.parse::<u32>().ok(),
+                    None => {
+                        let mut matching = candidates.iter().filter(|s| valid(s));
+                        let first = matching.next().map(|s| s.request.id);
+                        if matching.next().is_some() {
+                            None
+                        } else {
+                            first
+                        }
+                    }
+                };
+                let Some(id) = id else {
+                    self.notice = living_text(self.locale, "living.quest.no_selection").into();
+                    return true;
+                };
+                match command {
+                    "acceptquest" => Intent::AcceptRequest(id),
+                    "declinequest" => Intent::DeclineRequest(id),
+                    _ => Intent::AbandonRequest(id),
+                }
+            }
             "history" if self.world.road_history().is_some() => {
                 self.notice = self.history_lines().join("\n");
                 return true;
@@ -1346,6 +1410,14 @@ impl Session {
                         .push_str(living_text(self.locale, "living.history.help"));
                     if self.debug_world {
                         self.notice.push_str(" historylog");
+                    }
+                }
+                if self.world.requests().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.quest.help"));
+                    if self.debug_world {
+                        self.notice.push_str(" questdebug");
                     }
                 }
                 return true;
@@ -1965,6 +2037,106 @@ impl Session {
                 ("days", &d.days_ago.to_string()),
             ],
         )
+    }
+    fn quest_line(&self, s: sealed_sim::living::requests::Seen) -> String {
+        use sealed_sim::living::requests::{Site, Status};
+        let r = s.request;
+        let site = living_text(
+            self.locale,
+            match r.site {
+                Site::Shrine => "living.quest.shrine",
+                Site::Market => "living.quest.market",
+            },
+        );
+        let status = living_text(
+            self.locale,
+            match r.status {
+                Status::Offered => "living.quest.offered",
+                Status::Accepted => "living.quest.accepted",
+                Status::Completed => "living.quest.completed",
+                Status::Declined => "living.quest.declined",
+                Status::Abandoned => "living.quest.abandoned",
+                Status::Expired => "living.quest.expired",
+                Status::Superseded => "living.quest.superseded",
+            },
+        );
+        let reward = if r.bonus == 0 {
+            living_text(self.locale, "living.quest.reward.none").to_owned()
+        } else {
+            living_format(
+                self.locale,
+                match r.status {
+                    Status::Offered => "living.quest.reward.offer",
+                    Status::Accepted => "living.quest.reward.reserved",
+                    Status::Completed => "living.quest.reward.paid",
+                    _ => "living.quest.reward.unpaid",
+                },
+                &[("coins", &r.bonus.to_string())],
+            )
+        };
+        living_format(
+            self.locale,
+            "living.quest.line",
+            &[
+                ("id", &r.id.to_string()),
+                ("site", site),
+                ("status", status),
+                ("done", &r.delivered.to_string()),
+                ("need", &r.required.to_string()),
+                ("due", &r.deadline.to_string()),
+                ("reward", &reward),
+                ("seen", &s.at.to_string()),
+            ],
+        )
+    }
+    pub(crate) fn quest_lines(&self, log: bool, count: usize) -> Vec<String> {
+        let mut records = if log {
+            self.world.request_receipts().collect::<Vec<_>>()
+        } else {
+            self.world.known_requests()
+        };
+        if log {
+            records.reverse();
+        }
+        if records.is_empty() {
+            return vec![
+                living_text(
+                    self.locale,
+                    if log {
+                        "living.quest.no_receipts"
+                    } else {
+                        "living.quest.unknown"
+                    },
+                )
+                .into(),
+            ];
+        }
+        records
+            .into_iter()
+            .take(count)
+            .map(|s| self.quest_line(s))
+            .collect()
+    }
+    pub(crate) fn local_quest_hint(&self) -> Option<String> {
+        self.world
+            .known_requests()
+            .into_iter()
+            .find(|s| s.request.status.active() && self.world.at_request_site(s.request.site))
+            .map(|s| self.quest_line(s))
+    }
+    pub(crate) fn latest_quest_notice(&self) -> Option<String> {
+        use sealed_sim::living::requests::Status;
+        self.world
+            .request_receipts()
+            .filter(|s| {
+                s.at == self.world.tick()
+                    && matches!(
+                        s.request.status,
+                        Status::Completed | Status::Expired | Status::Superseded
+                    )
+            })
+            .last()
+            .map(|s| self.quest_line(s))
     }
     pub(crate) fn history_lines(&self) -> Vec<String> {
         let known = self.world.known_deposits();
@@ -2601,6 +2773,12 @@ impl Session {
         }
         if let Some(outcome) = world.latest_outcome() {
             let _ = writeln!(out, "{}", outcome_label(self.locale, world, outcome));
+        }
+        if let Some(receipt) = self.latest_quest_notice() {
+            let _ = writeln!(out, "{receipt}");
+        }
+        if let Some(hint) = self.local_quest_hint() {
+            let _ = writeln!(out, "{hint}");
         }
         for incident in world
             .social()
@@ -3611,6 +3789,16 @@ pub(crate) fn outcome_label(locale: Locale, world: &World, outcome: Outcome) -> 
             );
         }
 
+        Outcome::RequestAccepted(id)
+        | Outcome::RequestDeclined(id)
+        | Outcome::RequestAbandoned(id) => {
+            let key = match outcome {
+                Outcome::RequestAccepted(_) => "living.quest.accept_outcome",
+                Outcome::RequestDeclined(_) => "living.quest.decline_outcome",
+                _ => "living.quest.abandon_outcome",
+            };
+            return living_format(locale, key, &[("id", &id.to_string())]);
+        }
         Outcome::LotSold { to, id, coins } => {
             return living_format(
                 locale,
@@ -3948,6 +4136,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         30 => "checkpoint.c43",
         31 => "checkpoint.c44",
         32 => "checkpoint.c45",
+        33 => "checkpoint.c46",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3980,10 +4169,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         30 => World::exact_lod_campaign(0),
         31 => World::settlement_production_campaign(0),
         32 => World::road_history_campaign(0),
+        33 => World::emergent_requests_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn requests_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 33);
+    if seed != 0 {
+        session.world = World::emergent_requests_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_requests_campaign(seed: u32, debug_world: bool) {
+    run_session(requests_session(seed, debug_world));
 }
 
 pub(crate) fn history_session(seed: u32, debug_world: bool) -> Session {

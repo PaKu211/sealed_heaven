@@ -4095,6 +4095,169 @@
     "parameters": {},
     "surface": "living_ascii.rs"
   },
+  "living.quest.abandon_outcome": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {
+      "id": "C4.6 situated request evidence"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.abandoned": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.accept_outcome": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {
+      "id": "C4.6 situated request evidence"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.accepted": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.completed": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.decline_outcome": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {
+      "id": "C4.6 situated request evidence"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.declined": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.expired": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.help": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.line": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {
+      "done": "C4.6 situated request evidence",
+      "due": "C4.6 situated request evidence",
+      "id": "C4.6 situated request evidence",
+      "need": "C4.6 situated request evidence",
+      "reward": "C4.6 situated request evidence",
+      "seen": "C4.6 situated request evidence",
+      "site": "C4.6 situated request evidence",
+      "status": "C4.6 situated request evidence"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.market": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.no_receipts": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.no_selection": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.offered": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.pixel.hint": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {
+      "seed": "C4.6 situated request evidence"
+    },
+    "surface": "living_pixel.rs"
+  },
+  "living.quest.reward.none": {
+    "active": true,
+    "context": "Request reward quote, escrow, payout or no payout",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.reward.offer": {
+    "active": true,
+    "context": "Request reward quote, escrow, payout or no payout",
+    "parameters": {
+      "coins": "Physical market bonus"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.reward.paid": {
+    "active": true,
+    "context": "Request reward quote, escrow, payout or no payout",
+    "parameters": {
+      "coins": "Physical market bonus"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.reward.reserved": {
+    "active": true,
+    "context": "Request reward quote, escrow, payout or no payout",
+    "parameters": {
+      "coins": "Physical market bonus"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.reward.unpaid": {
+    "active": true,
+    "context": "Request reward quote, escrow, payout or no payout",
+    "parameters": {
+      "coins": "Physical market bonus"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.shrine": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.superseded": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.quest.unknown": {
+    "active": true,
+    "context": "C4.6 optional player requests and remembered outcomes",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.regional.developer": {
     "active": true,
     "context": "C4.2 dated regional evidence; not live remote stock",

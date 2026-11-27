@@ -243,6 +243,9 @@ impl World {
             Some(PLAYER),
             1,
         );
+        if !buying {
+            self.request_contribution(super::requests::Site::Market);
+        }
         Ok(Outcome::Traded {
             bought: buying,
             coins,
