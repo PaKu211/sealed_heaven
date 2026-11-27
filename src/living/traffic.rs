@@ -139,9 +139,7 @@ impl World {
                 .clear_stall(id);
             return;
         }
-        if let Some(next) = next_step(self.scenario, position, destination, reach, |cell| {
-            self.walkable(cell) && !self.occupied(cell)
-        }) {
+        if let Some(next) = self.route_step(position, destination, reach) {
             self.npcs.get_mut(&id).expect("moving NPC").position = next;
             self.traffic
                 .as_mut()

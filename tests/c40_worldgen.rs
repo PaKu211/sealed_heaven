@@ -314,11 +314,11 @@ fn checkpoint_binds_generated_map_seed_version_and_original_rules() {
     rechecksum(&mut wrong_rev);
     assert_eq!(World::restore(&wrong_rev), Err(LoadError::ScenarioMismatch));
     let mut future = original.clone();
-    future[12..14].copy_from_slice(&30u16.to_le_bytes());
+    future[12..14].copy_from_slice(&31u16.to_le_bytes());
     rechecksum(&mut future);
     assert_eq!(
         World::restore(&future),
-        Err(LoadError::UnsupportedRevision(30))
+        Err(LoadError::UnsupportedRevision(31))
     );
     let mut broken = original.clone();
     broken[50] ^= 1;

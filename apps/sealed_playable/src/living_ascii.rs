@@ -44,7 +44,9 @@ impl Session {
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 29 {
+        if self.world.checkpoint_revision() == 30 {
+            World::exact_lod_campaign(seed)
+        } else if self.world.checkpoint_revision() == 29 {
             World::regional_knowledge_campaign(seed)
         } else if self.world.checkpoint_revision() == 28 {
             World::expanded_riverlands(seed)
@@ -1073,6 +1075,28 @@ impl Session {
                     )
                     .into(),
                 };
+                return true;
+            }
+            "lod" if self.debug_world && self.world.scheduler().is_some() => {
+                let scheduler = self.world.scheduler().unwrap();
+                let (full, routine) = scheduler.evaluation_totals();
+                let mut lines = vec![format!(
+                    "LOD tick={} full={full} routine={routine}",
+                    self.world.tick()
+                )];
+                for (&actor, entry) in scheduler.entries() {
+                    lines.push(format!(
+                        "{} {} {:?} wake={} full={} routine={} transitions={}",
+                        actor.get(),
+                        actor_name(self.locale, &self.world, actor),
+                        entry.mode,
+                        entry.next_wake,
+                        entry.full_evaluations,
+                        entry.routine_evaluations,
+                        entry.transitions
+                    ));
+                }
+                self.notice = lines.join("\n");
                 return true;
             }
             "news" if self.world.regional_news().is_some() => {
@@ -3683,6 +3707,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         27 => "checkpoint.c40",
         28 => "checkpoint.c41",
         29 => "checkpoint.c42",
+        30 => "checkpoint.c43",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3712,10 +3737,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         27 => World::generated_riverlands(0),
         28 => World::expanded_riverlands(0),
         29 => World::regional_knowledge_campaign(0),
+        30 => World::exact_lod_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn lod_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 30);
+    if seed != 0 {
+        session.world = World::exact_lod_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_lod_campaign(seed: u32, debug_world: bool) {
+    run_session(lod_session(seed, debug_world));
 }
 
 pub(crate) fn knowledge_session(seed: u32, debug_world: bool) -> Session {

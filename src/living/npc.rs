@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 
 use super::character_agency::{Ambition, Decision, DecisionReason, ambition_reason, decision_for};
-use super::navigation::{distance, in_reach, moved, next_step};
+use super::navigation::{distance, in_reach, moved};
 use super::{
     ActorId, BREATH_MASTERY, GUARD_BLOCK, IncidentId, KnowledgeSource, PLAYER, Position, Region,
     World,
@@ -166,9 +166,14 @@ impl World {
             .npcs
             .values()
             .filter(|npc| npc.alive())
-            .map(|npc| (npc.id(), self.choose_decision(npc)))
+            .map(|npc| (npc.id(), self.scheduled_plan(npc)))
             .collect();
-        for (id, decision) in plans {
+        if let Some(scheduler) = self.scheduler.as_mut() {
+            for &(id, (_, eligible, used_routine)) in &plans {
+                scheduler.update(id, self.tick, eligible, used_routine);
+            }
+        }
+        for (id, (decision, _, _)) in plans {
             if self
                 .traffic()
                 .is_some_and(|traffic| traffic.was_committed(id))
@@ -334,36 +339,7 @@ impl World {
         let resting = off_duty
             || npc.fatigue >= npc.definition.rest_threshold
             || (npc.activity.goal == Goal::Rest && npc.fatigue > 0);
-        let duty = match npc.definition.role {
-            Role::FrontierCarrier | Role::FrontierGrower => self.frontier_duty(npc),
-            Role::Medic => Goal::TendClinic,
-            Role::Supplier if npc.herbs > 0 => Goal::DeliverHerbs,
-            Role::Supplier
-                if self.supply.shrine < self.scenario.shrine_target
-                    && self.supply.source > 0
-                    && (self.company.is_none() || self.west_shortage() > 0) =>
-            {
-                Goal::CollectHerbs
-            }
-            Role::Grower if npc.herbs > 0 => Goal::StockMarket,
-            Role::Grower if self.needs_east_harvest() => Goal::StockGarden,
-            Role::Courier if npc.herbs > 0 => Goal::DeliverFreight,
-            Role::Courier if self.needs_courier_supply() => Goal::CollectFreight,
-            Role::RivalEnvoy
-                if self
-                    .rivalry()
-                    .is_some_and(|rival| rival.at_peace(self.tick)) =>
-            {
-                Goal::Patrol
-            }
-            Role::RivalEnvoy if npc.herbs > 0 => Goal::PetitionHall,
-            Role::RivalEnvoy if self.rival_can_buy() => Goal::BuyForLodge,
-            Role::HallSteward if npc.herbs > 0 => Goal::SupplyHall,
-            Role::HallSteward if self.hall_can_buy() => Goal::BuyForHall,
-            _ if teaches => Goal::TeachAtHall,
-            _ if !npc.definition.route.is_empty() => Goal::Patrol,
-            _ => Goal::Idle,
-        };
+        let duty = self.livelihood_duty(npc, teaches);
         let expedition = self.company_goal(npc);
         let expedition_priority = if expedition == Some(Goal::FieldCare) {
             79
@@ -501,6 +477,96 @@ impl World {
         decision_for(goal, reason, score)
     }
 
+    fn livelihood_duty(&self, npc: &Npc, teaches: bool) -> Goal {
+        match npc.definition.role {
+            Role::FrontierCarrier | Role::FrontierGrower => self.frontier_duty(npc),
+            Role::Medic => Goal::TendClinic,
+            Role::Supplier if npc.herbs > 0 => Goal::DeliverHerbs,
+            Role::Supplier
+                if self.supply.shrine < self.scenario.shrine_target
+                    && self.supply.source > 0
+                    && (self.company.is_none() || self.west_shortage() > 0) =>
+            {
+                Goal::CollectHerbs
+            }
+            Role::Grower if npc.herbs > 0 => Goal::StockMarket,
+            Role::Grower if self.needs_east_harvest() => Goal::StockGarden,
+            Role::Courier if npc.herbs > 0 => Goal::DeliverFreight,
+            Role::Courier if self.needs_courier_supply() => Goal::CollectFreight,
+            Role::RivalEnvoy
+                if self
+                    .rivalry()
+                    .is_some_and(|rival| rival.at_peace(self.tick)) =>
+            {
+                Goal::Patrol
+            }
+            Role::RivalEnvoy if npc.herbs > 0 => Goal::PetitionHall,
+            Role::RivalEnvoy if self.rival_can_buy() => Goal::BuyForLodge,
+            Role::HallSteward if npc.herbs > 0 => Goal::SupplyHall,
+            Role::HallSteward if self.hall_can_buy() => Goal::BuyForHall,
+            _ if teaches => Goal::TeachAtHall,
+            _ if !npc.definition.route.is_empty() => Goal::Patrol,
+            _ => Goal::Idle,
+        }
+    }
+
+    /// A conservative certificate for the ordinary livelihood/rest decision.
+    /// No approximation of due work, fatigue or priorities is permitted.
+    /// Exceptional proposals are checked against the same immutable snapshot
+    /// as the full planner. New roles never become eligible implicitly.
+    pub(super) fn routine_certificate(&self, npc: &Npc) -> Option<Decision> {
+        let id = npc.id();
+        if !matches!(
+            npc.definition.role,
+            Role::Supplier
+                | Role::Traveler
+                | Role::Grower
+                | Role::Courier
+                | Role::FrontierCarrier
+                | Role::FrontierGrower
+        ) || !npc.alive()
+            || npc.hp != npc.definition.hp
+            || distance(npc.position, self.player.position) <= super::lod::LOCAL_RADIUS
+            || self.perceives(npc.position, self.player.position)
+            || self.is_hall_teacher(npc)
+            || self.injuries()?.people[&id].injured()
+            || self.character_agency()?.people[&id].suspended.is_some()
+            || self.company_goal(npc).is_some()
+            || self.martial_goal(npc).is_some()
+            || self.npc_meridian_goal(id).is_some()
+            || self.report_goal(npc).is_some()
+            || self.testimony_goal(npc).is_some()
+            || self.dispute_goal(id).is_some()
+            || self.lot_goal(id).is_some()
+            || self.wound_goal(id).is_some()
+            || self.sect_duty_goal(id).is_some()
+            || self.relief_goal(npc).is_some()
+            || self.faction_goal(npc).is_some()
+            || self.contract_goal(npc).is_some()
+            || self.audit_goal(id).is_some()
+        {
+            return None;
+        }
+        // Role exclusions remove Watch investigation/recovery and Medic
+        // treatment; full HP removes care; distance removes player threat.
+        let duty = self.livelihood_duty(npc, false);
+        let resting = (self.is_night()
+            && matches!(npc.definition.role, Role::Supplier | Role::Grower))
+            || npc.fatigue >= npc.definition.rest_threshold
+            || (npc.activity.goal == Goal::Rest && npc.fatigue > 0);
+        let camp = npc.definition.role == Role::FrontierCarrier && npc.fatigue >= 24;
+        let rest_score = 54 + u16::from(npc.fatigue);
+        // The full planner ranks camp before ordinary Rest on equal scores.
+        let decision = if camp && (!resting || rest_score <= 87) {
+            decision_for(Goal::CampRest, DecisionReason::Fatigue, 87)
+        } else if resting {
+            decision_for(Goal::Rest, DecisionReason::Fatigue, rest_score)
+        } else {
+            decision_for(duty, ambition_reason(npc, duty), 20)
+        };
+        Some(decision)
+    }
+
     fn report_goal(&self, npc: &Npc) -> Option<Goal> {
         if !npc.definition.shares_news {
             return None;
@@ -553,11 +619,7 @@ impl World {
     }
 
     pub(super) fn can_approach(&self, from: Position, destination: Position) -> bool {
-        in_reach(from, destination)
-            || next_step(self.scenario, from, destination, 1, |cell| {
-                self.walkable(cell) && !self.occupied(cell)
-            })
-            .is_some()
+        in_reach(from, destination) || self.route_step(from, destination, 1).is_some()
     }
 
     fn can_treat(&self, medic: &Npc, patient: &Npc) -> bool {
@@ -820,9 +882,7 @@ impl World {
             return;
         }
         let position = self.npcs[&id].position;
-        if let Some(next) = next_step(self.scenario, position, destination, reach, |cell| {
-            self.walkable(cell) && !self.occupied(cell)
-        }) {
+        if let Some(next) = self.route_step(position, destination, reach) {
             self.npcs.get_mut(&id).expect("planned actor").position = next;
         }
     }

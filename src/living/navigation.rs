@@ -111,3 +111,112 @@ pub(super) fn next_step(
     }
     None
 }
+
+use super::World;
+
+/// Ephemeral occupancy snapshot for one path query. Rebuilt after every
+/// commit, so earlier ID-ordered moves, swaps and deaths cannot stale it.
+/// No canonical state, cache invalidation or new ordering semantics.
+struct Occupancy {
+    width: u32,
+    height: u32,
+    cells: Vec<bool>,
+}
+impl Occupancy {
+    fn new(width: u32, height: u32, positions: impl IntoIterator<Item = Position>) -> Self {
+        let mut cells = vec![false; (width * height) as usize];
+        for p in positions {
+            assert!(p.x < width && p.y < height, "invalid occupied cell");
+            cells[(p.y * width + p.x) as usize] = true;
+        }
+        Self {
+            width,
+            height,
+            cells,
+        }
+    }
+    fn occupied(&self, p: Position) -> bool {
+        p.x < self.width && p.y < self.height && self.cells[(p.y * self.width + p.x) as usize]
+    }
+}
+impl World {
+    pub(super) fn route_step(
+        &self,
+        from: Position,
+        destination: Position,
+        reach: u32,
+    ) -> Option<Position> {
+        if self.scheduler().is_none() {
+            return next_step(self.scenario, from, destination, reach, |p| {
+                self.walkable(p) && !self.occupied(p)
+            });
+        }
+        if distance(from, destination) <= reach {
+            return None;
+        }
+        let occupants = self
+            .npcs
+            .values()
+            .filter(|n| n.alive())
+            .map(|n| n.position)
+            .chain(self.player.alive().then_some(self.player.position));
+        let occupied = Occupancy::new(self.scenario.width, self.scenario.height, occupants);
+        next_step(self.scenario, from, destination, reach, |p| {
+            self.walkable(p) && !occupied.occupied(p)
+        })
+    }
+}
+
+#[cfg(test)]
+mod occupancy_tests {
+    use super::*;
+    use std::{hint::black_box, time::Instant};
+    #[test]
+    fn indexed_paths_match_scan_reference_on_dense_synthetic_populations() {
+        let w = World::exact_lod_campaign(0);
+        let scenario = Scenario {
+            width: 64,
+            height: 64,
+            ..*w.scenario
+        };
+        let mut slots: Vec<_> = (1..63)
+            .flat_map(|x| (1..63).map(move |y| position(x, y)))
+            .collect();
+        // A reproducible permutation, with no external RNG or clock input.
+        slots.sort_by_key(|p| u64::from(p.x * 64 + p.y).wrapping_mul(0x9e3779b97f4a7c15));
+        for n in [20, 100, 500, 1000, 2000] {
+            let occupants = &slots[..n];
+            let queries = [
+                (position(0, 0), position(63, 63), 0),
+                (position(0, 63), position(63, 0), 1),
+                (position(0, 0), position(63, 32), 0),
+                (position(63, 0), position(0, 63), 1),
+            ];
+            let mut reference = Vec::new();
+            let start = Instant::now();
+            for &(from, to, reach) in &queries {
+                reference.push(black_box(next_step(&scenario, from, to, reach, |p| {
+                    !occupants.contains(&p)
+                })));
+            }
+            let scan = start.elapsed();
+            let start = Instant::now();
+            let mut result = Vec::new();
+            for &(from, to, reach) in &queries {
+                let index = Occupancy::new(64, 64, occupants.iter().copied());
+                result.push(black_box(next_step(&scenario, from, to, reach, |p| {
+                    !index.occupied(p)
+                })));
+            }
+            let indexed = start.elapsed();
+            assert_eq!(reference, result);
+            assert!(result.iter().all(Option::is_some));
+            println!(
+                "synthetic actors={n} queries={} scan_us={} indexed_us={}",
+                queries.len(),
+                scan.as_micros(),
+                indexed.as_micros()
+            );
+        }
+    }
+}

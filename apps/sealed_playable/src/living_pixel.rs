@@ -8,7 +8,7 @@ use crate::{
     clock,
     living_ascii::{
         Session, campaign_session, expanded_session, generated_session, knowledge_session,
-        outcome_label,
+        lod_session, outcome_label,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
@@ -44,6 +44,10 @@ pub(crate) fn run_expanded(seed: u32) {
 
 pub(crate) fn run_knowledge(seed: u32) {
     run_session(knowledge_session(seed, false));
+}
+
+pub(crate) fn run_lod(seed: u32) {
+    run_session(lod_session(seed, false));
 }
 
 fn run_session(session: Session) {
@@ -829,5 +833,55 @@ mod tests {
             app.world().resource::<Game>().session.world.checkpoint(),
             before
         );
+    }
+
+    #[test]
+    fn lod_projection_rebuilds_are_canonical_read_only() {
+        use sealed_sim::living::Intent;
+        let mut session = lod_session(7, false);
+        for _ in 0..180 {
+            session
+                .world
+                .step(session.world.tick(), Intent::Wait)
+                .unwrap();
+        }
+        let before = session.world.checkpoint();
+        let mut reference = session.world.clone();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .add_systems(Update, draw);
+        app.update();
+        fn projections(app: &mut App) -> Vec<Entity> {
+            let mut q = app.world_mut().query_filtered::<Entity, With<Projection>>();
+            q.iter(app.world()).collect()
+        }
+        let expected = projections(&mut app).len();
+        assert!(expected > 153);
+        for i in 0..1000 {
+            // Alternate explicit teardown and in-place projection rebuild.
+            if i % 3 == 0 {
+                for entity in projections(&mut app) {
+                    app.world_mut().despawn(entity);
+                }
+            }
+            let lang = if i % 2 == 0 { "lang id" } else { "lang en" };
+            app.world_mut().resource_mut::<Game>().session.input(lang);
+            app.update();
+            assert_eq!(projections(&mut app).len(), expected);
+            assert_eq!(
+                app.world().resource::<Game>().session.world.checkpoint(),
+                before
+            );
+        }
+        for _ in 0..32 {
+            reference.step(reference.tick(), Intent::Wait).unwrap();
+            let mut game = app.world_mut().resource_mut::<Game>();
+            game.session.input("wait");
+            assert_eq!(game.session.world.checkpoint(), reference.checkpoint());
+            app.update();
+        }
     }
 }

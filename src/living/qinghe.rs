@@ -3,7 +3,10 @@ use super::{Rules, Scenario, checkpoint, content};
 pub(super) use content::SCENARIO_QINGHE as QINGHE;
 
 pub(super) fn region(seed: u32, rules: Rules) -> &'static Scenario {
-    if matches!(rules, Rules::ExpandedRiverlands | Rules::RegionalKnowledge) {
+    if matches!(
+        rules,
+        Rules::ExpandedRiverlands | Rules::RegionalKnowledge | Rules::ExactLod
+    ) {
         return super::expansion::scenario(seed);
     }
     let revision = if rules == Rules::GeneratedRiverlands {
