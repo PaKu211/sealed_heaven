@@ -329,6 +329,13 @@ pub(crate) fn living_text(locale: Locale, key: &'static str) -> &'static str {
     runtime().text(locale, key)
 }
 
+/// Dynamic, namespaced menu keys still resolve from the validated catalog.
+pub(crate) fn living_dynamic_text(locale: Locale, key: &str) -> Option<&'static str> {
+    runtime()
+        .message(locale, key)
+        .and_then(|m| m.plain.as_deref())
+}
+
 pub(crate) fn living_format(locale: Locale, key: &str, args: &[(&str, &str)]) -> String {
     runtime().format(locale, key, args).unwrap_or_else(|error| {
         eprintln!("Localization formatting error: {key}: {error}");
@@ -364,21 +371,66 @@ mod tests {
         for key in catalog.english.keys() {
             assert!(entries.contains_key(key), "{key}");
         }
-        let mut active = BTreeSet::new();
+        let mut active = BTreeSet::<String>::new();
+        let field_source = include_str!("living_ascii/field.rs");
         for source in [
             include_str!("living_ascii.rs"),
             include_str!("living_pixel.rs"),
+            field_source,
+            include_str!("living_pixel/slice.rs"),
         ] {
             for token in source.split("#[cfg(test)]").next().unwrap().split('"') {
-                if token.starts_with("living.")
-                    && token.chars().all(|c| {
-                        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_'
-                    })
+                if !token
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_')
                 {
-                    assert!(catalog.english.contains_key(token), "unregistered {token}");
-                    active.insert(token);
+                    continue;
+                }
+                if token.starts_with("living.") {
+                    active.insert(token.to_owned());
+                } else if [
+                    "action.",
+                    "atlas.",
+                    "view.",
+                    "route.",
+                    "pixel.",
+                    "menu.",
+                    "page.",
+                    "site.",
+                    "direction.",
+                ]
+                .iter()
+                .any(|prefix| token.starts_with(prefix))
+                {
+                    active.insert(format!("living.field.{token}"));
                 }
             }
+        }
+        // Dynamic field keys are derived from the actual finite enums and
+        // the journal dispatch table, never from the catalogue being tested.
+        for page in crate::living_ascii::field::Page::ALL {
+            active.insert(format!("living.field.page.{}", page.slug()));
+        }
+        for landmark in sealed_sim::living::exploration::Landmark::ALL {
+            active.insert(format!("living.field.site.{}", landmark.slug()));
+        }
+        let journal_table = field_source
+            .split_once("for (key, cmd) in [")
+            .unwrap()
+            .1
+            .split_once("] {")
+            .unwrap()
+            .0;
+        for line in journal_table
+            .lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with('(') && l.contains('"'))
+        {
+            let key = line.split('"').nth(1).unwrap();
+            active.insert(format!("living.field.view.{key}"));
+        }
+        for key in &active {
+            assert!(catalog.english.contains_key(key), "unregistered {key}");
         }
         for (key, entry) in entries {
             assert_eq!(

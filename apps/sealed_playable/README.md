@@ -2,7 +2,7 @@
 
 ## Current regional campaign
 
-C5.9: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c59 --pixel`. Omit `--pixel` for ASCII. `governance` / Ctrl+F9 show dated institutional boards; save slot `checkpoint.c59`. See the [C5.9 specification](../../C5_9_COMMUNITY_GOVERNANCE.md).
+C6.0: `cargo run --manifest-path apps/sealed_playable/Cargo.toml --locked --offline --release --bin sealed_agency -- --c60 --pixel`. Enter opens the field menu, arrow keys select tabs/items, Enter confirms, Esc closes, Right Shift+Space follows one charted route step. Omit `--pixel` for ASCII: field, choose N, map, route SITE, go. Save slot `checkpoint.c60`. See the [C6.0 specification](../../C6_0_CHARTED_SANDBOX.md).
 
 **Current acceptance: C0.4 independent audit PASS.**
 Native evidence is `../../docs/evidence/c04-native-acceptance/`. The verdict is

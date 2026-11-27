@@ -22,6 +22,8 @@ use crate::{
     persistence,
 };
 
+pub(crate) mod field;
+
 pub(crate) struct Session {
     pub(crate) world: World,
     save_path: PathBuf,
@@ -35,6 +37,7 @@ pub(crate) struct Session {
     circle_cursor: usize,
     diplomacy_cursor: usize,
     governance_cursor: usize,
+    pub(crate) field: field::FieldUi,
 }
 
 impl Session {
@@ -52,11 +55,14 @@ impl Session {
             circle_cursor: 0,
             diplomacy_cursor: 0,
             governance_cursor: 0,
+            field: field::FieldUi::default(),
         }
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 46 {
+        if self.world.checkpoint_revision() == 47 {
+            World::sandbox_campaign(seed)
+        } else if self.world.checkpoint_revision() == 46 {
             World::governance_campaign(seed)
         } else if self.world.checkpoint_revision() == 45 {
             World::diplomacy_campaign(seed)
@@ -146,6 +152,11 @@ impl Session {
     /// Returns false on quit. Local inspection and file operations consume no time.
     pub(crate) fn input(&mut self, line: &str) -> bool {
         self.notice.clear();
+        if self.world.exploration().is_some()
+            && let Some(keep) = self.field_input(line)
+        {
+            return keep;
+        }
         let lower = line.trim().to_ascii_lowercase();
         let mut words = lower.split_whitespace();
         let command = words.next().unwrap_or("look");
@@ -3661,6 +3672,9 @@ impl Session {
             return if player.alive() { '@' } else { 'x' };
         }
         if !self.debug_world && !world.player_sees(cell) {
+            if world.exploration().is_some() {
+                return world.charted_symbol(cell).unwrap_or('?');
+            }
             let wall_edge = !world.walkable(cell)
                 && [
                     x.checked_sub(1).map(|x| Position { x, y }),
@@ -3787,6 +3801,12 @@ impl Session {
                 ),
             ],
         );
+        if world.exploration().is_some() {
+            let _ = writeln!(out, "{}", tr("living.field.ascii.help"));
+            if self.field.waypoint.is_some() {
+                let _ = writeln!(out, "{}", self.route_line());
+            }
+        }
         if self.debug_world {
             let _ = writeln!(out, "{}", tr("living.ascii.frame.developer_view"));
         }
@@ -5500,6 +5520,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         44 => "checkpoint.c57",
         45 => "checkpoint.c58",
         46 => "checkpoint.c59",
+        47 => "checkpoint.c60",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -5546,10 +5567,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         44 => World::circles_campaign(0),
         45 => World::diplomacy_campaign(0),
         46 => World::governance_campaign(0),
+        47 => World::sandbox_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn sandbox_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 47);
+    if seed != 0 {
+        session.world = World::sandbox_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_sandbox_campaign(seed: u32, debug_world: bool) {
+    run_session(sandbox_session(seed, debug_world));
 }
 
 pub(crate) fn governance_session(seed: u32, debug_world: bool) -> Session {

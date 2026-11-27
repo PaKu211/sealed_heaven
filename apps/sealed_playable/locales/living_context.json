@@ -4236,6 +4236,907 @@
     },
     "surface": "living_ascii.rs"
   },
+  "living.field.action.accord": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.aid": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.aidlodge": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.allocate": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.ask": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.atlas": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.attack": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.brew": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.buy": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.cache.entrust": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "id": "local or remembered field detail: id"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.cache.take": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "id": "local or remembered field detail: id"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.center": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.channel": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.circulate": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.clear": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.deliver": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.drawqi": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.drill": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.duty": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.favor.accept": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor",
+      "id": "local or remembered field detail: id"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.favor.decline": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor",
+      "id": "local or remembered field detail: id"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.favor.fund": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor",
+      "id": "local or remembered field detail: id"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.favor.withdraw": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor",
+      "id": "local or remembered field detail: id"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.follow": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.form": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.gather": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.guard": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.herbalist": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.inspect": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.invite": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.join": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.load": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.mend": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.pack": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.part": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.peddler": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.pledge": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.practice": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.quest.abandon": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "id": "local or remembered field detail: id",
+      "site": "local or remembered field detail: site"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.quest.accept": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "id": "local or remembered field detail: id",
+      "site": "local or remembered field detail: site"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.quest.decline": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "id": "local or remembered field detail: id",
+      "site": "local or remembered field detail: site"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.quest.route": {
+    "active": true,
+    "context": "C6.0 route to already known request site",
+    "parameters": {
+      "id": "known request id",
+      "site": "charted site"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.remedy": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.renounce": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.repay": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.route": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "site": "local or remembered field detail: site"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.save": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.sell": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.sponsor": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.study": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.survey": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.talk": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.technique": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.tell": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor",
+      "id": "local or remembered field detail: id"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.treat": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.wait": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.waive": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "actor": "local or remembered field detail: actor"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.action.wanderer": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.ascii.help": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.atlas.count": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "count": "local or remembered field detail: count",
+      "total": "local or remembered field detail: total"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.atlas.legend": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.direction.east": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.direction.north": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.direction.south": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.direction.west": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.menu.ascii": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.menu.invalid": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.menu.selection": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.page.commitments": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.page.journal": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.page.local": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.page.system": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.page.training": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.page.travel": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.pixel.atlas.control": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.control": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.current": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.empty": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.here": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.last": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.memory": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.menu.control": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.no_local": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.pages": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "page": "local or remembered field detail: page",
+      "total": "local or remembered field detail: total"
+    },
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.position": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "count": "local or remembered field detail: count",
+      "x": "local or remembered field detail: x",
+      "y": "local or remembered field detail: y"
+    },
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.reader.control": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.route": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.select": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.title": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.field.pixel.turn": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "breath": "local or remembered field detail: breath",
+      "coins": "local or remembered field detail: coins",
+      "herbs": "local or remembered field detail: herbs",
+      "hp": "local or remembered field detail: hp",
+      "tick": "local or remembered field detail: tick"
+    },
+    "surface": "living_pixel.rs"
+  },
+  "living.field.route.arrived": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "site": "local or remembered field detail: site"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.route.next": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "direction": "local or remembered field detail: direction",
+      "site": "local or remembered field detail: site",
+      "steps": "local or remembered field detail: steps"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.route.none": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.route.unavailable": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {
+      "site": "local or remembered field detail: site"
+    },
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.route.unknown": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.clinic": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.depot": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.garden": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.grove": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.hall": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.market": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.patch": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.site.shrine": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.agency": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.aid": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.audits": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.bonds": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.circles": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.contacts": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.contracts": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.cultivation": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.diplomacy": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.encounters": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.factions": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.favorlog": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.favors": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.governance": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.help": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.history": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.knowledge": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.martial": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.meridians": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.messages": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.news": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.obligations": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.politics": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.production": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.profiles": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.questlog": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.quests": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.rumors": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.sect": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.social": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.stories": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.teams": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
+  "living.field.view.travel": {
+    "active": true,
+    "context": "C6.0 field menu or charted map; no hidden simulation state",
+    "parameters": {},
+    "surface": "living_ascii/field.rs"
+  },
   "living.governance.account": {
     "active": true,
     "context": "C5.9 locally read dated institutional board, never live remote information",

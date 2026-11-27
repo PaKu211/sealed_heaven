@@ -21,6 +21,7 @@ pub mod development;
 pub mod diplomacy;
 pub mod encounters;
 pub mod expansion;
+pub mod exploration;
 mod faction_agency;
 #[cfg(test)]
 mod faction_agency_tests;
@@ -452,6 +453,7 @@ pub struct World {
     circles: Option<circles::Circles>,
     diplomacy: Option<diplomacy::Diplomacy>,
     governance: Option<governance::Governance>,
+    exploration: Option<exploration::Exploration>,
     tick: u64,
     player: Player,
     npcs: BTreeMap<ActorId, Npc>,
@@ -528,6 +530,7 @@ enum Rules {
     VoluntaryCircles,
     SituatedDiplomacy,
     CommunityGovernance,
+    ChartedSandbox,
 }
 
 impl Rules {
@@ -555,6 +558,7 @@ impl Rules {
                 | Self::VoluntaryCircles
                 | Self::SituatedDiplomacy
                 | Self::CommunityGovernance
+                | Self::ChartedSandbox
         )
     }
 
@@ -608,6 +612,7 @@ impl Rules {
                 | Self::VoluntaryCircles
                 | Self::SituatedDiplomacy
                 | Self::CommunityGovernance
+                | Self::ChartedSandbox
         )
     }
 }
@@ -814,6 +819,11 @@ impl World {
         Self::seeded(seed, Rules::CommunityGovernance)
     }
 
+    /// C6.0 adds canonical exploration memory, retaining C5.9 simulation.
+    pub fn sandbox_campaign(seed: u32) -> Self {
+        Self::seeded(seed, Rules::ChartedSandbox)
+    }
+
     fn seeded(seed: u32, rules: Rules) -> Self {
         let mut world = Self::with_rules(qinghe::region(seed, rules), rules);
         if matches!(
@@ -838,6 +848,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             let base = worldgen::GeneratedRegion::generate(seed);
             if matches!(
@@ -861,6 +872,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             ) {
                 world.expanded = Some(std::sync::Arc::new(expansion::ExpandedRegion::from_base(
                     seed, &base,
@@ -893,6 +905,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.road_history = Some(road_history::RoadHistory::new(&mut world, seed));
             world.observe_road_history();
@@ -917,6 +930,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.init_regional_news();
         }
@@ -939,6 +953,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.scheduler = Some(lod::Scheduler::new(&world));
         }
@@ -960,6 +975,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.production = Some(production::Production::new(&world));
         }
@@ -979,6 +995,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.requests = Some(requests::Requests::default());
             world.advance_requests();
@@ -998,6 +1015,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.favors = Some(favors::Favors::default());
         }
@@ -1015,6 +1033,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.reciprocity = Some(reciprocity::Reciprocity::default());
         }
@@ -1031,6 +1050,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.encounters = Some(encounters::Encounters::default());
         }
@@ -1046,6 +1066,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.social_network = Some(social_network::SocialNetwork::default());
         }
@@ -1060,6 +1081,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.cooperation = Some(cooperation::Cooperation::default());
         }
@@ -1073,6 +1095,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.obligations = Some(obligations::Obligations::default());
         }
@@ -1085,6 +1108,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.communication = Some(communication::Communication::default());
         }
@@ -1096,6 +1120,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.rumors = Some(rumors::Rumors::default());
             world.observe_regional(0);
@@ -1107,6 +1132,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.narrative = Some(narrative::Narrative::default());
         }
@@ -1116,21 +1142,32 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.development = Some(development::Development::new(world.npcs.keys().copied()));
         }
         if matches!(
             rules,
-            Rules::VoluntaryCircles | Rules::SituatedDiplomacy | Rules::CommunityGovernance
+            Rules::VoluntaryCircles
+                | Rules::SituatedDiplomacy
+                | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         ) {
             world.circles = Some(circles::Circles::default());
         }
-        if matches!(rules, Rules::SituatedDiplomacy | Rules::CommunityGovernance) {
+        if matches!(
+            rules,
+            Rules::SituatedDiplomacy | Rules::CommunityGovernance | Rules::ChartedSandbox
+        ) {
             world.diplomacy = Some(diplomacy::Diplomacy::default());
         }
-        if rules == Rules::CommunityGovernance {
+        if matches!(rules, Rules::CommunityGovernance | Rules::ChartedSandbox) {
             world.governance = Some(governance::Governance::default());
             world.observe_governance_boards();
+        }
+        if rules == Rules::ChartedSandbox {
+            world.exploration = Some(exploration::Exploration::default());
+            world.observe_exploration();
         }
         world
     }
@@ -1168,6 +1205,7 @@ impl World {
             circles: None,
             diplomacy: None,
             governance: None,
+            exploration: None,
             tick: 0,
             player: Player {
                 position: scenario.entrance,
@@ -1225,6 +1263,7 @@ impl World {
                         | Rules::VoluntaryCircles
                         | Rules::SituatedDiplomacy
                         | Rules::CommunityGovernance
+                        | Rules::ChartedSandbox
                 ) {
                     // Watch, Mentor and Hall steward can brief each other in person.
                     social.link(ActorId::new(2), ActorId::new(33));
@@ -1282,6 +1321,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(Company::default),
             rivalry: matches!(
@@ -1327,6 +1367,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(Rivalry::new),
             politics: matches!(
@@ -1371,6 +1412,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(Politics::new),
             traffic: matches!(
@@ -1414,6 +1456,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(Traffic::new),
             relief: matches!(rules, Rules::LivingAgency | Rules::FactionAgency).then(Relief::new),
@@ -1456,6 +1499,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(Contracts::new),
             contract_memory: matches!(
@@ -1495,6 +1539,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(ContractMemory::default),
             information: matches!(
@@ -1533,6 +1578,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(Information::default),
             contested: matches!(
@@ -1565,6 +1611,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(|| {
                 Contested::new(matches!(
@@ -1596,6 +1643,7 @@ impl World {
                         | Rules::VoluntaryCircles
                         | Rules::SituatedDiplomacy
                         | Rules::CommunityGovernance
+                        | Rules::ChartedSandbox
                 ))
             }),
             martial: matches!(
@@ -1626,6 +1674,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(|| Martial::new(scenario)),
             meridians: matches!(
@@ -1655,6 +1704,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(|| Meridians::new(scenario)),
             injuries: matches!(
@@ -1683,6 +1733,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(|| Injuries::new(scenario)),
             character_agency: matches!(
@@ -1710,6 +1761,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(|| CharacterAgency::new(scenario)),
             sect_hierarchy: matches!(
@@ -1736,6 +1788,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
             .then(|| SectHierarchy::new(scenario)),
         }
@@ -1931,6 +1984,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             ) || to.get() > 255
                 || body.get() > 0x00ff_ffff)
         {
@@ -1972,6 +2026,7 @@ impl World {
                     | Rules::VoluntaryCircles
                     | Rules::SituatedDiplomacy
                     | Rules::CommunityGovernance
+                    | Rules::ChartedSandbox
             )
         {
             return Err(StepError::ContestedCampaignRequired);
@@ -2018,6 +2073,7 @@ impl World {
             self.select_default_background();
         }
         let outcome = self.apply_player(intent).unwrap_or_else(Outcome::Rejected);
+        self.observe_exploration();
         self.observe_road_history();
         self.advance_relief();
         self.advance_faction_agency();
@@ -2061,6 +2117,7 @@ impl World {
         self.reconcile_character_agency_inventory();
         self.reconcile_sect_hierarchy_inventory();
         self.observe_governance_boards();
+        self.observe_exploration();
         if let Some(traffic) = self.traffic.as_mut() {
             traffic.finish_tick();
         }
@@ -2239,6 +2296,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         )
     }
 
@@ -2277,6 +2335,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         )
     }
 
@@ -2314,6 +2373,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         )
     }
 
@@ -2350,6 +2410,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         )
     }
 
@@ -2385,6 +2446,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         )
     }
 
@@ -2418,6 +2480,7 @@ impl World {
                 | Rules::VoluntaryCircles
                 | Rules::SituatedDiplomacy
                 | Rules::CommunityGovernance
+                | Rules::ChartedSandbox
         )
     }
 

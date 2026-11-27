@@ -11,11 +11,14 @@ use crate::{
         cooperation_session, development_session, diplomacy_session, encounter_session,
         expanded_session, favors_session, generated_session, governance_session, history_session,
         knowledge_session, lod_session, narrative_session, obligations_session, outcome_label,
-        production_session, requests_session, rumor_session, social_network_session,
+        production_session, requests_session, rumor_session, sandbox_session,
+        social_network_session,
     },
     locale::Locale,
     locale_living::{living_format, living_text},
 };
+
+mod slice;
 
 const SIDE: f32 = 32.0;
 const INK: Color = Color::srgb(0.94, 0.90, 0.78);
@@ -69,6 +72,10 @@ pub(crate) fn run_favors(seed: u32) {
     run_session(favors_session(seed, false));
 }
 
+pub(crate) fn run_sandbox(seed: u32) {
+    run_session(sandbox_session(seed, false));
+}
+
 pub(crate) fn run_governance(seed: u32) {
     run_session(governance_session(seed, false));
 }
@@ -118,20 +125,36 @@ pub(crate) fn run_bonds(seed: u32) {
 }
 
 fn run_session(session: Session) {
+    let slice = session.world.exploration().is_some();
     App::new()
         .insert_resource(Game {
             session,
             target: None,
         })
         .insert_resource(ClearColor(Color::srgb(0.048, 0.062, 0.065)))
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: living_text(Locale::English, "living.pixel.window.title").into(),
-                resolution: (900, 660).into(),
+        .add_plugins(
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: living_text(
+                        Locale::English,
+                        if slice {
+                            "living.field.pixel.title"
+                        } else {
+                            "living.pixel.window.title"
+                        },
+                    )
+                    .into(),
+                    resolution: if slice {
+                        (1100, 720).into()
+                    } else {
+                        (900, 660).into()
+                    },
+                    resizable: !slice,
+                    ..default()
+                }),
                 ..default()
             }),
-            ..default()
-        }))
+        )
         .add_systems(Startup, setup)
         .add_systems(Update, (keyboard, draw).chain())
         .run();
@@ -185,6 +208,15 @@ fn keyboard(
     mut game: ResMut<Game>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
+    let c60 = game.session.world.exploration().is_some();
+    if c60 && keys.get_just_pressed().next().is_some() && slice::keyboard(&keys, &mut game) {
+        return;
+    }
+    let previous_notice = if c60 && keys.get_just_pressed().next().is_some() {
+        Some(game.session.notice.clone())
+    } else {
+        None
+    };
     if keys.just_pressed(KeyCode::Tab) {
         let command = if game.session.locale == Locale::English {
             "lang id"
@@ -193,7 +225,15 @@ fn keyboard(
         };
         game.session.input(command);
         if let Ok(mut window) = windows.single_mut() {
-            window.title = living_text(game.session.locale, "living.pixel.window.title").to_owned();
+            window.title = living_text(
+                game.session.locale,
+                if c60 {
+                    "living.field.pixel.title"
+                } else {
+                    "living.pixel.window.title"
+                },
+            )
+            .to_owned();
         }
     } else if game.session.world.governance().is_some()
         && keys.just_pressed(KeyCode::F9)
@@ -373,10 +413,17 @@ fn keyboard(
         .find(|(key, _)| keys.just_pressed(*key))
     {
         let nearby = nearby(&game.session);
-        let target = game
-            .target
-            .filter(|id| nearby.contains(id))
-            .or_else(|| nearby.first().copied());
+        let target = game.target.filter(|id| nearby.contains(id)).or_else(|| {
+            if !c60 || nearby.len() == 1 {
+                nearby.first().copied()
+            } else {
+                None
+            }
+        });
+        if c60 && nearby.len() > 1 && target.is_none() {
+            game.session.notice = game.session.field_text("pixel.select").into();
+            return;
+        }
         match target {
             Some(id) => {
                 game.session.input(&format!("{command} {}", id.get()));
@@ -387,6 +434,12 @@ fn keyboard(
         }
     } else if let Some((_, command)) = COMMANDS.iter().find(|(key, _)| keys.just_pressed(*key)) {
         game.session.input(command);
+    }
+    if previous_notice.is_some_and(|n| n != game.session.notice)
+        && !game.session.field.modal()
+        && slice::notice_lines(&game.session.notice).len() > 3
+    {
+        game.session.field.reader = Some(0);
     }
 }
 
@@ -410,6 +463,10 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     }
     for entity in &previous {
         commands.entity(entity).despawn();
+    }
+    if game.session.world.exploration().is_some() {
+        slice::draw(&mut commands, &game);
+        return;
     }
     let session = &game.session;
     let world = &session.world;
