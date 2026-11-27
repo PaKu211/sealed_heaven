@@ -111,6 +111,13 @@ pub fn run_c34() {
     crate::living_ascii::run_c34();
 }
 
+pub fn run_cooperation_campaign(seed: u32, debug: bool) {
+    crate::living_ascii::run_cooperation_campaign(seed, debug);
+}
+#[cfg(feature = "desktop")]
+pub fn run_cooperation_window(seed: u32) {
+    crate::living_pixel::run_cooperation(seed);
+}
 pub fn run_social_network_campaign(seed: u32, debug: bool) {
     crate::living_ascii::run_social_network_campaign(seed, debug);
 }

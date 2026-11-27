@@ -403,6 +403,9 @@ impl World {
                 (Site::QingheShrine, EventKind::FreightArrived)
             };
             self.record_regional_event(site, kind, Some(id), amount);
+            if !east_grower {
+                self.complete_cooperative_delivery(id, super::cooperation::Route::Qinghe, amount);
+            }
         }
     }
 }

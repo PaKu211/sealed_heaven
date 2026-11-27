@@ -519,6 +519,7 @@ impl World {
                     | super::Rules::ReciprocalBonds
                     | super::Rules::EncounterMemory
                     | super::Rules::SocialNetworks
+                    | super::Rules::CollectiveAgency
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

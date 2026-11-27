@@ -173,6 +173,7 @@ impl World {
                 scheduler.update(id, self.tick, eligible, used_routine);
             }
         }
+        self.commit_cooperative_dispatches(&plans);
         for (id, (decision, _, _)) in plans {
             if self
                 .traffic()

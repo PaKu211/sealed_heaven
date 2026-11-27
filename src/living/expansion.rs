@@ -560,6 +560,13 @@ impl World {
         };
         if event.2 > 0 {
             self.record_regional_event(event.0, event.1, Some(id), event.2);
+            if goal == Goal::DeliverFrontierFreight {
+                self.complete_cooperative_delivery(
+                    id,
+                    super::cooperation::Route::Willowford,
+                    event.2,
+                );
+            }
         }
     }
 }

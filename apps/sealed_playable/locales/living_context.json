@@ -4830,6 +4830,78 @@
     "source": "phase A",
     "surface": "living"
   },
+  "living.team.delivered": {
+    "active": true,
+    "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",
+    "parameters": {
+      "at": "event tick",
+      "carrier": "observed carrier name",
+      "grower": "observed contributor name",
+      "id": "stable project identifier",
+      "load": "total physical shipment quantity",
+      "part": "allocated fresh contribution quantity",
+      "route": "known shipment destination"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.team.dispatched": {
+    "active": true,
+    "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",
+    "parameters": {
+      "at": "event tick",
+      "carrier": "observed carrier name",
+      "grower": "observed contributor name",
+      "id": "stable project identifier",
+      "load": "total physical shipment quantity",
+      "part": "allocated fresh contribution quantity",
+      "route": "known shipment destination"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.team.empty": {
+    "active": true,
+    "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.team.help": {
+    "active": true,
+    "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.team.pixel.hint": {
+    "active": true,
+    "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",
+    "parameters": {},
+    "surface": "living_pixel.rs"
+  },
+  "living.team.qinghe": {
+    "active": true,
+    "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.team.registered": {
+    "active": true,
+    "context": "C5.1 delivery manifest read at physical destination, not eyewitness testimony",
+    "parameters": {
+      "at": "event tick",
+      "carrier": "observed carrier name",
+      "grower": "observed contributor name",
+      "id": "stable project identifier",
+      "load": "total physical shipment quantity",
+      "part": "allocated fresh contribution quantity",
+      "route": "known shipment destination"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.team.willowford": {
+    "active": true,
+    "context": "C5.1 directly witnessed public freight cooperation; historical, not live tracking",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
   "living.worldgen.help": {
     "active": true,
     "context": "C4.0 regional worldgen projection",

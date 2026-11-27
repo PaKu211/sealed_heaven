@@ -11,7 +11,7 @@ class LocalePackTests(unittest.TestCase):
         cls.base=cls.catalogs["living"]["en"]
 
     def test_source_parity(self):
-        self.assertEqual(len(self.base),702)
+        self.assertEqual(len(self.base),710)
         expected_contacts = {
             "living.contact.care", "living.contact.talk",
             "living.contact.empty", "living.contact.help",
@@ -19,6 +19,7 @@ class LocalePackTests(unittest.TestCase):
         }
         self.assertEqual({key for key in self.base if key.startswith("living.contact.")},expected_contacts)
         self.assertEqual({key for key in self.base if key.startswith("living.network.")},{'living.network.greeting', 'living.network.aid', 'living.network.pixel.hint', 'living.network.conflict', 'living.network.empty', 'living.network.help'})
+        self.assertEqual({key for key in self.base if key.startswith("living.team.")},{'living.team.dispatched', 'living.team.delivered', 'living.team.registered', 'living.team.help', 'living.team.pixel.hint', 'living.team.empty', 'living.team.qinghe', 'living.team.willowford'})
         self.assertEqual(self.base.keys(),self.catalogs["living"]["id"].keys())
         self.assertEqual(len(self.catalogs["ui"]["en"]),203)
 

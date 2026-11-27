@@ -106,7 +106,13 @@ fn canonical_registry_is_pinned_and_order_independent_for_object_keys() {
         content::identity_for_revision(35),
         content::identity_for_revision(34)
     );
-    assert!(content::identity_for_revision(36).is_none());
+    for revision in 36..=sealed_sim::living::cooperation::REVISION {
+        assert_eq!(
+            content::identity_for_revision(revision),
+            content::identity_for_revision(35)
+        );
+    }
+    assert!(content::identity_for_revision(u16::MAX).is_none());
 }
 #[test]
 fn duplicate_unknown_and_invalid_schema_fields_are_rejected() {

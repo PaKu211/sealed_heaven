@@ -73,6 +73,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::ReciprocalBonds => super::reciprocity::REVISION,
         Rules::EncounterMemory => super::encounters::REVISION,
         Rules::SocialNetworks => super::social_network::REVISION,
+        Rules::CollectiveAgency => super::cooperation::REVISION,
     }
 }
 
@@ -140,6 +141,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         super::reciprocity::REVISION => Rules::ReciprocalBonds,
         super::encounters::REVISION => Rules::EncounterMemory,
         super::social_network::REVISION => Rules::SocialNetworks,
+        super::cooperation::REVISION => Rules::CollectiveAgency,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -249,6 +251,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::Invite(actor)
@@ -289,6 +292,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::Provision(actor)
@@ -329,6 +333,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::Part(actor)
@@ -368,6 +373,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::OfferAccord
@@ -407,6 +413,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::SupportHall
@@ -445,6 +452,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::PledgeLodge
@@ -483,6 +491,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::AidLodge
@@ -521,6 +530,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::RenounceLodge
@@ -552,6 +562,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::Ask(actor)
@@ -583,6 +594,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::Examine
@@ -614,6 +626,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -645,6 +658,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::Take(actor)
@@ -673,6 +687,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -703,6 +718,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::ClaimLot(value)
@@ -729,6 +745,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -755,6 +772,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::AttuneLot(value)
@@ -780,6 +798,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -804,6 +823,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::Drill(actor)
@@ -828,6 +848,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -859,6 +880,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::DrawQi
@@ -879,6 +901,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::CirculateQi
@@ -899,6 +922,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::MendMeridians
@@ -919,6 +943,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::TreatWounds
@@ -939,6 +964,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -952,6 +978,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::RecoverCache(id)
@@ -965,6 +992,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::EntrustCache(id)
@@ -977,6 +1005,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::AcceptRequest(id)
@@ -989,6 +1018,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::DeclineRequest(id)
@@ -1001,6 +1031,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::AbandonRequest(id)
@@ -1012,6 +1043,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::AcceptFavor(id)
@@ -1023,6 +1055,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::DeclineFavor(id)
@@ -1034,6 +1067,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::WithdrawFavor(id)
@@ -1045,6 +1079,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::FundFavor(id)
@@ -1052,7 +1087,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (51, id)
             if matches!(
                 rules,
-                Rules::ReciprocalBonds | Rules::EncounterMemory | Rules::SocialNetworks
+                Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
+                    | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::RequestAid(ActorId::new(id))
@@ -1060,7 +1098,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (52, id)
             if matches!(
                 rules,
-                Rules::ReciprocalBonds | Rules::EncounterMemory | Rules::SocialNetworks
+                Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
+                    | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::RepayAid(ActorId::new(id))
@@ -1068,7 +1109,10 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
         (53, id)
             if matches!(
                 rules,
-                Rules::ReciprocalBonds | Rules::EncounterMemory | Rules::SocialNetworks
+                Rules::ReciprocalBonds
+                    | Rules::EncounterMemory
+                    | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) =>
         {
             Intent::WaiveAid(ActorId::new(id))
@@ -1080,7 +1124,9 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = if world.rules == Rules::SocialNetworks {
+        let mut bytes = if world.rules == Rules::CollectiveAgency {
+            b"SH:C51:SCENARIO:v1\0".to_vec()
+        } else if world.rules == Rules::SocialNetworks {
             b"SH:C50:SCENARIO:v1\0".to_vec()
         } else if world.rules == Rules::EncounterMemory {
             b"SH:C49:SCENARIO:v1\0".to_vec()
@@ -1163,6 +1209,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::ReciprocalBonds => b"SH:C10:RULES:v35".to_vec(),
         Rules::EncounterMemory => b"SH:C10:RULES:v36".to_vec(),
         Rules::SocialNetworks => b"SH:C10:RULES:v37".to_vec(),
+        Rules::CollectiveAgency => b"SH:C10:RULES:v38".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -1261,6 +1308,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::ReciprocalBonds
             | Rules::EncounterMemory
             | Rules::SocialNetworks
+            | Rules::CollectiveAgency
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -1314,6 +1362,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::ReciprocalBonds => b"SH:C10:STATE:v35".to_vec(),
         Rules::EncounterMemory => b"SH:C10:STATE:v36".to_vec(),
         Rules::SocialNetworks => b"SH:C10:STATE:v37".to_vec(),
+        Rules::CollectiveAgency => b"SH:C10:STATE:v38".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1432,6 +1481,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
                 | Rules::SocialNetworks
+                | Rules::CollectiveAgency
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1519,6 +1569,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::ReciprocalBonds
             | Rules::EncounterMemory
             | Rules::SocialNetworks
+            | Rules::CollectiveAgency
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1562,6 +1613,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::ReciprocalBonds
                     | Rules::EncounterMemory
                     | Rules::SocialNetworks
+                    | Rules::CollectiveAgency
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1612,6 +1664,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::ReciprocalBonds
             | Rules::EncounterMemory
             | Rules::SocialNetworks
+            | Rules::CollectiveAgency
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1703,6 +1756,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::ReciprocalBonds
                 | Rules::EncounterMemory
                 | Rules::SocialNetworks
+                | Rules::CollectiveAgency
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1892,6 +1946,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
     }
     if let Some(network) = world.social_network() {
         let bytes = network.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
+    }
+    if let Some(cooperation) = world.cooperation() {
+        let bytes = cooperation.canonical_bytes();
         out.count(bytes.len());
         out.0.extend(bytes);
     }
