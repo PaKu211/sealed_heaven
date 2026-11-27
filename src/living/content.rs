@@ -61,14 +61,14 @@ pub fn definition_for_revision(revision: u16, id: &str) -> Option<&'static Defin
 pub fn identity_for_revision(revision: u16) -> Option<ContentIdentity> {
     // Revision 27 derives its geography from this exact authored v1 pack.
     // The separate generator version and world digest bind the generated map.
-    (1..=super::expansion::REVISION)
+    (1..=super::regional_news::REVISION)
         .contains(&revision)
         .then_some(ContentIdentity {
             schema_version: SCHEMA_VERSION,
             core_version: CORE_VERSION,
             world_version: CONTENT_VERSION,
             sha256: CONTENT_SHA256,
-            overlay_sha256: (revision == super::expansion::REVISION)
+            overlay_sha256: (revision >= super::expansion::REVISION)
                 .then_some(super::expansion::CONTENT_SHA256),
         })
 }

@@ -11,7 +11,7 @@ class LocalePackTests(unittest.TestCase):
         cls.base=cls.catalogs["living"]["en"]
 
     def test_source_parity(self):
-        self.assertEqual(len(self.base),577)
+        self.assertEqual(len(self.base),603)
         self.assertEqual(len(self.catalogs["ui"]["en"]),203)
 
     def test_escaped_and_reordered_named_parameters(self):

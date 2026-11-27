@@ -376,6 +376,12 @@ impl World {
             .checked_add(count)
             .ok_or(Rejection::PackFull)?;
         f.grove_herbs -= count;
+        self.record_regional_event(
+            super::regional_news::Site::PinefordGrove,
+            super::regional_news::EventKind::Harvested,
+            Some(super::PLAYER),
+            count,
+        );
         Ok(if count == 2 {
             Outcome::GatheredPair
         } else {
@@ -428,12 +434,25 @@ impl World {
             f.player_sold += 1;
             quote.sell
         };
+        self.record_regional_event(
+            super::regional_news::Site::PinefordDepot,
+            if buying {
+                super::regional_news::EventKind::Bought
+            } else {
+                super::regional_news::EventKind::Sold
+            },
+            Some(super::PLAYER),
+            1,
+        );
         Ok(Outcome::Traded {
             bought: buying,
             coins,
         })
     }
     pub(super) fn frontier_duty(&self, npc: &super::Npc) -> Goal {
+        if self.regional_news().is_some() {
+            return self.situated_frontier_duty(npc);
+        }
         let f = self
             .frontier()
             .expect("frontier actor only in expanded rules");
@@ -484,42 +503,63 @@ impl World {
             self.travel(id, site, 1);
             return;
         }
+        use super::regional_news::{EventKind, Site};
+        // Only the local source is read at commit. The destination quota in
+        // revision 29 comes from the carrier's own fresh observation/report.
+        let situated = self.regional_news().is_some();
+        let known_depot = self.known_stock(id, Site::PinefordDepot);
+        let known_market = self.known_stock(id, Site::WillowfordMarket);
         let npc = self.npcs.get_mut(&id).expect("frontier actor");
         let f = self.frontier.as_mut().expect("expanded rules");
         let r = self.region.as_mut().expect("regional rules");
         // All transfers are commit-time, from one physical inventory to another.
         // A shipment already loaded is delivered even if demand has since changed.
-        match goal {
+        let event = match goal {
             Goal::GatherFrontier => {
-                let count = f
-                    .grove_herbs
-                    .min(CARAVAN_LOAD)
-                    .min(DEPOT_TARGET.saturating_sub(f.depot_herbs));
+                let demand = if situated {
+                    known_depot.map_or(0, |stock| DEPOT_TARGET.saturating_sub(stock))
+                } else {
+                    DEPOT_TARGET.saturating_sub(f.depot_herbs)
+                };
+                let count = f.grove_herbs.min(CARAVAN_LOAD).min(demand);
                 f.grove_herbs -= count;
                 npc.herbs += count;
+                (Site::PinefordGrove, EventKind::Harvested, count)
             }
             Goal::StockFrontierDepot => {
                 f.depot_herbs += npc.herbs;
                 f.stocked += npc.herbs;
+                let count = npc.herbs;
                 npc.herbs = 0;
+                (Site::PinefordDepot, EventKind::DepotStocked, count)
             }
             Goal::CollectFrontierFreight => {
+                let target = content::MARKET_TARGET + WILLOWFORD_BUFFER;
+                let demand = if situated {
+                    known_market.map_or(0, |stock| target.saturating_sub(stock))
+                } else {
+                    target.saturating_sub(r.market_herbs)
+                };
                 let count = f
                     .depot_herbs
                     .saturating_sub(DEPOT_RESERVE)
                     .min(CARAVAN_LOAD)
-                    .min(
-                        (content::MARKET_TARGET + WILLOWFORD_BUFFER).saturating_sub(r.market_herbs),
-                    );
+                    .min(demand);
                 f.depot_herbs -= count;
                 npc.herbs += count;
+                (Site::PinefordDepot, EventKind::FreightLoaded, count)
             }
             Goal::DeliverFrontierFreight => {
                 r.market_herbs += npc.herbs;
                 f.shipped_to_willowford += npc.herbs;
+                let count = npc.herbs;
                 npc.herbs = 0;
+                (Site::WillowfordMarket, EventKind::FreightArrived, count)
             }
             _ => unreachable!(),
+        };
+        if event.2 > 0 {
+            self.record_regional_event(event.0, event.1, Some(id), event.2);
         }
     }
 }

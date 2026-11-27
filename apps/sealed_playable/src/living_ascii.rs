@@ -28,6 +28,7 @@ pub(crate) struct Session {
     pub(crate) notice: String,
     pub(crate) locale: Locale,
     debug_world: bool,
+    news_cursor: usize,
 }
 
 impl Session {
@@ -38,11 +39,14 @@ impl Session {
             notice: String::new(),
             locale: Locale::default(),
             debug_world: false,
+            news_cursor: 0,
         }
     }
 
     fn new_seeded_world(&self, seed: u32) -> World {
-        if self.world.checkpoint_revision() == 28 {
+        if self.world.checkpoint_revision() == 29 {
+            World::regional_knowledge_campaign(seed)
+        } else if self.world.checkpoint_revision() == 28 {
             World::expanded_riverlands(seed)
         } else if self.world.checkpoint_revision() == 27 {
             World::generated_riverlands(seed)
@@ -1071,6 +1075,36 @@ impl Session {
                 };
                 return true;
             }
+            "news" if self.world.regional_news().is_some() => {
+                self.notice = self.regional_news_lines().join("\n");
+                return true;
+            }
+            "newsnext" if self.world.regional_news().is_some() => {
+                let lines = self.regional_news_lines();
+                let page = self.news_cursor % lines.len();
+                let line = &lines[page];
+                let short = line
+                    .split_once(" | ")
+                    .map_or_else(|| line.clone(), |(first, rest)| format!("{first}\n{rest}"));
+                self.notice = format!("{}/{}  {}", page + 1, lines.len(), short);
+                self.news_cursor = (page + 1) % lines.len();
+                return true;
+            }
+            "chronicle" if self.world.regional_news().is_some() && self.debug_world => {
+                let news = self.world.regional_news().unwrap();
+                self.notice = news
+                    .events()
+                    .iter()
+                    .rev()
+                    .take(16)
+                    .map(|event| self.regional_event_line(event, None))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if self.notice.is_empty() {
+                    self.notice = living_text(self.locale, "living.regional.empty").into();
+                }
+                return true;
+            }
             "survey" if self.world.generated_region().is_some() => {
                 self.notice = self.survey();
                 return true;
@@ -1191,6 +1225,11 @@ impl Session {
                     self.notice.push(' ');
                     self.notice
                         .push_str(living_text(self.locale, "living.expansion.help"));
+                }
+                if self.world.regional_news().is_some() {
+                    self.notice.push(' ');
+                    self.notice
+                        .push_str(living_text(self.locale, "living.regional.help"));
                 }
                 return true;
             }
@@ -1718,6 +1757,120 @@ impl Session {
     }
 
     /// Both presentation modes project the same observation rules.
+    fn regional_site_name(&self, site: sealed_sim::living::regional_news::Site) -> &'static str {
+        use sealed_sim::living::regional_news::Site;
+        living_text(
+            self.locale,
+            match site {
+                Site::QingheShrine => "living.regional.site.shrine",
+                Site::WillowfordMarket => "living.regional.site.market",
+                Site::PinefordDepot => "living.regional.site.depot",
+                Site::PinefordGrove => "living.regional.site.grove",
+            },
+        )
+    }
+
+    fn regional_source(&self, r: sealed_sim::living::regional_news::Receipt) -> String {
+        if let Some(sender) = r.via {
+            living_format(
+                self.locale,
+                "living.regional.reported",
+                &[
+                    ("sender", actor_name(self.locale, &self.world, sender)),
+                    ("origin", actor_name(self.locale, &self.world, r.origin)),
+                    ("hops", &r.hops.to_string()),
+                ],
+            )
+        } else {
+            living_text(self.locale, "living.regional.observed").into()
+        }
+    }
+
+    fn regional_event_line(
+        &self,
+        event: &sealed_sim::living::regional_news::RegionalEvent,
+        receipt: Option<sealed_sim::living::regional_news::Receipt>,
+    ) -> String {
+        use sealed_sim::living::regional_news::EventKind;
+        let kind = living_text(
+            self.locale,
+            match event.kind {
+                EventKind::Shortage => "living.regional.event.shortage",
+                EventKind::Recovered => "living.regional.event.recovered",
+                EventKind::Harvested => "living.regional.event.harvested",
+                EventKind::DepotStocked => "living.regional.event.stocked",
+                EventKind::FreightLoaded => "living.regional.event.loaded",
+                EventKind::FreightArrived => "living.regional.event.arrived",
+                EventKind::Bought => "living.regional.event.bought",
+                EventKind::Sold => "living.regional.event.sold",
+                EventKind::MarketStocked => "living.regional.event.market_stocked",
+                EventKind::ShrineContributed => "living.regional.event.shrine_contributed",
+            },
+        );
+        let actor = event
+            .actor
+            .map_or("-", |a| actor_name(self.locale, &self.world, a));
+        let source = receipt.map_or_else(
+            || living_text(self.locale, "living.regional.developer").into(),
+            |r| self.regional_source(r),
+        );
+        living_format(
+            self.locale,
+            "living.regional.event.line",
+            &[
+                ("id", &event.id.to_string()),
+                ("tick", &event.at.to_string()),
+                ("site", self.regional_site_name(event.site)),
+                ("kind", kind),
+                ("amount", &event.amount.to_string()),
+                ("actor", actor),
+                ("source", &source),
+            ],
+        )
+    }
+
+    pub(crate) fn regional_news_lines(&self) -> Vec<String> {
+        use sealed_sim::living::regional_news::{STOCK_LIFETIME, Site};
+        let Some(news) = self.world.regional_news() else {
+            return vec![living_text(self.locale, "living.regional.empty").into()];
+        };
+        let mut lines = Vec::new();
+        for site in Site::ALL {
+            let Some(k) = news.stock(PLAYER, site) else {
+                continue;
+            };
+            let freshness = living_text(
+                self.locale,
+                if k.receipt.fresh(self.world.tick(), STOCK_LIFETIME) {
+                    "living.regional.fresh"
+                } else {
+                    "living.regional.stale"
+                },
+            );
+            lines.push(living_format(
+                self.locale,
+                "living.regional.stock.line",
+                &[
+                    ("site", self.regional_site_name(site)),
+                    ("stock", &k.amount.to_string()),
+                    ("tick", &k.receipt.observed_at.to_string()),
+                    ("source", &self.regional_source(k.receipt)),
+                    ("freshness", freshness),
+                ],
+            ));
+        }
+        lines.extend(
+            news.known_events(PLAYER)
+                .rev()
+                .take(6)
+                .map(|(event, r)| self.regional_event_line(event, Some(r))),
+        );
+        if lines.is_empty() {
+            lines.push(living_text(self.locale, "living.regional.empty").into());
+        }
+        lines
+    }
+
     fn survey(&self) -> String {
         use sealed_sim::living::worldgen::Terrain;
         let player = self.world.player();
@@ -2981,6 +3134,8 @@ fn goal_label(locale: Locale, goal: Goal) -> &'static str {
         Goal::StockFrontierDepot => "living.expansion.goal.stock",
         Goal::CollectFrontierFreight => "living.expansion.goal.collect",
         Goal::DeliverFrontierFreight => "living.expansion.goal.deliver",
+        Goal::SurveyWillowford => "living.regional.goal.survey_market",
+        Goal::SurveyPinefordDepot => "living.regional.goal.survey_depot",
         Goal::Report { .. } => "living.ascii.goal_label.seeking_someone_to_report_to",
         Goal::Retreat => "living.ascii.goal_label.retreating",
         Goal::Retaliate => "living.ascii.goal_label.retaliating",
@@ -3527,6 +3682,7 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         26 => "checkpoint.c351",
         27 => "checkpoint.c40",
         28 => "checkpoint.c41",
+        29 => "checkpoint.c42",
         _ => unreachable!("unsupported campaign revision"),
     });
     let mut session = Session::new(path);
@@ -3555,10 +3711,22 @@ pub(crate) fn campaign_session(debug_world: bool, revision: u16) -> Session {
         26 => World::duty_coherence_campaign(0),
         27 => World::generated_riverlands(0),
         28 => World::expanded_riverlands(0),
+        29 => World::regional_knowledge_campaign(0),
         _ => unreachable!("unsupported campaign revision"),
     };
     session.debug_world = debug_world;
     session
+}
+
+pub(crate) fn knowledge_session(seed: u32, debug_world: bool) -> Session {
+    let mut session = campaign_session(debug_world, 29);
+    if seed != 0 {
+        session.world = World::regional_knowledge_campaign(seed);
+    }
+    session
+}
+pub(crate) fn run_knowledge_campaign(seed: u32, debug_world: bool) {
+    run_session(knowledge_session(seed, debug_world));
 }
 
 pub(crate) fn expanded_session(seed: u32, debug_world: bool) -> Session {

@@ -3902,6 +3902,182 @@
     "parameters": {},
     "surface": "living_pixel.rs"
   },
+  "living.regional.developer": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.empty": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.arrived": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.bought": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.harvested": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.line": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {
+      "actor": "regional event or dated knowledge field",
+      "amount": "regional event or dated knowledge field",
+      "id": "regional event or dated knowledge field",
+      "kind": "regional event or dated knowledge field",
+      "site": "regional event or dated knowledge field",
+      "source": "regional event or dated knowledge field",
+      "tick": "regional event or dated knowledge field"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.loaded": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.market_stocked": {
+    "active": true,
+    "context": "C4.2 committed regional event",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.recovered": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.shortage": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.shrine_contributed": {
+    "active": true,
+    "context": "C4.2 committed regional event",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.sold": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.event.stocked": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.fresh": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.goal.survey_depot": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.goal.survey_market": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.help": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.observed": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.pixel.hint": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {
+      "seed": "regional event or dated knowledge field"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.reported": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {
+      "hops": "regional event or dated knowledge field",
+      "origin": "regional event or dated knowledge field",
+      "sender": "regional event or dated knowledge field"
+    },
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.site.depot": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.site.grove": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.site.market": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.site.shrine": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.stale": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {},
+    "surface": "living_ascii.rs"
+  },
+  "living.regional.stock.line": {
+    "active": true,
+    "context": "C4.2 dated regional evidence; not live remote stock",
+    "parameters": {
+      "freshness": "regional event or dated knowledge field",
+      "site": "regional event or dated knowledge field",
+      "source": "regional event or dated knowledge field",
+      "stock": "regional event or dated knowledge field",
+      "tick": "regional event or dated knowledge field"
+    },
+    "surface": "living_ascii.rs"
+  },
   "living.reset.ok": {
     "active": true,
     "context": "reset / ok",

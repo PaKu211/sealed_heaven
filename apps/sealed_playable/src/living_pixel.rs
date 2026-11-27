@@ -6,7 +6,10 @@ use sealed_sim::living::{ActorId, BREATH_MASTERY, MAX_QI, Position, Region};
 
 use crate::{
     clock,
-    living_ascii::{Session, campaign_session, expanded_session, generated_session, outcome_label},
+    living_ascii::{
+        Session, campaign_session, expanded_session, generated_session, knowledge_session,
+        outcome_label,
+    },
     locale::Locale,
     locale_living::{living_format, living_text},
 };
@@ -37,6 +40,10 @@ pub(crate) fn run_generated(seed: u32) {
 
 pub(crate) fn run_expanded(seed: u32) {
     run_session(expanded_session(seed, false));
+}
+
+pub(crate) fn run_knowledge(seed: u32) {
+    run_session(knowledge_session(seed, false));
 }
 
 fn run_session(session: Session) {
@@ -119,6 +126,8 @@ fn keyboard(
         }
     } else if keys.just_pressed(KeyCode::F2) && game.session.world.generated_region().is_some() {
         game.session.input("survey");
+    } else if keys.just_pressed(KeyCode::F3) && game.session.world.regional_news().is_some() {
+        game.session.input("newsnext");
     } else if keys.just_pressed(KeyCode::KeyT) {
         let nearby = nearby(&game.session);
         let next = nearby
@@ -240,7 +249,11 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
             &mut commands,
             living_format(
                 session.locale,
-                "living.worldgen.pixel.hint",
+                if world.regional_news().is_some() {
+                    "living.regional.pixel.hint"
+                } else {
+                    "living.worldgen.pixel.hint"
+                },
                 &[("seed", &map.seed().to_string())],
             ),
             190.0,
@@ -339,7 +352,12 @@ fn draw(mut commands: Commands, game: Res<Game>, previous: Query<Entity, With<Pr
     } else {
         session.notice.clone()
     };
-    label(&mut commands, message, -171.0, 16.0, INK);
+    let message_size = if world.regional_news().is_some() && message.contains('\n') {
+        14.0
+    } else {
+        16.0
+    };
+    label(&mut commands, message, -171.0, message_size, INK);
     let nearby = nearby(session);
     let target = game
         .target
@@ -693,6 +711,120 @@ mod tests {
             .press(KeyCode::Tab);
         app.update();
         assert!(text(&mut app).contains("Depot Pineford:"));
+        assert_eq!(
+            app.world().resource::<Game>().session.world.checkpoint(),
+            before
+        );
+    }
+
+    #[test]
+    fn regional_pixel_news_pages_are_localized_read_only_and_never_reveal_remote_history() {
+        use sealed_sim::living::{Direction, Intent, PLAYER, regional_news::Site};
+        use std::collections::{BTreeSet, VecDeque};
+        let mut session = knowledge_session(7, false);
+        assert!(session.regional_news_lines()[0].contains("No regional knowledge"));
+        let target = session.world.scenario().shrine;
+        for _ in 0..100 {
+            let start = session.world.player().position;
+            if start.x.abs_diff(target.x) + start.y.abs_diff(target.y) <= 1 {
+                break;
+            }
+            let mut q = VecDeque::from([(start, None)]);
+            let mut seen = BTreeSet::from([start]);
+            let mut choice = None;
+            while let Some((at, first)) = q.pop_front() {
+                if at.x.abs_diff(target.x) + at.y.abs_diff(target.y) <= 1 {
+                    choice = first;
+                    break;
+                }
+                for (d, x, y) in [
+                    (Direction::North, Some(at.x), at.y.checked_sub(1)),
+                    (Direction::East, at.x.checked_add(1), Some(at.y)),
+                    (Direction::South, Some(at.x), at.y.checked_add(1)),
+                    (Direction::West, at.x.checked_sub(1), Some(at.y)),
+                ] {
+                    let (Some(x), Some(y)) = (x, y) else {
+                        continue;
+                    };
+                    let p = Position { x, y };
+                    if !session.world.walkable(p)
+                        || session.world.npcs().any(|n| n.alive() && n.position == p)
+                        || !seen.insert(p)
+                    {
+                        continue;
+                    }
+                    q.push_back((p, first.or(Some(d))));
+                }
+            }
+            session
+                .world
+                .step(
+                    session.world.tick(),
+                    choice.map_or(Intent::Wait, Intent::Move),
+                )
+                .unwrap();
+        }
+        assert!(
+            session
+                .world
+                .regional_news()
+                .unwrap()
+                .stock(PLAYER, Site::QingheShrine)
+                .is_some()
+        );
+        for _ in 0..150 {
+            session
+                .world
+                .step(session.world.tick(), Intent::Wait)
+                .unwrap();
+        }
+        let before = session.world.checkpoint();
+        let mut app = App::new();
+        app.insert_resource(Game {
+            session,
+            target: None,
+        })
+        .init_resource::<ButtonInput<KeyCode>>()
+        .add_systems(Update, (keyboard, draw).chain());
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.update();
+        let text = |app: &mut App| {
+            let mut q = app.world_mut().query::<&Text2d>();
+            q.iter(app.world())
+                .map(|t| t.0.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert!(text(&mut app).contains("F3: known regional news"));
+        let press = |app: &mut App, key| {
+            let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            keys.clear();
+            keys.release(key);
+            keys.press(key);
+            app.update();
+        };
+        let len = app
+            .world()
+            .resource::<Game>()
+            .session
+            .regional_news_lines()
+            .len();
+        for _ in 0..len {
+            press(&mut app, KeyCode::F3);
+            let value = text(&mut app);
+            assert!(
+                !value.contains("developer record")
+                    && !value.contains("Pineford depot:")
+                    && !value.contains("Willowford market:")
+            );
+        }
+        press(&mut app, KeyCode::F3);
+        assert!(text(&mut app).contains("Qinghe shrine:"));
+        press(&mut app, KeyCode::Tab);
+        assert!(text(&mut app).contains("F3: kabar regional"));
+        for _ in 0..len {
+            press(&mut app, KeyCode::F3);
+        }
         assert_eq!(
             app.world().resource::<Game>().session.world.checkpoint(),
             before

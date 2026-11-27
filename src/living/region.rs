@@ -233,6 +233,16 @@ impl World {
             region.coins += quote.sell;
             quote.sell
         };
+        self.record_regional_event(
+            super::regional_news::Site::WillowfordMarket,
+            if buying {
+                super::regional_news::EventKind::Bought
+            } else {
+                super::regional_news::EventKind::Sold
+            },
+            Some(PLAYER),
+            1,
+        );
         Ok(Outcome::Traded {
             bought: buying,
             coins,
@@ -361,6 +371,14 @@ impl World {
             amount
         };
         self.npcs.get_mut(&id).expect("regional worker").herbs += amount;
+        if !east_grower && amount > 0 {
+            self.record_regional_event(
+                super::regional_news::Site::WillowfordMarket,
+                super::regional_news::EventKind::FreightLoaded,
+                Some(id),
+                amount,
+            );
+        }
     }
 
     pub(super) fn unload_regional_cargo(&mut self, id: ActorId, east_grower: bool) {
@@ -372,6 +390,16 @@ impl World {
             self.supply.shrine += amount;
             self.supply.npc_deliveries += amount;
             region.shipped_to_qinghe += amount;
+        }
+
+        if amount > 0 {
+            use super::regional_news::{EventKind, Site};
+            let (site, kind) = if east_grower {
+                (Site::WillowfordMarket, EventKind::MarketStocked)
+            } else {
+                (Site::QingheShrine, EventKind::FreightArrived)
+            };
+            self.record_regional_event(site, kind, Some(id), amount);
         }
     }
 }

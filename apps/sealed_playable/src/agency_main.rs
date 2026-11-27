@@ -16,7 +16,7 @@ fn main() {
     if options.iter().any(|arg| {
         matches!(
             arg.as_str(),
-            "--worldgen-info" | "--expansion-info" | "--c40" | "--c41"
+            "--worldgen-info" | "--expansion-info" | "--c40" | "--c41" | "--c42"
         )
     }) {
         let result = if options.iter().any(|arg| arg == "--worldgen-info") {

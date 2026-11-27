@@ -500,6 +500,7 @@ impl World {
                     | super::Rules::DutyCoherence
                     | super::Rules::GeneratedRiverlands
                     | super::Rules::ExpandedRiverlands
+                    | super::Rules::RegionalKnowledge
             )
             && self.contested().is_some_and(|state| state.wards > 0)
         {

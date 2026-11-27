@@ -64,6 +64,7 @@ pub(super) fn revision(rules: Rules) -> u16 {
         Rules::DutyCoherence => 26,
         Rules::GeneratedRiverlands => super::worldgen::GENERATED_REVISION,
         Rules::ExpandedRiverlands => super::expansion::REVISION,
+        Rules::RegionalKnowledge => super::regional_news::REVISION,
     }
 }
 
@@ -122,6 +123,7 @@ pub(super) fn decode(bytes: &[u8], scenario: &'static Scenario) -> Result<World,
         26 => Rules::DutyCoherence,
         super::worldgen::GENERATED_REVISION => Rules::GeneratedRiverlands,
         super::expansion::REVISION => Rules::ExpandedRiverlands,
+        super::regional_news::REVISION => Rules::RegionalKnowledge,
         revision => return Err(LoadError::UnsupportedRevision(revision)),
     };
     let turns = u32::from_le_bytes(bytes[46..50].try_into().unwrap()) as usize;
@@ -222,6 +224,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::Invite(actor)
@@ -253,6 +256,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::Provision(actor)
@@ -284,6 +288,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::Part(actor)
@@ -314,6 +319,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::OfferAccord
@@ -344,6 +350,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::SupportHall
@@ -373,6 +380,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::PledgeLodge
@@ -402,6 +410,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::AidLodge
@@ -431,6 +440,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::RenounceLodge
@@ -453,6 +463,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::Ask(actor)
@@ -475,6 +486,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::Examine
@@ -497,6 +509,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             let (to, event) = unpack_testimony(value);
@@ -519,6 +532,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::Take(actor)
@@ -538,6 +552,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             let (to, body) = unpack_testimony(value);
@@ -559,6 +574,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::ClaimLot(value)
@@ -576,6 +592,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             let (to, id) = unpack_testimony(value);
@@ -593,6 +610,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::AttuneLot(value)
@@ -609,6 +627,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::ChannelStrike(actor)
@@ -624,6 +643,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::Drill(actor)
@@ -639,6 +659,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::TechniqueStrike(actor)
@@ -661,6 +682,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::DrawQi
@@ -672,6 +694,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::CirculateQi
@@ -683,6 +706,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::MendMeridians
@@ -694,6 +718,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::TreatWounds
@@ -705,6 +730,7 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) =>
         {
             Intent::ClaimHallAllocation
@@ -716,7 +742,11 @@ fn read_intent(record: &[u8], rules: Rules) -> Result<Intent, LoadError> {
 fn bound_scenario_digest(world: &World) -> [u8; 32] {
     let authored = scenario_digest(world.scenario, world.rules);
     if let Some(map) = world.expanded_region() {
-        let mut bytes = b"SH:C41:SCENARIO:v1\0".to_vec();
+        let mut bytes = if world.rules == Rules::RegionalKnowledge {
+            b"SH:C42:SCENARIO:v1\0".to_vec()
+        } else {
+            b"SH:C41:SCENARIO:v1\0".to_vec()
+        };
         bytes.extend_from_slice(&authored);
         bytes.extend_from_slice(&super::expansion::GENERATOR_VERSION.to_le_bytes());
         bytes.extend_from_slice(super::content::CONTENT_SHA256.as_bytes());
@@ -767,6 +797,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
         Rules::DutyCoherence => b"SH:C10:RULES:v26".to_vec(),
         Rules::GeneratedRiverlands => b"SH:C10:RULES:v27".to_vec(),
         Rules::ExpandedRiverlands => b"SH:C10:RULES:v28".to_vec(),
+        Rules::RegionalKnowledge => b"SH:C10:RULES:v29".to_vec(),
     });
     out.u64(MAX_TICKS);
     out.string(scenario.name);
@@ -856,6 +887,7 @@ fn scenario_digest(scenario: &Scenario, rules: Rules) -> [u8; 32] {
             | Rules::DutyCoherence
             | Rules::GeneratedRiverlands
             | Rules::ExpandedRiverlands
+            | Rules::RegionalKnowledge
     ) {
         out.count(scenario.recruits.len());
         for &(actor, rule) in scenario.recruits {
@@ -900,6 +932,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
         Rules::DutyCoherence => b"SH:C10:STATE:v26".to_vec(),
         Rules::GeneratedRiverlands => b"SH:C10:STATE:v27".to_vec(),
         Rules::ExpandedRiverlands => b"SH:C10:STATE:v28".to_vec(),
+        Rules::RegionalKnowledge => b"SH:C10:STATE:v29".to_vec(),
     });
     out.0.extend(bound_scenario_digest(world));
     out.u64(world.tick);
@@ -1009,6 +1042,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
                 | Rules::ExpandedRiverlands
+                | Rules::RegionalKnowledge
         ) {
             out.u8(npc.packed_herbs);
         }
@@ -1087,6 +1121,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::DutyCoherence
             | Rules::GeneratedRiverlands
             | Rules::ExpandedRiverlands
+            | Rules::RegionalKnowledge
     ) {
         out.count(social.discoveries.len());
         for discovery in social.discoveries.values() {
@@ -1121,6 +1156,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                     | Rules::DutyCoherence
                     | Rules::GeneratedRiverlands
                     | Rules::ExpandedRiverlands
+                    | Rules::RegionalKnowledge
             ) {
                 out.u8(u8::from(discovery.prior_report.is_some()));
                 if let Some((at, source)) = discovery.prior_report {
@@ -1162,6 +1198,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             | Rules::DutyCoherence
             | Rules::GeneratedRiverlands
             | Rules::ExpandedRiverlands
+            | Rules::RegionalKnowledge
     ) {
         out.count(social.recovery_cargo.len());
         for (&actor, &herbs) in &social.recovery_cargo {
@@ -1244,6 +1281,7 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
                 | Rules::DutyCoherence
                 | Rules::GeneratedRiverlands
                 | Rules::ExpandedRiverlands
+                | Rules::RegionalKnowledge
         ) {
             out.u8(contested.wards);
             out.u8(contested.script_charges);
@@ -1390,6 +1428,11 @@ pub(super) fn state_digest(world: &World) -> [u8; 32] {
             out.u8(u8::from(event.witnessed));
         }
         out.u32(hierarchy.next_event);
+    }
+    if let Some(news) = world.regional_news() {
+        let bytes = news.canonical_bytes();
+        out.count(bytes.len());
+        out.0.extend(bytes);
     }
     out.count(world.journal.len());
     for &intent in &world.journal {
@@ -2024,6 +2067,8 @@ impl Wire {
             Goal::StockFrontierDepot => 51,
             Goal::CollectFrontierFreight => 52,
             Goal::DeliverFrontierFreight => 53,
+            Goal::SurveyWillowford => 54,
+            Goal::SurveyPinefordDepot => 55,
         });
         match goal {
             Goal::Treat(patient) => self.actor(patient),

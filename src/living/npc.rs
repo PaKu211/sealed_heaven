@@ -106,6 +106,8 @@ pub enum Goal {
     StockFrontierDepot,
     CollectFrontierFreight,
     DeliverFrontierFreight,
+    SurveyWillowford,
+    SurveyPinefordDepot,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -614,6 +616,8 @@ impl World {
             | Goal::StockFrontierDepot
             | Goal::CollectFrontierFreight
             | Goal::DeliverFrontierFreight => self.work_frontier(id, goal),
+            Goal::SurveyWillowford => self.travel(id, Region::sites().market, 1),
+            Goal::SurveyPinefordDepot => self.travel(id, super::expansion::DEPOT, 1),
             Goal::Retreat => self.retreat(id),
             Goal::TendClinic => self.travel(id, scenario.clinic, 0),
             Goal::SeekCare => self.travel(id, scenario.clinic, 1),
@@ -651,6 +655,14 @@ impl World {
                 self.supply.shrine += npc.herbs;
                 self.supply.npc_deliveries += npc.herbs;
                 self.npcs.get_mut(&id).expect("planned actor").herbs = 0;
+                if npc.herbs > 0 {
+                    self.record_regional_event(
+                        super::regional_news::Site::QingheShrine,
+                        super::regional_news::EventKind::ShrineContributed,
+                        Some(id),
+                        npc.herbs,
+                    );
+                }
             }
             Goal::DeliverHerbs => self.travel(id, scenario.shrine, 0),
             Goal::Treat(patient) if pos == scenario.clinic => {

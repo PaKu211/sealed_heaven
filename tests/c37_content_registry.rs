@@ -78,7 +78,11 @@ fn canonical_registry_is_pinned_and_order_independent_for_object_keys() {
             .overlay_sha256
             .is_none()
     );
-    assert!(content::identity_for_revision(29).is_none());
+    assert_eq!(
+        content::identity_for_revision(29),
+        content::identity_for_revision(28)
+    );
+    assert!(content::identity_for_revision(30).is_none());
 }
 #[test]
 fn duplicate_unknown_and_invalid_schema_fields_are_rejected() {

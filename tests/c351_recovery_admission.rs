@@ -59,7 +59,7 @@ fn historical_campaign_rejects_unsupported_information_intents_before_commit() {
 // a turn; a structural rejection must not mutate anything.
 #[test]
 fn every_admitted_intent_roundtrips_across_released_seeded_campaigns() {
-    let campaigns: [fn(u32) -> World; 26] = [
+    let campaigns: [fn(u32) -> World; 27] = [
         World::riverlands,
         World::reed_hall,
         World::road_company,
@@ -86,6 +86,7 @@ fn every_admitted_intent_roundtrips_across_released_seeded_campaigns() {
         World::duty_coherence_campaign,
         World::generated_riverlands,
         World::expanded_riverlands,
+        World::regional_knowledge_campaign,
     ];
     let actor = ActorId::new(1);
     let intents = [

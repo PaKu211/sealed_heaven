@@ -379,6 +379,8 @@ fn resumable(goal: Goal) -> bool {
             | Goal::StockFrontierDepot
             | Goal::CollectFrontierFreight
             | Goal::DeliverFrontierFreight
+            | Goal::SurveyWillowford
+            | Goal::SurveyPinefordDepot
     )
 }
 
@@ -399,7 +401,9 @@ pub(super) fn ambition_reason(npc: &Npc, goal: Goal) -> DecisionReason {
         Goal::GatherFrontier
         | Goal::StockFrontierDepot
         | Goal::CollectFrontierFreight
-        | Goal::DeliverFrontierFreight => DecisionReason::Livelihood,
+        | Goal::DeliverFrontierFreight
+        | Goal::SurveyWillowford
+        | Goal::SurveyPinefordDepot => DecisionReason::Livelihood,
         Goal::MartialPractice(_) | Goal::MartialRest => DecisionReason::MartialAmbition,
         Goal::MeridianDraw | Goal::MeridianCirculate | Goal::MeridianCare => {
             DecisionReason::Cultivation
